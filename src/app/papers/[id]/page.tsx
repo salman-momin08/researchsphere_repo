@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,21 +9,22 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, User, Users, Tag, CalendarDays, ShieldCheck, BarChart3, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle } from 'lucide-react';
+import { FileText, User, Users, Tag, CalendarDays, ShieldCheck, BarChart3, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
 import PaymentModal from '@/components/payment/PaymentModal';
-import { plagiarismCheck, PlagiarismCheckInput } from '@/ai/flows/plagiarism-check'; // For re-check, if needed
-import { acceptanceProbability, AcceptanceProbabilityInput } from '@/ai/flows/acceptance-probability'; // For re-check
+import { plagiarismCheck, PlagiarismCheckInput, PlagiarismCheckOutput } from '@/ai/flows/plagiarism-check';
+import { acceptanceProbability, AcceptanceProbabilityInput, AcceptanceProbabilityOutput } from '@/ai/flows/acceptance-probability';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
-// Extended mock data from dashboard, assuming these could be fetched by ID
+// Extended mock data with AI fields initially null
 const mockPapersDB: Paper[] = [
    {
-    id: "1", userId: "1", title: "The Future of AI in Academic Research", abstract: "This paper explores the potential impact of artificial intelligence on academic research methodologies and publication processes...",
+    id: "1", userId: "1", title: "The Future of AI in Academic Research", abstract: "This paper explores the potential impact of artificial intelligence on academic research methodologies and publication processes. It covers areas like automated literature reviews, AI-assisted writing and peer review, and the ethical implications of AI in academia.",
     authors: ["Dr. Alice Wonderland", "Dr. Bob The Builder"], keywords: ["AI", "Academia", "Future", "Research"],
     uploadDate: new Date("2023-10-15T10:00:00Z").toISOString(), status: "Accepted",
     plagiarismScore: 0.05, plagiarismReport: { highlightedSections: ["This specific phrase seems common.", "Another sentence here might be too similar."] },
@@ -32,25 +32,25 @@ const mockPapersDB: Paper[] = [
     fileName: "future_of_ai.pdf"
   },
   {
-    id: "2", userId: "1", title: "Quantum Computing: A New Paradigm", abstract: "An in-depth analysis of quantum computing principles and its applications in solving complex problems...",
+    id: "2", userId: "1", title: "Quantum Computing: A New Paradigm", abstract: "An in-depth analysis of quantum computing principles and its applications in solving complex problems such as drug discovery, materials science, and cryptography. The paper also discusses current challenges and future prospects of quantum technology.",
     authors: ["Dr. Jane Doe"], keywords: ["Quantum Computing", "Physics", "Technology"],
     uploadDate: new Date("2023-11-01T14:30:00Z").toISOString(), status: "Under Review",
-    plagiarismScore: 0.12, plagiarismReport: { highlightedSections: ["This definition of quantum bit is standard.", "The historical overview matches other sources."] },
-    acceptanceProbability: 0.60, acceptanceReport: { reasoning: "Solid research, but the novelty could be emphasized more. Some sections lack depth." },
+    plagiarismScore: null, plagiarismReport: null, // Initially null
+    acceptanceProbability: null, acceptanceReport: null, // Initially null
     fileName: "quantum_paradigm.docx"
   },
   {
     id: "3", userId: "1", title: "Sustainable Energy Solutions for Urban Environments",
-    abstract: "Investigating innovative sustainable energy solutions to address the growing demands of urban environments and mitigate climate change.",
+    abstract: "Investigating innovative sustainable energy solutions to address the growing demands of urban environments and mitigate climate change. This includes a review of solar, wind, and geothermal technologies, as well as smart grid implementations.",
     authors: ["Prof. John Smith", "Dr. Emily White"], keywords: ["Sustainability", "Urban Planning", "Renewable Energy", "Climate Change"],
     uploadDate: new Date("2024-01-20T09:15:00Z").toISOString(), status: "Payment Pending",
-    plagiarismScore: 0.08, plagiarismReport: { highlightedSections: ["Data on solar panel efficiency is widely cited."] },
-    acceptanceProbability: 0.72, acceptanceReport: { reasoning: "Relevant topic with good data analysis. The conclusion could be stronger." },
+    plagiarismScore: null, plagiarismReport: null,
+    acceptanceProbability: null, acceptanceReport: null,
     fileName: "sustainable_urban_energy.pdf"
   },
     {
     id: "4", userId: "1", title: "The Role of Gut Microbiota in Human Health",
-    abstract: "A comprehensive review of current research on the gut microbiota and its profound impact on various aspects of human health and disease.",
+    abstract: "A comprehensive review of current research on the gut microbiota and its profound impact on various aspects of human health and disease, including metabolism, immunity, and neurological function. Potential therapeutic interventions are also discussed.",
     authors: ["Dr. Sarah Miller", "Dr. Kevin Lee"], keywords: ["Microbiome", "Gut Health", "Immunology", "Medicine"],
     uploadDate: new Date("2024-02-10T16:45:00Z").toISOString(), status: "Action Required",
     adminFeedback: "Please address reviewer comments regarding the methodology section. Specifically, provide more details on the statistical analysis used and clarify the participant selection criteria.",
@@ -66,24 +66,63 @@ function PaperDetailsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const [paper, setPaper] = useState<Paper | null>(null);
+  
+  const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
   const [loadingPaper, setLoadingPaper] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [adminFeedbackText, setAdminFeedbackText] = useState("");
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
+  const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useState(false);
+  const [isCheckingAcceptance, setIsCheckingAcceptance] = useState(false);
+
 
   useEffect(() => {
     if (params.id) {
       setLoadingPaper(true);
-      // Simulate fetching paper by ID
       setTimeout(() => {
-        const foundPaper = mockPapersDB.find(p => p.id === params.id);
-        if (foundPaper && (foundPaper.userId === user?.id || isAdmin)) { // Security check
-          setPaper(foundPaper);
+        // Try to find in mock DB first
+        let foundPaper = mockPapersDB.find(p => p.id === params.id);
+
+        // If not found, and it's a newly submitted paper (e.g., from PaperUploadForm redirect)
+        // we create a temporary entry. This is a workaround for mock data.
+        // A real app would fetch directly from the database.
+        if (!foundPaper && params.id && user) {
+            const paperTitleFromStorage = localStorage.getItem(`newPaperTitle-${params.id}`);
+            const paperAbstractFromStorage = localStorage.getItem(`newPaperAbstract-${params.id}`);
+            const paperFileNameFromStorage = localStorage.getItem(`newPaperFileName-${params.id}`);
+            if (paperTitleFromStorage && paperAbstractFromStorage && paperFileNameFromStorage) {
+                 foundPaper = {
+                    id: params.id as string,
+                    userId: user.id, // Assume current user
+                    title: paperTitleFromStorage,
+                    abstract: paperAbstractFromStorage,
+                    authors: ["Author from Temp"], 
+                    keywords: ["temp", "keywords"],
+                    fileName: paperFileNameFromStorage,
+                    uploadDate: new Date().toISOString(),
+                    status: "Submitted",
+                    plagiarismScore: null,
+                    plagiarismReport: null,
+                    acceptanceProbability: null,
+                    acceptanceReport: null,
+                };
+                // Add to mock DB for consistency if other actions update it
+                if (!mockPapersDB.find(p => p.id === foundPaper!.id)) {
+                    mockPapersDB.push(foundPaper!);
+                }
+                localStorage.removeItem(`newPaperTitle-${params.id}`);
+                localStorage.removeItem(`newPaperAbstract-${params.id}`);
+                localStorage.removeItem(`newPaperFileName-${params.id}`);
+            }
+        }
+
+
+        if (foundPaper && (foundPaper.userId === user?.id || isAdmin)) {
+          setCurrentPaper(foundPaper);
           if(foundPaper.adminFeedback) setAdminFeedbackText(foundPaper.adminFeedback);
         } else {
-          setPaper(null); // Or redirect to 404/error
+          setCurrentPaper(null); 
         }
         setLoadingPaper(false);
       }, 1000);
@@ -91,15 +130,13 @@ function PaperDetailsContent() {
   }, [params.id, user, isAdmin]);
 
   useEffect(() => {
-    if (searchParams.get('action') === 'pay' && paper?.status === 'Payment Pending') {
+    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending') {
       setIsPaymentModalOpen(true);
     }
-  }, [searchParams, paper]);
+  }, [searchParams, currentPaper]);
 
   const handlePaymentSuccess = (paperId: string) => {
-    // Simulate updating paper status in the backend/mock data
-    setPaper(prev => prev ? { ...prev, status: 'Submitted', submissionDate: new Date().toISOString() } : null);
-    // Update mockDB (this is hacky for client-side mock)
+    setCurrentPaper(prev => prev ? { ...prev, status: 'Submitted', submissionDate: new Date().toISOString() } : null);
     const paperIndex = mockPapersDB.findIndex(p => p.id === paperId);
     if (paperIndex !== -1) {
       mockPapersDB[paperIndex].status = 'Submitted';
@@ -109,14 +146,12 @@ function PaperDetailsContent() {
   };
   
   const handleAdminFeedbackSubmit = async () => {
-    if (!paper || !isAdmin) return;
+    if (!currentPaper || !isAdmin) return;
     setIsSubmittingFeedback(true);
-    // Simulate saving feedback
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    setPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText, status: "Action Required" } : null);
-    // Update mockDB (hacky)
-    const paperIndex = mockPapersDB.findIndex(p => p.id === paper.id);
+    setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText, status: "Action Required" } : null);
+    const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
     if (paperIndex !== -1) {
       mockPapersDB[paperIndex].adminFeedback = adminFeedbackText;
       mockPapersDB[paperIndex].status = "Action Required";
@@ -126,15 +161,70 @@ function PaperDetailsContent() {
   };
 
   const handleStatusChange = async (newStatus: Paper['status']) => {
-    if (!paper || !isAdmin) return;
-    // Simulate updating status
+    if (!currentPaper || !isAdmin) return;
     await new Promise(resolve => setTimeout(resolve, 500));
-    setPaper(prev => prev ? { ...prev, status: newStatus } : null);
-    const paperIndex = mockPapersDB.findIndex(p => p.id === paper.id);
+    setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
+    const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
     if (paperIndex !== -1) {
       mockPapersDB[paperIndex].status = newStatus;
     }
     toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
+  };
+
+  const handleRunPlagiarismCheck = async () => {
+    if (!currentPaper || !currentPaper.abstract) {
+        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for plagiarism check." });
+        return;
+    }
+    setIsCheckingPlagiarism(true);
+    try {
+      const result = await plagiarismCheck({ documentText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
+      setCurrentPaper(prev => prev ? {
+        ...prev,
+        plagiarismScore: result.plagiarismScore,
+        plagiarismReport: { highlightedSections: result.highlightedSections }
+      } : null);
+      
+      const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+      if (paperIndex !== -1) {
+        mockPapersDB[paperIndex].plagiarismScore = result.plagiarismScore;
+        mockPapersDB[paperIndex].plagiarismReport = { highlightedSections: result.highlightedSections };
+      }
+      toast({ title: "Plagiarism Check Complete" });
+    } catch (error) {
+      console.error("Plagiarism check error:", error);
+      toast({ variant: "destructive", title: "Plagiarism Check Failed", description: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      setIsCheckingPlagiarism(false);
+    }
+  };
+
+  const handleRunAcceptanceCheck = async () => {
+    if (!currentPaper || !currentPaper.abstract) {
+        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for acceptance check." });
+        return;
+    }
+    setIsCheckingAcceptance(true);
+    try {
+      const result = await acceptanceProbability({ paperText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
+      setCurrentPaper(prev => prev ? {
+        ...prev,
+        acceptanceProbability: result.probabilityScore,
+        acceptanceReport: { reasoning: result.reasoning }
+      } : null);
+
+      const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+      if (paperIndex !== -1) {
+        mockPapersDB[paperIndex].acceptanceProbability = result.probabilityScore;
+        mockPapersDB[paperIndex].acceptanceReport = { reasoning: result.reasoning };
+      }
+      toast({ title: "Acceptance Probability Check Complete" });
+    } catch (error) {
+      console.error("Acceptance check error:", error);
+      toast({ variant: "destructive", title: "Acceptance Check Failed", description: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      setIsCheckingAcceptance(false);
+    }
   };
 
 
@@ -142,7 +232,7 @@ function PaperDetailsContent() {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
   }
 
-  if (!paper) {
+  if (!currentPaper) {
     return (
       <div className="container py-12 text-center px-4">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
@@ -154,7 +244,6 @@ function PaperDetailsContent() {
   }
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
-    // (Same as PaperListItem, can be utility)
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
       case 'Rejected': return 'destructive';
@@ -170,21 +259,21 @@ function PaperDetailsContent() {
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
             <div>
-              <Badge variant={getStatusBadgeVariant(paper.status)} className="mb-2">{paper.status}</Badge>
-              <CardTitle className="text-2xl md:text-3xl font-bold">{paper.title}</CardTitle>
+              <Badge variant={getStatusBadgeVariant(currentPaper.status)} className="mb-2">{currentPaper.status}</Badge>
+              <CardTitle className="text-2xl md:text-3xl font-bold">{currentPaper.title}</CardTitle>
               <CardDescription className="mt-1 text-md">
-                {paper.fileName ? (
-                  <span className="flex items-center"><FileText className="h-4 w-4 mr-2" />{paper.fileName}</span>
+                {currentPaper.fileName ? (
+                  <span className="flex items-center"><FileText className="h-4 w-4 mr-2" />{currentPaper.fileName}</span>
                 ) : "File information not available"}
               </CardDescription>
             </div>
-            {paper.status === 'Payment Pending' && !isAdmin && (
+            {currentPaper.status === 'Payment Pending' && !isAdmin && (
               <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                 <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
               </Button>
             )}
             {isAdmin && (
-                 <Button onClick={() => router.push(`/admin/dashboard?edit=${paper.id}`)} variant="outline" className="w-full md:w-auto">
+                 <Button onClick={() => router.push(`/admin/dashboard?edit=${currentPaper.id}`)} variant="outline" className="w-full md:w-auto">
                     <Edit className="mr-2 h-4 w-4" /> Manage Paper
                   </Button>
             )}
@@ -194,28 +283,49 @@ function PaperDetailsContent() {
           <div className="md:col-span-2 space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-2 flex items-center"><User className="h-5 w-5 mr-2 text-primary" />Abstract</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{paper.abstract}</p>
+              <p className="text-muted-foreground whitespace-pre-wrap">{currentPaper.abstract}</p>
             </div>
             
-            {paper.plagiarismReport && paper.plagiarismScore !== undefined && (
-                <PlagiarismReport result={{ plagiarismScore: paper.plagiarismScore, highlightedSections: paper.plagiarismReport.highlightedSections }} />
-            )}
-            {paper.acceptanceReport && paper.acceptanceProbability !== undefined && (
-                 <AcceptanceProbabilityReport result={{ probabilityScore: paper.acceptanceProbability, reasoning: paper.acceptanceReport.reasoning }} />
-            )}
+            <Separator />
 
-            {paper.adminFeedback && (
+            {/* AI Analysis Section */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                <Button onClick={handleRunPlagiarismCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                  {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                  {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Check' : 'Run Plagiarism Check'}
+                </Button>
+                <Button onClick={handleRunAcceptanceCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                  {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BarChart3 className="mr-2 h-4 w-4" />}
+                   {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Check' : 'Run Acceptance Check'}
+                </Button>
+              </div>
+
+              {currentPaper.plagiarismScore !== null && currentPaper.plagiarismReport && (
+                  <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
+              )}
+              {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
+                  <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
+              )}
+            </div>
+            
+            <Separator />
+
+            {currentPaper.adminFeedback && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Admin/Reviewer Feedback</h3>
-                <Alert variant={paper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
+                <Alert variant={currentPaper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Feedback Received</AlertTitle>
-                  <AlertDescription className="whitespace-pre-wrap">{paper.adminFeedback}</AlertDescription>
+                  <AlertDescription className="whitespace-pre-wrap">{currentPaper.adminFeedback}</AlertDescription>
                 </Alert>
               </div>
             )}
 
-            {isAdmin && !paper.adminFeedback && (
+            {isAdmin && !currentPaper.adminFeedback && (
               <div className="mt-6 p-4 border rounded-md">
                 <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
                 <Label htmlFor="adminFeedback">Feedback / Comments</Label>
@@ -241,10 +351,10 @@ function PaperDetailsContent() {
                     {(["Under Review", "Accepted", "Rejected", "Action Required", "Published"] as Paper['status'][]).map(statusOption => (
                       <Button 
                         key={statusOption}
-                        variant={paper.status === statusOption ? "default" : "outline"}
+                        variant={currentPaper.status === statusOption ? "default" : "outline"}
                         size="sm"
                         onClick={() => handleStatusChange(statusOption)}
-                        disabled={paper.status === statusOption}
+                        disabled={currentPaper.status === statusOption}
                       >
                         Mark as {statusOption}
                       </Button>
@@ -264,44 +374,43 @@ function PaperDetailsContent() {
                   <Users className="h-4 w-4 mr-2 mt-1 text-primary flex-shrink-0" />
                   <div>
                     <strong>Authors:</strong>&nbsp;
-                    <span className="text-muted-foreground">{paper.authors.join(', ')}</span>
+                    <span className="text-muted-foreground">{currentPaper.authors.join(', ')}</span>
                   </div>
                 </div>
                 <div className="flex items-start">
                   <Tag className="h-4 w-4 mr-2 mt-1 text-primary flex-shrink-0" />
                    <div>
                     <strong>Keywords:</strong>&nbsp;
-                    <span className="text-muted-foreground">{paper.keywords.join(', ')}</span>
+                    <span className="text-muted-foreground">{currentPaper.keywords.join(', ')}</span>
                   </div>
                 </div>
                 <div className="flex items-center">
                   <CalendarDays className="h-4 w-4 mr-2 text-primary" />
                   <strong>Uploaded:</strong>&nbsp;
-                  <span className="text-muted-foreground">{new Date(paper.uploadDate).toLocaleDateString()}</span>
+                  <span className="text-muted-foreground">{new Date(currentPaper.uploadDate).toLocaleDateString()}</span>
                 </div>
-                {paper.submissionDate && (
+                {currentPaper.submissionDate && (
                   <div className="flex items-center">
                     <CalendarDays className="h-4 w-4 mr-2 text-primary" />
                     <strong>Submitted:</strong>&nbsp;
-                    <span className="text-muted-foreground">{new Date(paper.submissionDate).toLocaleDateString()}</span>
+                    <span className="text-muted-foreground">{new Date(currentPaper.submissionDate).toLocaleDateString()}</span>
                   </div>
                 )}
                  <div className="flex items-center">
                   <FileText className="h-4 w-4 mr-2 text-primary" />
                   <strong>File:</strong>&nbsp;
                   {/* In real app, this would be a download link */}
-                  <span className="text-muted-foreground hover:underline cursor-pointer">{paper.fileName || 'View File'}</span>
+                  <span className="text-muted-foreground hover:underline cursor-pointer">{currentPaper.fileName || 'View File'}</span>
                 </div>
               </CardContent>
             </Card>
-            {/* Placeholder for version history or similar */}
           </aside>
         </CardContent>
       </Card>
       <PaymentModal 
         isOpen={isPaymentModalOpen} 
         onOpenChange={setIsPaymentModalOpen} 
-        paper={paper} 
+        paper={currentPaper} 
         onPaymentSuccess={handlePaymentSuccess} 
       />
     </div>
