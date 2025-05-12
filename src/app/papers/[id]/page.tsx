@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -79,13 +78,13 @@ function PaperDetailsContent() {
 
 
   useEffect(() => {
-    if (params.id && user) { // Ensure user is available for userId check
+    if (params.id && user) { 
       setLoadingPaper(true);
+      // Simulate API call or data fetching
       setTimeout(() => {
         let foundPaper = mockPapersDB.find(p => p.id === params.id);
 
         if (!foundPaper) {
-            // Attempt to retrieve from localStorage if it was a new submission
             const paperTitleFromStorage = localStorage.getItem(`newPaperTitle-${params.id}`);
             const paperAbstractFromStorage = localStorage.getItem(`newPaperAbstract-${params.id}`);
             const paperFileNameFromStorage = localStorage.getItem(`newPaperFileName-${params.id}`);
@@ -93,31 +92,27 @@ function PaperDetailsContent() {
             if (paperTitleFromStorage && paperAbstractFromStorage && paperFileNameFromStorage) {
                  foundPaper = {
                     id: params.id as string,
-                    userId: user.id, // Assume current user created it
+                    userId: user.id, 
                     title: paperTitleFromStorage,
                     abstract: paperAbstractFromStorage,
-                    // Provide default authors/keywords for mock purposes
                     authors: user.displayName ? [user.displayName] : ["Registered Author"], 
                     keywords: ["new", "submission"],
                     fileName: paperFileNameFromStorage,
                     uploadDate: new Date().toISOString(),
-                    status: "Submitted", // Default status for new paper
+                    status: "Submitted", 
                     plagiarismScore: null,
                     plagiarismReport: null,
                     acceptanceProbability: null,
                     acceptanceReport: null,
                 };
-                // Add to mock DB so it's "found" if user navigates away and back
                 if (!mockPapersDB.find(p => p.id === foundPaper!.id)) {
                     mockPapersDB.push(foundPaper!);
                 }
-                // Clean up localStorage after use
                 localStorage.removeItem(`newPaperTitle-${params.id}`);
                 localStorage.removeItem(`newPaperAbstract-${params.id}`);
                 localStorage.removeItem(`newPaperFileName-${params.id}`);
             }
         }
-
 
         if (foundPaper && (foundPaper.userId === user?.id || isAdmin)) {
           setCurrentPaper(foundPaper);
@@ -126,12 +121,16 @@ function PaperDetailsContent() {
           setCurrentPaper(null); 
         }
         setLoadingPaper(false);
-      }, 500); // Reduced timeout
-    } else if (!user && !loadingPaper) { // If user is not loaded yet, wait. If loaded and no user, deny.
-        setLoadingPaper(false); // To prevent infinite loading if user is null
-        setCurrentPaper(null);
+      }, 500); 
+    } else if (!user && loadingPaper) { 
+        // If user is null and we are still in initial loadingPaper state, wait for user.
+        // If user is null and loadingPaper became false (meaning an attempt was made), then set currentPaper to null.
+        // This case is mostly to prevent setting currentPaper to null if auth is just slow.
+    } else if (!user && !loadingPaper) {
+        setCurrentPaper(null); // User not available, and not initial load
+        setLoadingPaper(false);
     }
-  }, [params.id, user, isAdmin, loadingPaper]); // Added loadingPaper to dependencies
+  }, [params.id, user, isAdmin]); // Removed loadingPaper from dependencies
 
   useEffect(() => {
     if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending') {
@@ -437,3 +436,4 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
+
