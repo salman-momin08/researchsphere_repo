@@ -4,45 +4,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
+    // Users collection rules
     match /users/{userId} {
-      // Allow users to read their own profile if they are authenticated
+      // Allow users to read their own document.
       allow read: if request.auth != null && request.auth.uid == userId;
 
-      // Allow users to create their own profile document if they are authenticated
-      // and the document ID they are trying to create matches their UID.
-      // This is crucial for social sign-up where the profile is created after auth.
+      // Allow users to create their own document upon signup.
+      // Ensure the document ID matches the authenticated user's ID.
       allow create: if request.auth != null && request.auth.uid == userId;
 
-      // Allow users to update their own profile if they are authenticated
-      // and the document ID matches their UID.
-      // You might want to add more granular field-level validation here if needed
-      // (e.g., request.resource.data.email == resource.data.email to prevent email changes).
+      // Allow users to update their own document.
+      // You might want to add more granular field-level validation here
+      // (e.g., user cannot change their isAdmin status).
       allow update: if request.auth != null && request.auth.uid == userId;
 
-      // Generally, do not allow users to delete their own profile directly via client SDK for safety.
-      // Handle deletions via a backend function (e.g., Firebase Cloud Function) or an admin process if needed.
-      allow delete: if false; // Or specific admin role check: request.auth.token.admin == true
+      // Generally, disallow client-side deletion of user documents for safety.
+      // Deletion should be handled by admin tools or server-side functions if needed.
+      allow delete: if false;
     }
 
-    // Papers collection (example, adjust to your needs)
+    // Papers collection rules (example, adjust to your needs)
     match /papers/{paperId} {
-      // Allow authenticated users to read papers (adjust if public access is needed)
-      allow read: if request.auth != null; // Or allow read: if true; for public papers
+      // Allow authenticated users to create a paper if the paper's userId matches their auth uid.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
-      // Allow authenticated users to create papers if the paper's userId matches their UID
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Allow users to read their own papers.
+      // Allow users marked as admin (in their Firestore user document) to read any paper.
+      allow read: if request.auth != null &&
+                    (resource.data.userId == request.auth.uid ||
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
 
-      // Allow users to update their own papers
-      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Allow users to update their own papers.
+      // Allow users marked as admin to update any paper.
+      allow update: if request.auth != null &&
+                      (resource.data.userId == request.auth.uid ||
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
 
-      // Allow users to delete their own papers
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
-
-      // Potentially add admin override for papers
-      // allow read, write: if request.auth != null && request.auth.token.admin == true;
+      // Disallow client-side deletion of papers for now.
+      allow delete: if false;
     }
 
-    // Add rules for other collections as needed following similar principles.
+    // Add rules for other collections as needed.
+
+    // Default deny: By default, no one can read or write to any other path.
+    // This is important for security.
+    // match /{document=**} {
+    //   allow read, write: if false;
+    // }
+    // Note: The above default deny is implicit if no other rules match.
+    // It's good practice to be explicit if you have complex rules,
+    // but for now, focusing on /users and /papers is key.
   }
 }
