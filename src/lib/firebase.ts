@@ -14,7 +14,13 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Check if Firebase has already been initialized
+let app;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -25,3 +31,4 @@ export const googleAuthCredentialProvider = new GoogleAuthProvider();
 export const githubAuthCredentialProvider = new GithubAuthProvider();
 
 export default firebaseConfig;
+
