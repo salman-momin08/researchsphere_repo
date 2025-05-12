@@ -10,12 +10,12 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  signup: (data: SignupFormValues) => Promise<void>; // Updated signature
+  signup: (data: SignupFormValues) => Promise<void>; 
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithGitHub: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
-  updateUserProfile: (updatedData: { displayName: string }) => Promise<void>; // New function
+  updateUserProfile: (updatedData: Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>) => Promise<void>;
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
@@ -81,14 +81,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, _pass: string) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    let loggedInUser: User | undefined; // Ensure loggedInUser can be undefined initially
+    let loggedInUser: User | undefined; 
     if (email === MOCK_USER_ADMIN.email) {
       loggedInUser = MOCK_USER_ADMIN;
     } else if (email === MOCK_USER_NORMAL.email) {
       loggedInUser = MOCK_USER_NORMAL;
     }
      else {
-      // For other emails, create a basic user profile if not found in localStorage users
       const allUsers = [...mockExistingUsers];
       const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
       if (localUsersRaw) {
@@ -105,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    if (!loggedInUser) { // Check if a user was found or matched
+    if (!loggedInUser) { 
         setLoading(false);
         throw new Error("Invalid credentials. Please check your email and password.");
     }
@@ -114,15 +113,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
     setLoading(false);
     setShowLoginModal(false); 
-    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
-    localStorage.removeItem('redirectAfterLogin');
-    router.push(redirectPath);
+
+    const isProfileComplete = loggedInUser.username && loggedInUser.role;
+    if (!isProfileComplete) {
+      localStorage.setItem('profileIncomplete', 'true');
+      router.push('/profile/settings?complete=true');
+    } else {
+      localStorage.removeItem('profileIncomplete');
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
+      localStorage.removeItem('redirectAfterLogin');
+      router.push(redirectPath);
+    }
   };
 
   const signup = async (data: SignupFormValues) => {
     setLoading(true);
     
-    // Uniqueness check
     const allRegisteredUsers: User[] = [...mockExistingUsers];
     const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
     if (localUsersRaw) {
@@ -143,35 +149,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Email already registered. Please log in or use a different email.");
     }
 
-    // Simulate Firebase Auth user creation
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // In a real app, Firebase Auth would return a user object with a uid.
-    const userId = String(Date.now()); // Mock user ID
+    const userId = String(Date.now()); 
 
     const newUserProfile: User = {
       id: userId,
       email: data.email,
-      displayName: data.fullName, // Use fullName for displayName
+      displayName: data.fullName, 
       username: data.username,
       phoneNumber: data.phoneNumber || null,
       institution: data.institution || null,
-      role: data.role, // Role is "Author" or "Reviewer" from form
+      role: data.role, 
       researcherId: data.researcherId || null,
-      isAdmin: false, // New users are never admin by default
-      // photoURL could be set later
+      isAdmin: false, 
     };
 
-    // Simulate saving the full profile (e.g., to Firestore)
-    // For this mock, we update the AuthContext's user state and localStorage
     setUser(newUserProfile);
     localStorage.setItem('researchSphereUser', JSON.stringify(newUserProfile));
 
-    // Add to our list of "all users" in localStorage for persistence of mock data
     allRegisteredUsers.push(newUserProfile);
     localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
     
     setLoading(false);
     setShowLoginModal(false);
+    localStorage.removeItem('profileIncomplete'); // Profile is complete by definition on manual signup
     const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
     localStorage.removeItem('redirectAfterLogin');
     router.push(redirectPath);
@@ -182,7 +183,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 500));
     setUser(null);
     localStorage.removeItem('researchSphereUser');
-    localStorage.removeItem('redirectAfterLogin'); // Clear any pending redirect on logout
+    localStorage.removeItem('redirectAfterLogin'); 
+    localStorage.removeItem('profileIncomplete');
     setLoading(false);
     router.push('/'); 
   };
@@ -191,24 +193,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Create a more dynamic mock user for social login to avoid immediate collision with MOCK_USER_NORMAL
     const socialUserIdentifier = `${provider.toLowerCase()}-${Date.now().toString().slice(-5)}`;
-    const baseUser: User = {
-      id: socialUserIdentifier,
-      email: `${socialUserIdentifier}@example.com`,
-      displayName: `${provider} User ${socialUserIdentifier.slice(-4)}`,
-      username: socialUserIdentifier,
-      isAdmin: false,
-      role: 'Author', 
-    };
+    const socialUserEmail = `${socialUserIdentifier}@example.com`; // Mock email
+    const socialDisplayName = `${provider} User ${socialUserIdentifier.slice(-4)}`; // Mock display name
+    const socialPhotoURL = `https://picsum.photos/seed/${socialUserIdentifier}/40/40`; // Mock photo URL
 
-     // Check for uniqueness and add to localStorage for all users
-    let allRegisteredUsers: User[] = [...mockExistingUsers]; // Start with base mocks
+    let allRegisteredUsers: User[] = [...mockExistingUsers]; 
     const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
     if (localUsersRaw) {
         try {
             const localUsersParsed = JSON.parse(localUsersRaw) as User[];
-            // Merge ensuring no duplicates by ID
             const existingIds = new Set(allRegisteredUsers.map(u => u.id));
             localUsersParsed.forEach(lu => {
                 if (!existingIds.has(lu.id)) {
@@ -219,21 +213,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (e) { console.error("Error parsing local users for social login check", e); }
     }
     
-    // For social login, typically you'd get user info from the provider.
-    // Here, we simulate creating a new user or logging in an existing one if the email matches.
-    // This mock is simplified: it assumes a new user if email doesn't match MOCK_USER_NORMAL or MOCK_USER_ADMIN.
-    // A real app would handle linking accounts or more sophisticated existing user checks.
-    
     let loggedInUser: User | undefined;
-    // Example: if Google login email matches one of the core mock users, log them in
-    // This is a very basic check; real social auth is more complex.
-    if (provider === 'Google' && MOCK_USER_NORMAL.email === 'user@example.com' /* imagine this was the Google email */) {
-      // This is a contrived example. In reality, Firebase handles this.
-      // We're just picking one of the mock users to simulate a social login.
-      loggedInUser = MOCK_USER_NORMAL; 
+    // Simulate checking if this social user already exists (e.g., by email if provider guarantees uniqueness)
+    // For this mock, we assume a new user if the mock email doesn't match an existing user's email.
+    // A more robust mock might try to find by a "providerId" if we were storing that.
+    const existingSocialUser = allRegisteredUsers.find(u => u.email === socialUserEmail);
+
+    if (existingSocialUser) {
+      loggedInUser = existingSocialUser;
     } else {
       // Simulate new social user
-      loggedInUser = baseUser;
+      loggedInUser = {
+        id: socialUserIdentifier,
+        email: socialUserEmail,
+        displayName: socialDisplayName,
+        photoURL: socialPhotoURL,
+        isAdmin: false,
+        // These will be null for new social user, prompting completion
+        username: null, 
+        role: null, 
+        phoneNumber: null,
+        institution: null,
+        researcherId: null,
+      };
       if (!allRegisteredUsers.find(u => u.id === loggedInUser!.id)) {
         allRegisteredUsers.push(loggedInUser!);
         localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
@@ -244,9 +246,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
     setLoading(false);
     setShowLoginModal(false);
-    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
-    localStorage.removeItem('redirectAfterLogin');
-    router.push(redirectPath);
+
+    const isProfileComplete = loggedInUser.username && loggedInUser.role;
+
+    if (!isProfileComplete) {
+      localStorage.setItem('profileIncomplete', 'true');
+      router.push('/profile/settings?complete=true');
+    } else {
+      localStorage.removeItem('profileIncomplete');
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
+      localStorage.removeItem('redirectAfterLogin');
+      router.push(redirectPath);
+    }
   }
 
   const loginWithGoogle = () => loginWithSocial('Google');
@@ -255,42 +266,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const sendPasswordResetEmail = async (email: string) => {
     setLoading(true);
     console.log(`Mock password reset email requested for: ${email}`);
-    // Simulate API call (e.g., Firebase's sendPasswordResetEmail)
     await new Promise(resolve => setTimeout(resolve, 1500));
-    // In a real app, Firebase handles sending the email.
-    // No need to check if email exists; Firebase does this and for security,
-    // you typically don't confirm/deny if an email is registered on this form.
     setLoading(false);
-    // The UI will show a generic success message.
   };
 
-  const updateUserProfile = async (updatedData: { displayName: string }) => {
+  const updateUserProfile = async (updatedData: Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>) => {
     if (!user) {
       throw new Error("User not logged in.");
     }
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
 
-    const updatedUser = { ...user, displayName: updatedData.displayName };
+    // Uniqueness check for username if it's being changed or set
+    if (updatedData.username && updatedData.username !== user.username) {
+        const allUsersList = JSON.parse(localStorage.getItem('researchSphereAllUsers') || '[]') as User[];
+        if (allUsersList.some(u => u.username === updatedData.username && u.id !== user.id)) {
+            setLoading(false);
+            throw new Error("Username already taken. Please choose another one.");
+        }
+    }
+    
+    const updatedUser = { ...user, ...updatedData };
     setUser(updatedUser);
     localStorage.setItem('researchSphereUser', JSON.stringify(updatedUser));
 
-    // Update in the mock list of all users as well
     const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
-    let allUsers: User[] = [...mockExistingUsers];
+    let allUsers: User[] = [];
     if (localUsersRaw) {
         try {
             allUsers = JSON.parse(localUsersRaw) as User[];
-        } catch (e) { console.error("Failed to parse localUsersRaw for profile update", e); }
+        } catch (e) { console.error("Failed to parse localUsersRaw for profile update", e); allUsers = [...mockExistingUsers];}
+    } else {
+      allUsers = [...mockExistingUsers];
     }
+
     const userIndex = allUsers.findIndex(u => u.id === user.id);
     if (userIndex !== -1) {
         allUsers[userIndex] = updatedUser;
     } else {
-        // This case should ideally not happen if user is logged in and came from localStorage
-        allUsers.push(updatedUser);
+        allUsers.push(updatedUser); // Should not happen if user is logged in correctly
     }
     localStorage.setItem('researchSphereAllUsers', JSON.stringify(allUsers));
+
+    // If profile was incomplete, check if it's now complete
+    if (localStorage.getItem('profileIncomplete') === 'true') {
+        if (updatedUser.username && updatedUser.role) {
+            localStorage.removeItem('profileIncomplete');
+        }
+    }
 
     setLoading(false);
   };

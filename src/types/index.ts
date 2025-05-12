@@ -6,10 +6,10 @@ export interface User {
   isAdmin?: boolean; // For admin panel access
 
   // New fields from registration
-  username?: string;
+  username?: string | null; // Now can be null
   phoneNumber?: string | null;
   institution?: string | null;
-  role?: "Author" | "Reviewer" | "Admin"; // Role selected during registration or set by admin
+  role?: "Author" | "Reviewer" | "Admin" | null; // Now can be null
   researcherId?: string | null; // ORCID ID or other researcher ID
   // termsAccepted is usually for validation and not stored, but can be if needed for audit
 }
@@ -46,3 +46,4 @@ export interface Paper {
   adminFeedback?: string | null;
   submissionDate?: string | null; // ISO date string, after payment
 }
+
