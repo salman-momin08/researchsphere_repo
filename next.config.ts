@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    // Fix for Node.js-specific modules (like async_hooks, fs, tls)
+    // Fix for Node.js-specific modules (like async_hooks, fs, tls, net)
     // being incorrectly included in the client-side bundle.
     // By setting them to `false` in `resolve.fallback` for non-server builds,
     // we instruct Webpack (or Turbopack) to treat them as empty modules on the client,
@@ -30,7 +30,8 @@ const nextConfig: NextConfig = {
         ...config.resolve.fallback,
         async_hooks: false,
         fs: false, 
-        tls: false, // Add tls to fallback
+        tls: false,
+        net: false, // Add net to fallback
       };
     }
 
