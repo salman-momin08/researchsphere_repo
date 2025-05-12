@@ -3,23 +3,26 @@
 
 import type { User } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, SetStateAction, Dispatch } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import type { SignupFormValues } from '@/components/auth/SignupForm'; 
 import { 
-  auth as firebaseAuth, // renamed to avoid conflict with auth context variable
+  auth as firebaseAuth,
   db, 
   googleAuthCredentialProvider, 
   githubAuthCredentialProvider 
-} from '@/lib/firebase'; // Import real Firebase services
+} from '@/lib/firebase';
 import { 
   signInWithPopup, 
   signOut, 
   onAuthStateChanged,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   type UserCredential,
-  type User as FirebaseUser
+  type User as FirebaseUser,
+  signInWithEmailAndPassword, // Added for actual email/password login
+  createUserWithEmailAndPassword // Added for actual email/password signup
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { toast } from '@/hooks/use-toast'; // Ensured toast is imported
 
 interface AuthContextType {
   user: User | null;
@@ -38,39 +41,12 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data - can be phased out or used for specific mock scenarios if needed
-const MOCK_USER_NORMAL: User = {
-  id: 'mock-user-1',
-  email: 'user@example.com',
-  displayName: 'Mock Normal User',
-  isAdmin: false,
-  username: 'mocknormaluser',
-  phoneNumber: '+19876543210',
-  institution: 'University of Mock',
-  role: 'Author',
-  researcherId: '0000-0000-0000-0001',
-};
-
-const MOCK_USER_ADMIN: User = {
-  id: 'mock-user-admin',
-  email: 'admin@example.com',
-  displayName: 'Mock Admin User',
-  isAdmin: true,
-  username: 'mockadminuser',
-  phoneNumber: '+11234567890',
-  institution: 'ResearchSphere Admin Dept',
-  role: 'Admin',
-  researcherId: '0000-0000-0000-000X',
-};
-
-const mockExistingUsers: User[] = [MOCK_USER_NORMAL, MOCK_USER_ADMIN];
-
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
@@ -80,50 +56,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDocSnap.exists()) {
           const appUser = userDocSnap.data() as User;
           setUser(appUser);
-          localStorage.setItem('researchSphereUser', JSON.stringify(appUser));
-           // Check profile completeness for users logged in via onAuthStateChanged
+          // Check profile completeness for users logged in via onAuthStateChanged
           const isProfileComplete = appUser.username && appUser.role;
           if (!isProfileComplete) {
             localStorage.setItem('profileIncomplete', 'true');
-            if (router.pathname !== '/profile/settings') { // Avoid redirect loop
+            if (pathname !== '/profile/settings') { 
                  router.push('/profile/settings?complete=true');
             }
           } else {
             localStorage.removeItem('profileIncomplete');
           }
         } else {
-          // This case should ideally be handled during signup/social login if userDoc doesn't exist
-          // For now, if Firebase auth user exists but no Firestore doc, treat as partial profile
           const partialUser: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            isAdmin: false, // Default
+            isAdmin: false, 
             username: null,
-            role: null
+            role: null,
+            phoneNumber: firebaseUser.phoneNumber || null,
           };
+          await setDoc(userDocRef, partialUser); // Create the basic profile
           setUser(partialUser);
-          localStorage.setItem('researchSphereUser', JSON.stringify(partialUser));
           localStorage.setItem('profileIncomplete', 'true');
-           if (router.pathname !== '/profile/settings') {
+           if (pathname !== '/profile/settings') {
              router.push('/profile/settings?complete=true');
            }
         }
       } else {
         setUser(null);
-        localStorage.removeItem('researchSphereUser');
         localStorage.removeItem('profileIncomplete');
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
 
 
   const handleSuccessfulLogin = (appUser: User) => {
     setUser(appUser);
-    localStorage.setItem('researchSphereUser', JSON.stringify(appUser));
     setLoading(false);
     setShowLoginModal(false);
 
@@ -141,33 +113,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, pass: string) => {
     setLoading(true);
-     // This part still uses mock users for direct email/password login for simplicity
-    // For real Firebase email/password login, you'd use signInWithEmailAndPassword
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    let loggedInUser: User | undefined; 
-    if (email === MOCK_USER_ADMIN.email) {
-      loggedInUser = MOCK_USER_ADMIN;
-    } else if (email === MOCK_USER_NORMAL.email) {
-      loggedInUser = MOCK_USER_NORMAL;
-    } else { // Check local storage mock users
-      const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
-      if (localUsersRaw) {
-          const localUsersParsed = JSON.parse(localUsersRaw) as User[];
-          loggedInUser = localUsersParsed.find(u => u.email === email);
-      }
-    }
+    try {
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, pass);
+      const firebaseUser = userCredential.user;
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
 
-    if (!loggedInUser) { 
+      if (!userDocSnap.exists()) {
         setLoading(false);
-        throw new Error("Invalid credentials. Please check your email and password.");
+        throw new Error("User profile not found. Please contact support.");
+      }
+      const appUser = userDocSnap.data() as User;
+      handleSuccessfulLogin(appUser);
+    } catch (error) {
+      setLoading(false);
+      console.error("Login error:", error);
+      const firebaseError = error as { code?: string; message?: string };
+      let errorMessage = "An unknown error occurred during login.";
+      if (firebaseError.code) {
+        switch (firebaseError.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+            errorMessage = 'Invalid email or password.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          default:
+            errorMessage = firebaseError.message || errorMessage;
+        }
+      }
+      throw new Error(errorMessage);
     }
-    handleSuccessfulLogin(loggedInUser);
   };
 
   const signup = async (data: SignupFormValues) => {
     setLoading(true);
     
-    // Check for username and email uniqueness against Firestore
     const usersRef = collection(db, "users");
     const usernameQuery = query(usersRef, where("username", "==", data.username));
     const emailQuery = query(usersRef, where("email", "==", data.email));
@@ -186,41 +169,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("Email already registered. Please log in or use a different email.");
     }
     
-    // For this mock, we'll still use a local array for quick demo, but in real app this isn't needed
-    const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
-    let allRegisteredUsers: User[] = localUsersRaw ? JSON.parse(localUsersRaw) : [...mockExistingUsers];
+    try {
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+      const firebaseUser = userCredential.user;
 
+      const newUserProfile: User = {
+        id: firebaseUser.uid, 
+        email: data.email,
+        displayName: data.fullName, 
+        username: data.username,
+        phoneNumber: data.phoneNumber || null,
+        institution: data.institution || null,
+        role: data.role, 
+        researcherId: data.researcherId || null,
+        isAdmin: false, 
+        photoURL: firebaseUser.photoURL || null,
+      };
+      
+      await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile);
+      handleSuccessfulLogin(newUserProfile);
 
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network
-    const userId = String(Date.now()); // Mock ID generation
-
-    const newUserProfile: User = {
-      id: userId, // In real Firebase, this would be firebaseUser.uid
-      email: data.email,
-      displayName: data.fullName, 
-      username: data.username,
-      phoneNumber: data.phoneNumber || null,
-      institution: data.institution || null,
-      role: data.role, 
-      researcherId: data.researcherId || null,
-      isAdmin: false, 
-    };
-    
-    // Simulate saving to Firestore (in a real app, use setDoc with firebaseUser.uid)
-    // For mock, we add to our local storage list
-    if (!allRegisteredUsers.find(u => u.id === newUserProfile.id)) {
-        allRegisteredUsers.push(newUserProfile);
-        localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
+    } catch (error) {
+        setLoading(false);
+        console.error("Signup error:", error);
+        const firebaseError = error as { code?: string; message?: string };
+        let errorMessage = "An unknown error occurred during signup.";
+         if (firebaseError.code) {
+            switch (firebaseError.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'This email address is already in use.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Please enter a valid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Please choose a stronger one.';
+                break;
+            default:
+                errorMessage = firebaseError.message || errorMessage;
+            }
+        }
+        throw new Error(errorMessage);
     }
-    
-    handleSuccessfulLogin(newUserProfile);
   };
 
   const logout = async () => {
     setLoading(true);
-    await signOut(firebaseAuth); // Sign out from Firebase
+    await signOut(firebaseAuth); 
     setUser(null);
-    localStorage.removeItem('researchSphereUser');
     localStorage.removeItem('redirectAfterLogin'); 
     localStorage.removeItem('profileIncomplete');
     setLoading(false);
@@ -236,21 +232,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (userDocSnap.exists()) {
       appUser = userDocSnap.data() as User;
     } else {
-      // New social user, create a basic profile in Firestore
       appUser = {
         id: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
-        isAdmin: false, // Default for new users
-        username: null, // Indicates profile needs completion
-        role: null,     // Indicates profile needs completion
-        phoneNumber: firebaseUser.phoneNumber || null, // If provider gives it
+        isAdmin: false, 
+        username: null, 
+        role: null,     
+        phoneNumber: firebaseUser.phoneNumber || null, 
         institution: null,
         researcherId: null,
       };
       await setDoc(userDocRef, appUser);
-      userDocSnap = await getDoc(userDocRef); // Re-fetch to ensure we have the created doc
+      userDocSnap = await getDoc(userDocRef); 
       appUser = userDocSnap.data() as User;
     }
     handleSuccessfulLogin(appUser);
@@ -263,7 +258,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await processSocialLogin(credential);
     } catch (error) {
       console.error("Google login error:", error);
-      toast({ variant: "destructive", title: "Google Login Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === 'auth/cancelled-popup-request') {
+        toast({ variant: "default", title: "Login Cancelled", description: "Google Sign-In was cancelled." });
+      } else if (firebaseError.code === 'auth/popup-closed-by-user') {
+        toast({ variant: "default", title: "Login Cancelled", description: "Google Sign-In popup was closed." });
+      }
+       else {
+        toast({ variant: "destructive", title: "Google Login Failed", description: firebaseError.message || "An unknown error occurred." });
+      }
       setLoading(false);
     }
   };
@@ -272,11 +275,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       const credential = await signInWithPopup(firebaseAuth, githubAuthCredentialProvider);
-      // GitHub might not return email if not public; handle this if necessary
       await processSocialLogin(credential);
     } catch (error) {
       console.error("GitHub login error:", error);
-      toast({ variant: "destructive", title: "GitHub Login Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === 'auth/cancelled-popup-request') {
+        toast({ variant: "default", title: "Login Cancelled", description: "GitHub Sign-In was cancelled." });
+      } else if (firebaseError.code === 'auth/popup-closed-by-user') {
+         toast({ variant: "default", title: "Login Cancelled", description: "GitHub Sign-In popup was closed." });
+      }
+      else {
+        toast({ variant: "destructive", title: "GitHub Login Failed", description: firebaseError.message || "An unknown error occurred." });
+      }
       setLoading(false);
     }
   };
@@ -286,8 +296,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         await firebaseSendPasswordResetEmail(firebaseAuth, email);
     } catch (error) {
-        setLoading(false); // Ensure loading is set to false on error
-        throw error; // Re-throw to be caught by the calling component
+        setLoading(false); 
+        throw error; 
     }
     setLoading(false);
   };
@@ -300,7 +310,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const userDocRef = doc(db, "users", user.id);
 
-    // Check for username uniqueness if it's being changed
     if (updatedData.username && updatedData.username !== user.username) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("username", "==", updatedData.username));
@@ -311,14 +320,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     
-    await updateDoc(userDocRef, updatedData);
+    // Ensure only allowed fields are passed to updateDoc
+    const dataToUpdate: Partial<User> = {};
+    if (updatedData.displayName !== undefined) dataToUpdate.displayName = updatedData.displayName;
+    if (updatedData.username !== undefined) dataToUpdate.username = updatedData.username;
+    if (updatedData.role !== undefined) dataToUpdate.role = updatedData.role;
+    if (updatedData.phoneNumber !== undefined) dataToUpdate.phoneNumber = updatedData.phoneNumber;
+    if (updatedData.institution !== undefined) dataToUpdate.institution = updatedData.institution;
+    if (updatedData.researcherId !== undefined) dataToUpdate.researcherId = updatedData.researcherId;
+
+    await updateDoc(userDocRef, dataToUpdate);
     
-    // Fetch the updated user document to ensure local state is in sync
     const updatedUserDoc = await getDoc(userDocRef);
+    if (!updatedUserDoc.exists()) {
+      setLoading(false);
+      throw new Error("Failed to retrieve updated user profile.");
+    }
     const updatedUser = updatedUserDoc.data() as User;
     
-    setUser(updatedUser); // Update context state
-    localStorage.setItem('researchSphereUser', JSON.stringify(updatedUser)); // Update local storage
+    setUser(updatedUser); 
 
     if (localStorage.getItem('profileIncomplete') === 'true') {
         if (updatedUser.username && updatedUser.role) {
@@ -336,3 +356,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
