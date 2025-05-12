@@ -4,55 +4,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection rules
+    // Users Collection:
+    // - Authenticated users can create their own user document upon signup.
+    // - Authenticated users can read, update, and delete their own user document.
+    // - No one else can read/write other users' documents unless they are an admin (admin rule not explicitly shown here for users collection, typically admins use trusted server environments or specific admin roles).
     match /users/{userId} {
-      // Allow users to read their own document.
-      allow read: if request.auth != null && request.auth.uid == userId;
-
-      // Allow users to create their own document upon signup.
-      // Ensure the document ID matches the authenticated user's ID.
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId;
-
-      // Allow users to update their own document.
-      // You might want to add more granular field-level validation here
-      // (e.g., user cannot change their isAdmin status).
-      allow update: if request.auth != null && request.auth.uid == userId;
-
-      // Generally, disallow client-side deletion of user documents for safety.
-      // Deletion should be handled by admin tools or server-side functions if needed.
-      allow delete: if false;
     }
 
-    // Papers collection rules (example, adjust to your needs)
+    // Papers Collection (Example):
+    // - Authenticated users can create new papers.
+    // - Users can read their own papers.
+    // - Users can update or delete their own papers.
+    // - Admin users (identified by an 'isAdmin' field in their user document) can read, update, or delete any paper.
     match /papers/{paperId} {
-      // Allow authenticated users to create a paper if the paper's userId matches their auth uid.
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-
-      // Allow users to read their own papers.
-      // Allow users marked as admin (in their Firestore user document) to read any paper.
-      allow read: if request.auth != null &&
-                    (resource.data.userId == request.auth.uid ||
+      allow create: if request.auth != null;
+      
+      // Allow read if the user is the owner OR if the user is an admin
+      allow read: if request.auth != null && 
+                    (resource.data.userId == request.auth.uid || 
                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-
-      // Allow users to update their own papers.
-      // Allow users marked as admin to update any paper.
-      allow update: if request.auth != null &&
-                      (resource.data.userId == request.auth.uid ||
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-
-      // Disallow client-side deletion of papers for now.
-      allow delete: if false;
+      
+      // Allow update/delete if the user is the owner OR if the user is an admin
+      allow update, delete: if request.auth != null &&
+                              (resource.data.userId == request.auth.uid ||
+                               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
     }
 
-    // Add rules for other collections as needed.
-
-    // Default deny: By default, no one can read or write to any other path.
-    // This is important for security.
-    // match /{document=**} {
-    //   allow read, write: if false;
+    // Add rules for other collections as your application grows.
+    // For example, if you have a 'reviews' collection:
+    // match /reviews/{reviewId} {
+    //   // Define who can read/write reviews
     // }
-    // Note: The above default deny is implicit if no other rules match.
-    // It's good practice to be explicit if you have complex rules,
-    // but for now, focusing on /users and /papers is key.
   }
 }
