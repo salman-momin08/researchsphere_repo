@@ -1,4 +1,4 @@
-// use client";
+"use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
+import { Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const loginSchema = z.object({
@@ -96,6 +96,7 @@ export default function LoginForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {isLoading ? "Logging in..." : "Log In"}
       </Button>
     </form>

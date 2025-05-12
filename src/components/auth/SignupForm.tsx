@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UserPlus } from "lucide-react";
+import { Terminal, UserPlus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import type { User } from "@/types";
 
@@ -197,6 +197,7 @@ export default function SignupForm() {
       {form.formState.errors.termsAccepted && <p className="text-sm text-destructive mt-1">{form.formState.errors.termsAccepted.message}</p>}
 
       <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {isLoading ? "Creating account..." : "Create Account"}
       </Button>
     </form>
