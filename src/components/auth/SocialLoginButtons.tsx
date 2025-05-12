@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,10 @@ export default function SocialLoginButtons() {
         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Github className="mr-2 h-4 w-4" />}
         Continue with GitHub
       </Button>
+      <p className="text-xs text-muted-foreground text-center mt-2 px-2">
+        Please ensure popups are enabled in your browser for social sign-in to work correctly.
+      </p>
     </>
   );
 }
+

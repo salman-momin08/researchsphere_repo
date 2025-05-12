@@ -19,7 +19,8 @@ import {
   type UserCredential,
   type User as FirebaseUser,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  updateProfile as updateFirebaseProfile
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
@@ -58,6 +59,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (appUser.isAdmin === undefined) {
             appUser.isAdmin = false;
           }
+          // Sync Firebase Auth profile (displayName, photoURL) with Firestore user document if different
+          let firestoreUpdates: Partial<User> = {};
+          if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
+            firestoreUpdates.displayName = firebaseUser.displayName;
+          }
+          if (firebaseUser.photoURL && firebaseUser.photoURL !== appUser.photoURL) {
+            firestoreUpdates.photoURL = firebaseUser.photoURL;
+          }
+          if (Object.keys(firestoreUpdates).length > 0) {
+            try {
+              await updateDoc(userDocRef, firestoreUpdates);
+              appUser = { ...appUser, ...firestoreUpdates };
+            } catch (updateError) {
+              console.error("Error syncing Firebase Auth profile to Firestore:", updateError);
+            }
+          }
           setUser(appUser);
           const isProfileComplete = appUser.username && appUser.role;
           if (!isProfileComplete) {
@@ -69,14 +86,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.removeItem('profileIncomplete');
           }
         } else {
+          // New user, create Firestore document
           const newUser: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            isAdmin: false, // Explicitly set isAdmin
-            username: null,
-            role: null,
+            isAdmin: false, 
+            username: null, // Needs to be completed
+            role: null, // Needs to be completed
             phoneNumber: firebaseUser.phoneNumber || null,
             institution: null,
             researcherId: null,
@@ -141,9 +159,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL,
           isAdmin: false, username: null, role: null, phoneNumber: firebaseUser.phoneNumber || null, institution: null, researcherId: null,
         };
-        // This path should ideally be covered by onAuthStateChanged.
-        // If it reaches here, it implies onAuthStateChanged might not have completed or had an issue.
-        // Attempt to set doc, but be wary of race conditions or redundant writes.
         try {
           await setDoc(userDocRef, newUser);
           handleSuccessfulLogin(newUser);
@@ -154,7 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              userMessage = "Firestore permission denied during login profile setup. Check security rules for 'users' collection ('create' on '/users/{userId}' if 'request.auth.uid == userId').";
           }
           toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000});
-          await signOut(firebaseAuth); // Sign out if critical profile setup fails
+          await signOut(firebaseAuth); 
           setUser(null);
         }
         return;
@@ -197,65 +212,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
         throw new Error("Username already exists. Please choose another one.");
     }
+    
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+    } catch (authError: any) {
+      setLoading(false);
+      console.error("Firebase Auth Signup error:", authError);
+      let errorMessage = "An unknown error occurred during signup with Firebase Auth.";
+       if (authError.code) {
+          switch (authError.code) {
+          case 'auth/email-already-in-use':
+              errorMessage = 'This email address is already in use by another account.';
+              break;
+          case 'auth/invalid-email':
+              errorMessage = 'The email address is not valid.';
+              break;
+          case 'auth/operation-not-allowed':
+              errorMessage = 'Email/password accounts are not enabled. Contact support.';
+              break;
+          case 'auth/weak-password':
+              errorMessage = 'The password is too weak. Please choose a stronger one.';
+              break;
+          default:
+              errorMessage = authError.message || errorMessage;
+          }
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const firebaseUser = userCredential.user;
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
-      const firebaseUser = userCredential.user;
+        // Update Firebase Auth profile (optional, but good for consistency)
+        await updateFirebaseProfile(firebaseUser, { displayName: data.fullName });
+    } catch (profileUpdateError) {
+        console.warn("Could not update Firebase Auth profile displayName during signup:", profileUpdateError);
+        // Non-critical, so we don't throw, just log. Firestore profile is more important.
+    }
 
-      const newUserProfile: User = {
-        id: firebaseUser.uid,
-        email: data.email,
-        displayName: data.fullName,
-        username: data.username,
-        phoneNumber: data.phoneNumber || null,
-        institution: data.institution || null,
-        role: data.role,
-        researcherId: data.researcherId || null,
-        isAdmin: false,
-        photoURL: firebaseUser.photoURL || null,
-      };
 
+    const newUserProfile: User = {
+      id: firebaseUser.uid,
+      email: data.email,
+      displayName: data.fullName, 
+      username: data.username,
+      phoneNumber: data.phoneNumber || null,
+      institution: data.institution || null,
+      role: data.role,
+      researcherId: data.researcherId || null,
+      isAdmin: false,
+      photoURL: firebaseUser.photoURL || null, // Initially might be null
+    };
+
+    try {
       await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile);
-
-      setUser(newUserProfile);
-      setLoading(false);
-      setShowLoginModal(false);
-
-      localStorage.removeItem('profileIncomplete');
-      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
-      localStorage.removeItem('redirectAfterLogin');
-      router.push(redirectPath);
-
-    } catch (error) {
+    } catch (firestoreError: any) {
         setLoading(false);
-        console.error("Signup error:", error);
-        const firebaseError = error as { code?: string; message?: string };
-        let errorMessage = "An unknown error occurred during signup.";
-         if (firebaseError.code) {
-            switch (firebaseError.code) {
-            case 'auth/email-already-in-use':
-                errorMessage = 'This email address is already in use by another account.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'The email address is not valid.';
-                break;
-            case 'auth/operation-not-allowed':
-                errorMessage = 'Email/password accounts are not enabled. Contact support.';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'The password is too weak. Please choose a stronger one.';
-                break;
-            default:
-                // Check if it's a Firestore permission error
-                if (error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
-                     errorMessage = "Firestore permission denied during signup profile creation. Check security rules for 'users' collection ('create' on '/users/{userId}' if 'request.auth.uid == userId').";
-                } else {
-                    errorMessage = firebaseError.message || errorMessage;
-                }
-            }
+        console.error("Firestore profile creation error during signup:", firestoreError);
+        let errorMessage = "An unknown error occurred while saving your profile.";
+        if (firestoreError.code === 'permission-denied' || firestoreError.message?.includes('permission-denied') || firestoreError.message?.includes('Missing or insufficient permissions')) {
+            errorMessage = "Firestore permission denied during signup profile creation. Check security rules for 'users' collection ('create' on '/users/{userId}' if 'request.auth.uid == userId').";
+        }
+        // Attempt to delete the auth user if Firestore save fails, to avoid orphaned auth account
+        try {
+            await firebaseUser.delete();
+            console.log("Firebase Auth user deleted due to Firestore profile creation failure.");
+        } catch (deleteError) {
+            console.error("Failed to delete Firebase Auth user after Firestore error:", deleteError);
+            errorMessage += " Additionally, an orphaned auth account might exist. Please contact support.";
         }
         throw new Error(errorMessage);
     }
+
+    setUser(newUserProfile); // Set context user
+    setLoading(false);
+    setShowLoginModal(false);
+
+    localStorage.removeItem('profileIncomplete'); // Should be complete after signup
+    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
+    localStorage.removeItem('redirectAfterLogin');
+    router.push(redirectPath);
   };
 
   const logout = async () => {
@@ -279,15 +316,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (appUser.isAdmin === undefined) {
         appUser.isAdmin = false;
       }
+      // Ensure displayName and photoURL from provider are synced if they changed
+      let firestoreUpdates: Partial<User> = {};
+      if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
+          firestoreUpdates.displayName = firebaseUser.displayName;
+      }
+      if (firebaseUser.photoURL && firebaseUser.photoURL !== appUser.photoURL) {
+          firestoreUpdates.photoURL = firebaseUser.photoURL;
+      }
+      if (Object.keys(firestoreUpdates).length > 0) {
+          try {
+              await updateDoc(userDocRef, firestoreUpdates);
+              appUser = { ...appUser, ...firestoreUpdates };
+          } catch (updateError) {
+              console.error("Error syncing social login profile to Firestore:", updateError);
+              // Non-critical, continue with existing appUser data
+          }
+      }
+
     } else {
+      // New user via social login
       appUser = {
         id: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
-        isAdmin: false, // Explicitly set isAdmin
-        username: null,
-        role: null,
+        isAdmin: false, 
+        username: null, // Will require profile completion
+        role: null, // Will require profile completion
         phoneNumber: firebaseUser.phoneNumber || null,
         institution: null,
         researcherId: null,
@@ -298,7 +354,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
          console.error("Error creating/updating user document for social login:", dbError);
          let userMessage = "Failed to set up user profile. Please try again.";
          if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
-            userMessage = "Firestore permission denied. Please check your Firestore security rules to allow new users to create their own profile in the 'users' collection. The rules should permit 'create' on '/users/{userId}' if 'request.auth.uid == userId'.";
+            userMessage = "Firestore permission denied. Please check your Firestore security rules to allow new users to create their own profile in the 'users' collection. The rules should permit 'create' or 'write' on '/users/{userId}' if 'request.auth.uid == userId'.";
          }
          toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000 });
           try {
@@ -308,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           setUser(null);
           setLoading(false);
-          return;
+          return; // Critical error, stop processing
       }
     }
     handleSuccessfulLogin(appUser);
@@ -327,7 +383,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         switch (firebaseError.code) {
             case 'auth/popup-closed-by-user':
             case 'auth/cancelled-popup-request':
-                toastMessage = "Google Sign-In was cancelled.";
+                toastMessage = "Sign-in popup was closed before completion. Please try again. Ensure popups are allowed for this site.";
                 break;
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
@@ -339,7 +395,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               toastMessage = firebaseError.message || toastMessage;
         }
       }
-      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "Google Login Error", description: toastMessage, duration: 7000 });
+      toast({ variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "Google Login Error", description: toastMessage, duration: 7000 });
       setLoading(false);
     }
   };
@@ -357,7 +413,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         switch (firebaseError.code) {
             case 'auth/popup-closed-by-user':
             case 'auth/cancelled-popup-request':
-                toastMessage = "GitHub Sign-In was cancelled.";
+                toastMessage = "Sign-in popup was closed before completion. Please try again. Ensure popups are allowed for this site.";
                 break;
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method (e.g., Google or Email).";
@@ -369,7 +425,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               toastMessage = firebaseError.message || toastMessage;
         }
       }
-      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "GitHub Login Error", description: toastMessage, duration: 7000 });
+      toast({ variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "GitHub Login Error", description: toastMessage, duration: 7000 });
       setLoading(false);
     }
   };
@@ -378,15 +434,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
         await firebaseSendPasswordResetEmail(firebaseAuth, emailAddress);
-    } catch (error) {
+    } catch (error: any) {
         setLoading(false);
-        throw error;
+        console.error("Password reset error:", error);
+        let errorMessage = "Could not send password reset email.";
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No user found with this email address.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "The email address is not valid.";
+        }
+        // For security, it's often better to show a generic success message
+        // regardless of whether the email exists, to prevent email enumeration.
+        // However, since the original code re-throws, we'll stick to specific errors for now.
+        throw new Error(errorMessage);
     }
     setLoading(false);
   };
 
  const updateUserProfile = async (updatedData: Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>) => {
-    if (!user) {
+    if (!user || !firebaseAuth.currentUser) { // Check firebaseAuth.currentUser as well
       throw new Error("User not logged in. Cannot update profile.");
     }
     setLoading(true);
@@ -405,23 +471,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    const dataToUpdate: { [key: string]: any } = {};
+    const dataToUpdateInFirestore: { [key: string]: any } = {};
     const allowedFields: (keyof Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>)[] =
       ['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId'];
 
     allowedFields.forEach(field => {
       if (updatedData[field] !== undefined) {
-        dataToUpdate[field] = updatedData[field] === "" ? null : updatedData[field];
+        dataToUpdateInFirestore[field] = updatedData[field] === "" ? null : updatedData[field];
       }
     });
+    
+    // Update Firebase Auth profile if displayName changed
+    if (updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
+        try {
+            await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
+        } catch (authProfileError) {
+            console.warn("Could not update Firebase Auth profile displayName:", authProfileError);
+            // Non-critical, proceed with Firestore update
+        }
+    }
 
-    if (Object.keys(dataToUpdate).length === 0) {
+
+    if (Object.keys(dataToUpdateInFirestore).length === 0) {
       setLoading(false);
       return;
     }
 
     try {
-      await updateDoc(userDocRef, dataToUpdate);
+      await updateDoc(userDocRef, dataToUpdateInFirestore);
       const updatedUserDoc = await getDoc(userDocRef);
       if (!updatedUserDoc.exists()) {
         setLoading(false);
@@ -432,10 +509,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updatedUser.isAdmin = false;
       }
 
-      setUser(updatedUser);
+      setUser(updatedUser); // Update context user
 
       if (localStorage.getItem('profileIncomplete') === 'true') {
-          if (updatedUser.username && updatedUser.role) {
+          if (updatedUser.username && updatedUser.role) { // Check if essential fields are now filled
               localStorage.removeItem('profileIncomplete');
           }
       }
@@ -459,3 +536,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
