@@ -199,11 +199,11 @@ export default function HomePage() {
         <div className="container mx-auto text-center px-4">
           <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12">
             <Image 
-              src="https://picsum.photos/1200/400?random=1" 
-              alt="Academic research collaboration" 
+              src="https://picsum.photos/1200/400?random=2" 
+              alt="Academic paper publication process" 
               fill
               className="rounded-lg shadow-md object-cover" 
-              data-ai-hint="research collaboration" 
+              data-ai-hint="academic publishing" 
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
@@ -221,3 +221,4 @@ export default function HomePage() {
     </>
   );
 }
+
