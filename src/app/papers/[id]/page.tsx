@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -14,8 +15,8 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
 import PaymentModal from '@/components/payment/PaymentModal';
-import { plagiarismCheck, PlagiarismCheckInput, PlagiarismCheckOutput } from '@/ai/flows/plagiarism-check';
-import { acceptanceProbability, AcceptanceProbabilityInput, AcceptanceProbabilityOutput } from '@/ai/flows/acceptance-probability';
+import { plagiarismCheck } from '@/ai/flows/plagiarism-check';
+import { acceptanceProbability } from '@/ai/flows/acceptance-probability';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -35,8 +36,8 @@ const mockPapersDB: Paper[] = [
     id: "2", userId: "1", title: "Quantum Computing: A New Paradigm", abstract: "An in-depth analysis of quantum computing principles and its applications in solving complex problems such as drug discovery, materials science, and cryptography. The paper also discusses current challenges and future prospects of quantum technology.",
     authors: ["Dr. Jane Doe"], keywords: ["Quantum Computing", "Physics", "Technology"],
     uploadDate: new Date("2023-11-01T14:30:00Z").toISOString(), status: "Under Review",
-    plagiarismScore: null, plagiarismReport: null, // Initially null
-    acceptanceProbability: null, acceptanceReport: null, // Initially null
+    plagiarismScore: null, plagiarismReport: null,
+    acceptanceProbability: null, acceptanceReport: null,
     fileName: "quantum_paradigm.docx"
   },
   {
@@ -78,39 +79,39 @@ function PaperDetailsContent() {
 
 
   useEffect(() => {
-    if (params.id) {
+    if (params.id && user) { // Ensure user is available for userId check
       setLoadingPaper(true);
       setTimeout(() => {
-        // Try to find in mock DB first
         let foundPaper = mockPapersDB.find(p => p.id === params.id);
 
-        // If not found, and it's a newly submitted paper (e.g., from PaperUploadForm redirect)
-        // we create a temporary entry. This is a workaround for mock data.
-        // A real app would fetch directly from the database.
-        if (!foundPaper && params.id && user) {
+        if (!foundPaper) {
+            // Attempt to retrieve from localStorage if it was a new submission
             const paperTitleFromStorage = localStorage.getItem(`newPaperTitle-${params.id}`);
             const paperAbstractFromStorage = localStorage.getItem(`newPaperAbstract-${params.id}`);
             const paperFileNameFromStorage = localStorage.getItem(`newPaperFileName-${params.id}`);
+            
             if (paperTitleFromStorage && paperAbstractFromStorage && paperFileNameFromStorage) {
                  foundPaper = {
                     id: params.id as string,
-                    userId: user.id, // Assume current user
+                    userId: user.id, // Assume current user created it
                     title: paperTitleFromStorage,
                     abstract: paperAbstractFromStorage,
-                    authors: ["Author from Temp"], 
-                    keywords: ["temp", "keywords"],
+                    // Provide default authors/keywords for mock purposes
+                    authors: user.displayName ? [user.displayName] : ["Registered Author"], 
+                    keywords: ["new", "submission"],
                     fileName: paperFileNameFromStorage,
                     uploadDate: new Date().toISOString(),
-                    status: "Submitted",
+                    status: "Submitted", // Default status for new paper
                     plagiarismScore: null,
                     plagiarismReport: null,
                     acceptanceProbability: null,
                     acceptanceReport: null,
                 };
-                // Add to mock DB for consistency if other actions update it
+                // Add to mock DB so it's "found" if user navigates away and back
                 if (!mockPapersDB.find(p => p.id === foundPaper!.id)) {
                     mockPapersDB.push(foundPaper!);
                 }
+                // Clean up localStorage after use
                 localStorage.removeItem(`newPaperTitle-${params.id}`);
                 localStorage.removeItem(`newPaperAbstract-${params.id}`);
                 localStorage.removeItem(`newPaperFileName-${params.id}`);
@@ -125,9 +126,12 @@ function PaperDetailsContent() {
           setCurrentPaper(null); 
         }
         setLoadingPaper(false);
-      }, 1000);
+      }, 500); // Reduced timeout
+    } else if (!user && !loadingPaper) { // If user is not loaded yet, wait. If loaded and no user, deny.
+        setLoadingPaper(false); // To prevent infinite loading if user is null
+        setCurrentPaper(null);
     }
-  }, [params.id, user, isAdmin]);
+  }, [params.id, user, isAdmin, loadingPaper]); // Added loadingPaper to dependencies
 
   useEffect(() => {
     if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending') {
@@ -238,7 +242,7 @@ function PaperDetailsContent() {
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found</h2>
         <p className="text-muted-foreground">The paper you are looking for does not exist or you do not have permission to view it.</p>
-        <Button onClick={() => router.push('/dashboard')} className="mt-6">Go to Dashboard</Button>
+        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/dashboard')} className="mt-6">Go to Dashboard</Button>
       </div>
     );
   }
@@ -291,7 +295,7 @@ function PaperDetailsContent() {
             {/* AI Analysis Section */}
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools
+                <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools (Title & Abstract)
               </h3>
               <div className="grid sm:grid-cols-2 gap-4 mb-6">
                 <Button onClick={handleRunPlagiarismCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
@@ -310,6 +314,15 @@ function PaperDetailsContent() {
               {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
                   <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
               )}
+               {(!currentPaper.plagiarismScore && !currentPaper.acceptanceProbability && !isCheckingPlagiarism && !isCheckingAcceptance) && (
+                  <Alert variant="default" className="mt-4">
+                    <Sparkles className="h-4 w-4" />
+                    <AlertTitle>AI Analysis Available</AlertTitle>
+                    <AlertDescription>
+                      Run plagiarism and acceptance probability checks based on the paper's title and abstract using the buttons above.
+                    </AlertDescription>
+                  </Alert>
+               )}
             </div>
             
             <Separator />
@@ -348,7 +361,7 @@ function PaperDetailsContent() {
                 <div className="mt-6 p-4 border rounded-md">
                   <h3 className="text-lg font-semibold mb-2">Change Paper Status</h3>
                   <div className="flex flex-wrap gap-2">
-                    {(["Under Review", "Accepted", "Rejected", "Action Required", "Published"] as Paper['status'][]).map(statusOption => (
+                    {(["Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
                       <Button 
                         key={statusOption}
                         variant={currentPaper.status === statusOption ? "default" : "outline"}
