@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User } from '@/types';
@@ -79,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, _pass: string) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    let loggedInUser: User;
+    let loggedInUser: User | undefined; // Ensure loggedInUser can be undefined initially
     if (email === MOCK_USER_ADMIN.email) {
       loggedInUser = MOCK_USER_ADMIN;
     } else if (email === MOCK_USER_NORMAL.email) {
@@ -100,13 +101,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const existing = allUsers.find(u => u.email === email);
       if (existing) {
         loggedInUser = existing;
-      } else {
-        // This case should ideally not happen if signup creates users correctly.
-        // If it does, it means trying to log in with a non-existent email.
-        setLoading(false);
-        throw new Error("Invalid credentials. Please check your email and password.");
       }
     }
+
+    if (!loggedInUser) { // Check if a user was found or matched
+        setLoading(false);
+        throw new Error("Invalid credentials. Please check your email and password.");
+    }
+
     setUser(loggedInUser);
     localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
     setLoading(false);
@@ -169,6 +171,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setLoading(false);
     setShowLoginModal(false);
+    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
+    localStorage.removeItem('redirectAfterLogin');
+    router.push(redirectPath);
   };
 
   const logout = async () => {
@@ -176,6 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 500));
     setUser(null);
     localStorage.removeItem('researchSphereUser');
+    localStorage.removeItem('redirectAfterLogin'); // Clear any pending redirect on logout
     setLoading(false);
     router.push('/'); 
   };
@@ -183,39 +189,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithSocial = async (provider: 'Google' | 'GitHub') => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Create a more dynamic mock user for social login to avoid immediate collision with MOCK_USER_NORMAL
+    const socialUserIdentifier = `${provider.toLowerCase()}-${Date.now().toString().slice(-5)}`;
     const baseUser: User = {
-      ...MOCK_USER_NORMAL, // Base normal user fields
-      id: `${provider.toLowerCase()}-user-${Date.now()}`,
-      email: `${provider.toLowerCase()}user${Date.now()}@example.com`,
-      displayName: `${provider} User ${Date.now().toString().slice(-4)}`,
-      username: `${provider.toLowerCase()}user${Date.now().toString().slice(-4)}`,
-      role: 'Author',
+      id: socialUserIdentifier,
+      email: `${socialUserIdentifier}@example.com`,
+      displayName: `${provider} User ${socialUserIdentifier.slice(-4)}`,
+      username: socialUserIdentifier,
+      isAdmin: false,
+      role: 'Author', 
     };
 
      // Check for uniqueness and add to localStorage for all users
-    const allRegisteredUsers: User[] = [...mockExistingUsers];
+    let allRegisteredUsers: User[] = [...mockExistingUsers]; // Start with base mocks
     const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
     if (localUsersRaw) {
         try {
             const localUsersParsed = JSON.parse(localUsersRaw) as User[];
+            // Merge ensuring no duplicates by ID
+            const existingIds = new Set(allRegisteredUsers.map(u => u.id));
             localUsersParsed.forEach(lu => {
-                if (!allRegisteredUsers.find(u => u.id === lu.id)) allRegisteredUsers.push(lu);
+                if (!existingIds.has(lu.id)) {
+                    allRegisteredUsers.push(lu);
+                    existingIds.add(lu.id);
+                }
             });
         } catch (e) { console.error("Error parsing local users for social login check", e); }
     }
-    // Ensure email/username from social is unique if it's a new user
-    // For simplicity, assuming social logins always create "new" mock users if not an exact match
-    // This mock doesn't handle linking social accounts to existing email accounts
-    if (allRegisteredUsers.some(u => u.email === baseUser.email)) {
-        // If email collision, find that user and log them in
-        const existingSocialUser = allRegisteredUsers.find(u => u.email === baseUser.email);
-        if(existingSocialUser) setUser(existingSocialUser);
+    
+    // For social login, typically you'd get user info from the provider.
+    // Here, we simulate creating a new user or logging in an existing one if the email matches.
+    // This mock is simplified: it assumes a new user if email doesn't match MOCK_USER_NORMAL or MOCK_USER_ADMIN.
+    // A real app would handle linking accounts or more sophisticated existing user checks.
+    
+    let loggedInUser: User | undefined;
+    // Example: if Google login email matches one of the core mock users, log them in
+    // This is a very basic check; real social auth is more complex.
+    if (provider === 'Google' && MOCK_USER_NORMAL.email === 'user@example.com' /* imagine this was the Google email */) {
+      // This is a contrived example. In reality, Firebase handles this.
+      // We're just picking one of the mock users to simulate a social login.
+      loggedInUser = MOCK_USER_NORMAL; 
     } else {
-        setUser(baseUser);
-        allRegisteredUsers.push(baseUser);
+      // Simulate new social user
+      loggedInUser = baseUser;
+      if (!allRegisteredUsers.find(u => u.id === loggedInUser!.id)) {
+        allRegisteredUsers.push(loggedInUser!);
         localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
+      }
     }
-    localStorage.setItem('researchSphereUser', JSON.stringify(user || baseUser)); // user might be set if email collided
+    
+    setUser(loggedInUser);
+    localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
     setLoading(false);
     setShowLoginModal(false);
     const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
@@ -246,3 +271,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+

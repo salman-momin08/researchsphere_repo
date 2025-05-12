@@ -39,6 +39,7 @@ export default function HomePage() {
     if (user) {
       router.push('/submit');
     } else {
+      localStorage.setItem('redirectAfterLogin', '/submit'); // Set redirect path
       setShowLoginModal(true);
     }
   };

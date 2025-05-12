@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer, webpack: webpackInstance }) => { // Destructure webpackInstance from options
-    // Fix for Node.js-specific modules (like async_hooks, fs, tls, net, http2, dns)
+    // Fix for Node.js-specific modules (like async_hooks, fs, tls, net, http2, dns, perf_hooks)
     // being incorrectly included in the client-side bundle.
     if (!isServer) {
       // Ensure config.plugins exists
@@ -48,6 +48,7 @@ const nextConfig: NextConfig = {
         'net': false,
         'http2': false,
         'dns': false,
+        'perf_hooks': false, // Added perf_hooks
         // Keep fallbacks for 'node:*' prefixed modules as a safeguard,
         // though they might be less effective if the plugin always transforms them first.
         'node:async_hooks': false,
@@ -56,6 +57,7 @@ const nextConfig: NextConfig = {
         'node:net': false,
         'node:http2': false,
         'node:dns': false,
+        'node:perf_hooks': false, // Added node:perf_hooks
       };
     }
 
@@ -65,3 +67,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
