@@ -24,7 +24,16 @@ import { Input } from '@/components/ui/input';
 async function readFileContentSimulated(file: File): Promise<string> {
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve(`\n\n[Simulated content of ${file.name}. This is a placeholder for actual file content extraction.]\n\n`);
+      // Simulate some content based on file type for variety
+      let simulatedContent = `\n\n[Simulated content of ${file.name}. File type: ${file.type}.`;
+      if (file.type === "application/pdf") {
+        simulatedContent += " This appears to be a PDF document. It might contain complex layouts, figures, and references.]\n\n";
+      } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        simulatedContent += " This seems to be a DOCX file, likely rich text with formatting.]\n\n";
+      } else {
+        simulatedContent += " This is a generic file. Content extraction would depend on its specific format.]\n\n";
+      }
+      resolve(simulatedContent);
     }, 500); // Simulate async reading
   });
 }
@@ -72,6 +81,10 @@ function AiPreCheckContent() {
     if (files && files.length > 0) {
       setFileName(files[0].name);
       form.setValue("file", files, { shouldValidate: true });
+      // If a file is uploaded, and there's no text, clear the text field error (if any)
+      if (!form.getValues("paperText")) {
+        form.clearErrors("paperText");
+      }
     } else {
       setFileName(null);
       form.setValue("file", undefined, { shouldValidate: true });
@@ -108,17 +121,18 @@ function AiPreCheckContent() {
     }
 
 
-    let contentToAnalyze = `${data.title}`;
+    let contentToAnalyze = `Paper Title: ${data.title}`;
     if (data.paperText) {
         contentToAnalyze += `\n\nAbstract/Provided Text:\n${data.paperText}`;
     }
     if (fileContentForAnalysis) {
-        contentToAnalyze += `\n\nUploaded File Content Simulaton:\n${fileContentForAnalysis}`;
+        contentToAnalyze += `\n\n--- Start of Uploaded File Content (Simulated) ---\n${fileContentForAnalysis}\n--- End of Uploaded File Content (Simulated) ---`;
     }
     
     // Ensure total content length for AI is reasonable if needed (Genkit handles large inputs but good to be mindful)
-    if (contentToAnalyze.length < 50) { // title + some content
-        setAiError("Content is too short for meaningful analysis. Please provide more details in the title, abstract/text, or upload a file.");
+    // Minimum length check: title + some content (either text or indication of file)
+    if (data.title.length < 5 || (!data.paperText && !fileToUpload)) { 
+        setAiError("Content is too short for meaningful analysis. Please provide more details in the title, and either provide abstract/text or upload a file.");
         toast({variant: "destructive", title: "Content Too Short", description: "Provide more details."});
         setIsLoading(false);
         return;
@@ -167,7 +181,7 @@ function AiPreCheckContent() {
       feedbackText += `-----------------\n`;
       feedbackText += `Score: ${(plagiarismResult.plagiarismScore * 100).toFixed(1)}%\n`;
       if (plagiarismResult.highlightedSections && plagiarismResult.highlightedSections.length > 0) {
-        feedbackText += `Potentially Plagiarized Sections:\n`;
+        feedbackText += `Potentially Plagiarized Sections (from title, abstract, and/or simulated file content):\n`;
         plagiarismResult.highlightedSections.forEach(section => {
           feedbackText += `  - "...${section}..."\n`;
         });
@@ -181,14 +195,15 @@ function AiPreCheckContent() {
       feedbackText += `ACCEPTANCE PROBABILITY REPORT\n`;
       feedbackText += `-----------------------------\n`;
       feedbackText += `Estimated Probability: ${(acceptanceResult.probabilityScore * 100).toFixed(1)}%\n`;
-      feedbackText += `AI Reasoning: ${acceptanceResult.reasoning}\n`;
+      feedbackText += `AI Reasoning (based on title, abstract, and/or simulated file content): ${acceptanceResult.reasoning}\n`;
     }
 
     const blob = new Blob([feedbackText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `AI_PreCheck_Feedback_${form.getValues("title")?.replace(/\s+/g, '_') || 'Report'}.txt`;
+    const safeTitle = form.getValues("title")?.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+    a.download = `AI_PreCheck_Feedback_${safeTitle || 'Report'}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -203,13 +218,13 @@ function AiPreCheckContent() {
           <Sparkles className="mx-auto h-12 w-12 text-primary mb-2" />
           <CardTitle className="text-2xl md:text-3xl">AI Pre-Submission Check</CardTitle>
           <CardDescription>
-            Analyze your paper for potential plagiarism and acceptance probability. You can paste content or upload a file.
+            Analyze your paper for potential plagiarism and acceptance probability. You can paste content and/or upload a file for a more comprehensive analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(handleRunAIChecks)} className="space-y-6">
             <div>
-              <Label htmlFor="title">Paper Title</Label>
+              <Label htmlFor="title">Paper Title *</Label>
               <Input
                 id="title"
                 placeholder="Enter the title of your paper"
@@ -220,9 +235,23 @@ function AiPreCheckContent() {
                 <p className="text-sm text-destructive mt-1">{form.formState.errors.title.message}</p>
               )}
             </div>
+            
+            <div>
+              <Label htmlFor="paperText">Abstract / Additional Text Content (Optional if file uploaded)</Label>
+              <Textarea
+                id="paperText"
+                placeholder="Paste abstract or other relevant text here. This will be combined with uploaded file content for analysis."
+                rows={8}
+                {...form.register("paperText")}
+                disabled={isLoading}
+              />
+              {form.formState.errors.paperText && (
+                <p className="text-sm text-destructive mt-1">{form.formState.errors.paperText.message}</p>
+              )}
+            </div>
 
             <div>
-              <Label htmlFor="file-upload">Upload Paper (Optional, PDF/DOCX, max 5MB)</Label>
+              <Label htmlFor="file-upload">Upload Paper (Optional if text provided, PDF/DOCX, max 5MB)</Label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md border-input hover:border-primary transition-colors">
                 <div className="space-y-1 text-center">
                   <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -234,7 +263,7 @@ function AiPreCheckContent() {
                       <span>Upload a file</span>
                       <input id="file-upload" type="file" className="sr-only" 
                             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            {...form.register("file")}
+                            {...form.register("file")} // Register file input
                             onChange={handleFileChange} 
                             disabled={isLoading}
                       />
@@ -251,19 +280,6 @@ function AiPreCheckContent() {
               {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{ (form.formState.errors.file as any)?.message || "Invalid file"}</p>}
             </div>
 
-            <div>
-              <Label htmlFor="paperText">Abstract / Additional Text Content (Optional if file uploaded)</Label>
-              <Textarea
-                id="paperText"
-                placeholder="Paste abstract or other relevant text here. If a file is uploaded, its content will be prioritized for analysis."
-                rows={8}
-                {...form.register("paperText")}
-                disabled={isLoading}
-              />
-              {form.formState.errors.paperText && (
-                <p className="text-sm text-destructive mt-1">{form.formState.errors.paperText.message}</p>
-              )}
-            </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
