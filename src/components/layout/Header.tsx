@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare } from 'lucide-react'; 
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -87,14 +87,14 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container px-4 sm:px-6 flex h-16 items-center justify-between">
-        <Link href="/" className="mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+      <div className="container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
+        <Link href="/" className="mr-auto md:mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
           <span className="text-xl font-bold">ResearchSphere</span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-1 text-sm font-medium">
+        <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           <Link href="/" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Home</Link>
           {user && <Link href="/dashboard" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Dashboard</Link>}
           <Button 
@@ -117,7 +117,7 @@ export default function Header() {
         </nav>
 
         {/* Auth buttons / User Menu for Desktop */}
-        <div className="hidden md:flex items-center space-x-2">
+        <div className="hidden md:flex items-center space-x-2 ml-auto">
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -139,6 +139,10 @@ export default function Header() {
                 <DropdownMenuItem onClick={() => router.push('/dashboard')}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => router.push('/profile/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Profile Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSubmitPaperClick}>
                   <UploadCloud className="mr-2 h-4 w-4" />
@@ -170,7 +174,7 @@ export default function Header() {
         </div>
 
         {/* Mobile Navigation Trigger */}
-        <div className="ml-auto flex items-center md:hidden">
+        <div className="flex items-center md:hidden"> {/* Ensures this is only for mobile, removes ml-auto that was here */}
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -193,6 +197,9 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
+                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
+                        <Settings className="mr-2 h-4 w-4" /> Profile Settings
+                     </NavLink>
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
                     </Button>
@@ -211,3 +218,4 @@ export default function Header() {
     </header>
   );
 }
+

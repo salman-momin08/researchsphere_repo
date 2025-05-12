@@ -15,6 +15,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithGitHub: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
+  updateUserProfile: (updatedData: { displayName: string }) => Promise<void>; // New function
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
@@ -263,10 +264,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // The UI will show a generic success message.
   };
 
+  const updateUserProfile = async (updatedData: { displayName: string }) => {
+    if (!user) {
+      throw new Error("User not logged in.");
+    }
+    setLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+    const updatedUser = { ...user, displayName: updatedData.displayName };
+    setUser(updatedUser);
+    localStorage.setItem('researchSphereUser', JSON.stringify(updatedUser));
+
+    // Update in the mock list of all users as well
+    const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
+    let allUsers: User[] = [...mockExistingUsers];
+    if (localUsersRaw) {
+        try {
+            allUsers = JSON.parse(localUsersRaw) as User[];
+        } catch (e) { console.error("Failed to parse localUsersRaw for profile update", e); }
+    }
+    const userIndex = allUsers.findIndex(u => u.id === user.id);
+    if (userIndex !== -1) {
+        allUsers[userIndex] = updatedUser;
+    } else {
+        // This case should ideally not happen if user is logged in and came from localStorage
+        allUsers.push(updatedUser);
+    }
+    localStorage.setItem('researchSphereAllUsers', JSON.stringify(allUsers));
+
+    setLoading(false);
+  };
+
+
   const isAdmin = user?.isAdmin || false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, showLoginModal, setShowLoginModal, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, updateUserProfile, showLoginModal, setShowLoginModal, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
