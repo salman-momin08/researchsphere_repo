@@ -14,8 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 import type { Paper } from '@/types';
-import { UploadCloud, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
-import PreSubmissionCheckModal from './PreSubmissionCheckModal'; // Import the new modal
+import { UploadCloud, Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const paperSchema = z.object({
@@ -26,11 +25,11 @@ const paperSchema = z.object({
   file: z.any()
     .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0), "A paper file is required.")
     .refine(files => {
-        if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
+        if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true; // Allow server-side validation to pass if no FileList
         return files[0].size <= 5 * 1024 * 1024;
     }, "File size must be less than 5MB.")
     .refine(files => {
-        if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
+        if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true; // Allow server-side validation to pass if no FileList
         return ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type);
     }, "Only PDF or DOCX files are allowed."),
 });
@@ -40,15 +39,10 @@ type PaperFormValues = z.infer<typeof paperSchema>;
 export default function PaperUploadForm() {
   const { user } = useAuth();
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false); // Used for the final submission step
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
-  const [isPreCheckModalOpen, setIsPreCheckModalOpen] = useState(false);
-  const [preCheckModalData, setPreCheckModalData] = useState<{ title: string; abstract: string; fileName: string } | null>(null);
-  const [currentSubmitData, setCurrentSubmitData] = useState<PaperFormValues | null>(null);
-
-
   const form = useForm<PaperFormValues>({
     resolver: zodResolver(paperSchema),
     defaultValues: {
@@ -67,53 +61,30 @@ export default function PaperUploadForm() {
       form.setValue("file", files, { shouldValidate: true });
     } else {
       setFileName(null);
-      form.setValue("file", null, { shouldValidate: true });
+      // Setting to null might cause issues with z.any() if it doesn't expect null.
+      // It's better to set it to an empty FileList or undefined if the field is optional or handled.
+      // For a required field, this state implies an error that validation should catch.
+      form.setValue("file", undefined, { shouldValidate: true }); 
     }
   };
   
-  // This is the RHF submit handler, now triggers the pre-check modal
   const onFormSubmit = async (data: PaperFormValues) => {
     if (!user) {
       toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to submit a paper." });
       return;
     }
-    // FileList check must ensure FileList is available (client-side)
-    if (typeof window !== 'undefined' && data.file instanceof FileList && data.file.length === 0) {
+
+    // Ensure file is present (client-side check, though zod also handles it)
+    if (typeof window !== 'undefined' && !(data.file instanceof FileList && data.file.length > 0)) {
         form.setError("file", { type: "manual", message: "A paper file is required." });
+        toast({ variant: "destructive", title: "Validation Error", description: "A paper file is required."});
         return;
-    }
-     if (!data.file) { // Handles cases where file might be null/undefined after failed validation or reset
-        form.setError("file", { type: "manual", message: "A paper file is required." });
-        return;
-    }
-
-
-    setIsSubmitting(false); // Not submitting yet, just opening modal
-    setFormError(null);
-    
-    setCurrentSubmitData(data); // Store full form data for actual submission later
-    setPreCheckModalData({
-      title: data.title,
-      abstract: data.abstract,
-      // Ensure data.file is a FileList and has at least one file
-      fileName: (typeof window !== 'undefined' && data.file instanceof FileList && data.file.length > 0) ? data.file[0].name : "unknown_file",
-    });
-    setIsPreCheckModalOpen(true);
-  };
-
-  // This function will be called by the modal to proceed with the actual submission
-  const handleConfirmAndSubmitPaper = async () => {
-    if (!currentSubmitData || !user) {
-      toast({ variant: "destructive", title: "Error", description: "Submission data or user session is missing." });
-      setIsPreCheckModalOpen(false);
-      return;
     }
     
     setIsSubmitting(true);
-    setIsPreCheckModalOpen(false);
+    setFormError(null);
 
     try {
-      const data = currentSubmitData;
       const fileToUpload = (data.file instanceof FileList && data.file.length > 0) ? data.file[0] : null;
 
       if (!fileToUpload) {
@@ -131,25 +102,27 @@ export default function PaperUploadForm() {
         keywords: data.keywords,
         fileName: fileToUpload.name,
         uploadDate: new Date().toISOString(),
-        status: "Submitted",
-        plagiarismScore: null,
+        status: "Submitted", // Or "Payment Pending" if payment is required first
+        plagiarismScore: null, 
         plagiarismReport: null,
         acceptanceProbability: null,
         acceptanceReport: null,
       };
       
+      // Store in localStorage for mock persistence
       localStorage.setItem(`newPaperTitle-${newPaperId}`, newPaper.title);
       localStorage.setItem(`newPaperAbstract-${newPaperId}`, newPaper.abstract);
       localStorage.setItem(`newPaperFileName-${newPaperId}`, newPaper.fileName || 'unknown.pdf');
 
-      console.log("Submitting paper after pre-check:", newPaper);
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      console.log("Submitting paper:", newPaper);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       
       toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been uploaded.` });
       form.reset();
       setFileName(null);
-      setCurrentSubmitData(null);
       
+      // Redirect to the paper details page
       router.push(`/papers/${newPaperId}`);
 
     } catch (error) {
@@ -164,10 +137,10 @@ export default function PaperUploadForm() {
 
   return (
     <>
-      <Card className="w-full max-w-2xl mx-auto shadow-xl my-8"> {/* Added my-8 for vertical spacing */}
+      <Card className="w-full max-w-2xl mx-auto shadow-xl my-8">
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl">Submit Your Research Paper</CardTitle>
-          <CardDescription>Fill in the details below and upload your paper (PDF or DOCX, max 5MB). Pre-submission AI checks will be performed.</CardDescription>
+          <CardDescription>Fill in the details below and upload your paper (PDF or DOCX, max 5MB).</CardDescription>
         </CardHeader>
         <form onSubmit={form.handleSubmit(onFormSubmit)}>
           <CardContent className="space-y-6">
@@ -216,7 +189,7 @@ export default function PaperUploadForm() {
                       <span>Upload a file</span>
                       <input id="file-upload" type="file" className="sr-only" 
                             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            {...form.register("file")}
+                            {...form.register("file")} // RHF register
                             onChange={handleFileChange} 
                             disabled={isSubmitting}
                       />
@@ -238,21 +211,12 @@ export default function PaperUploadForm() {
               {isSubmitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting Paper...</>
               ) : (
-                <><Sparkles className="mr-2 h-4 w-4" /> Proceed to AI Pre-Check</>
+                <><UploadCloud className="mr-2 h-4 w-4" /> Submit Paper</>
               )}
             </Button>
           </CardFooter>
         </form>
       </Card>
-
-      {preCheckModalData && (
-        <PreSubmissionCheckModal
-          isOpen={isPreCheckModalOpen}
-          onOpenChange={setIsPreCheckModalOpen}
-          checkData={preCheckModalData}
-          onConfirmSubmit={handleConfirmAndSubmitPaper}
-        />
-      )}
     </>
   );
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -19,9 +20,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, DollarSign, Users, MessageSquare, FileText, Menu } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare } from 'lucide-react'; // Added Sparkles for AI Pre-Check
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
 
 const NavLink = ({ href, children, onClick, className }: { href: string, children: React.ReactNode, onClick?: () => void, className?: string }) => (
   <Link href={href} passHref>
@@ -52,7 +55,7 @@ export default function Header() {
   }
   
   const handleSubmitPaperClick = () => {
-    setIsMobileMenuOpen(false); // Close mobile menu if open
+    setIsMobileMenuOpen(false); 
     if (user) {
       router.push('/submit');
     } else {
@@ -65,10 +68,14 @@ export default function Header() {
     <>
       <NavLink href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Home</NavLink>
       {user && <NavLink href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Dashboard</NavLink>}
-      {/* Use a Button for Submit Paper in mobile to call handleSubmitPaperClick */}
        <Button variant="ghost" onClick={handleSubmitPaperClick} className="w-full justify-start hover:text-primary text-foreground">
         Submit Paper
       </Button>
+      {user && (
+         <NavLink href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
+           AI Pre-Check
+          </NavLink>
+      )}
       <NavLink href="/registration" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Registration & Pricing</NavLink>
       <NavLink href="/key-committee" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Key Committee</NavLink>
       <NavLink href="/sample-templates" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Sample Templates</NavLink>
@@ -82,7 +89,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container px-4 sm:px-6 flex h-16 items-center"> {/* Added responsive padding */}
+      <div className="container px-4 sm:px-6 flex h-16 items-center">
         <Link href="/" className="mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
           <span className="text-xl font-bold">ResearchSphere</span>
@@ -95,10 +102,15 @@ export default function Header() {
           <Button 
             variant="ghost" 
             onClick={handleSubmitPaperClick} 
-            className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium" // Ensure hover bg is transparent
+            className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
           >
             Submit Paper
           </Button>
+           {user && (
+            <Link href="/ai-pre-check" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center">
+              <Sparkles className="mr-1 h-4 w-4" /> AI Pre-Check
+            </Link>
+          )}
           <Link href="/registration" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Registration</Link>
           <Link href="/key-committee" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Committee</Link>
           <Link href="/sample-templates" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Templates</Link>
@@ -135,6 +147,10 @@ export default function Header() {
                 <DropdownMenuItem onClick={handleSubmitPaperClick}>
                   <UploadCloud className="mr-2 h-4 w-4" />
                   <span>Submit Paper</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  <span>AI Pre-Check</span>
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
