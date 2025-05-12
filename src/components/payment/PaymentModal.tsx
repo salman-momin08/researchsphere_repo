@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -66,11 +67,9 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
       }
     } else if (paymentMethod === "upi") {
       if (!upiId) {
-          const proceedWithoutUpiId = confirm("You have not entered a UPI ID. Do you want to proceed assuming QR code scan? (Mock behavior)");
-          if (!proceedWithoutUpiId) {
-            toast({ variant: "destructive", title: "Payment Error", description: "Please enter your UPI ID or scan the QR code."});
-            return;
-          }
+          // For mock purposes, we'll allow proceeding if QR is shown, as scanning is simulated.
+          // In a real app, you might require UPI ID or confirm payment through other means.
+          console.log("UPI ID not entered, assuming QR scan for mock payment.");
         }
     }
 
@@ -157,7 +156,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               {paymentMethod === "upi" && (
                 <div className="space-y-3 animate-in fade-in-50">
                   <div>
-                    <Label htmlFor="upiId">UPI ID</Label>
+                    <Label htmlFor="upiId">UPI ID (Optional if scanning QR)</Label>
                     <Input id="upiId" placeholder="yourname@bankupi" value={upiId} onChange={(e) => setUpiId(e.target.value)} disabled={isProcessing} />
                   </div>
                   <div className="text-center text-sm text-muted-foreground my-2">OR</div>
@@ -165,7 +164,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-muted inline-block">
                        <Image 
-                        src="https://picsum.photos/seed/qrpayment/150/150" 
+                        src="https://picsum.photos/seed/generic-qr-placeholder/120/120?grayscale&blur=1" 
                         alt="Scan QR Code for UPI Payment" 
                         width={120} 
                         height={120} 
@@ -207,3 +206,4 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     </Dialog>
   );
 }
+
