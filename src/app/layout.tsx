@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Changed from GeistSans
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/auth-context';
 import Header from '@/components/layout/Header';
@@ -7,16 +7,10 @@ import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster"
 import LoginModal from '@/components/auth/LoginModal';
 
-const inter = Inter({ // Changed from geistSans
-  variable: '--font-inter', // Changed variable name
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
 });
-
-// Geist Mono is not explicitly used but kept from original if needed.
-// const geistMono = Geist_Mono({
-//   variable: '--font-geist-mono',
-//   subsets: ['latin'],
-// });
 
 export const metadata: Metadata = {
   title: 'ScholarSubmit - Academic Paper Publishing',
@@ -29,7 +23,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}> {/* Changed from geistSans.variable */}
+    <html lang="en" className={inter.variable}>
+      {/* Next.js injects <head> based on metadata.
+          The <body > tag must follow without any intermediate text/whitespace nodes. */}
       <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
           <Header />
