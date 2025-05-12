@@ -4,43 +4,45 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // USERS collection
-    // Users can create their own document upon signup.
-    // Users can read, update, and delete their own document.
-    // Admins (with custom claim isAdmin=true) can read and write any user document.
+    // Users collection
     match /users/{userId} {
-      // Allow user to create their own document (e.g., during signup/profile completion)
+      // Allow users to read their own profile if they are authenticated
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Allow users to create their own profile document if they are authenticated
+      // and the document ID they are trying to create matches their UID.
+      // This is crucial for social sign-up where the profile is created after auth.
       allow create: if request.auth != null && request.auth.uid == userId;
-      // Allow user to read, update, delete their own document
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      
-      // Allow admins (identified by a custom claim 'isAdmin') to read/write any user document
-      // Ensure you are setting this custom claim for your admin users via Firebase Admin SDK.
-      allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
+
+      // Allow users to update their own profile if they are authenticated
+      // and the document ID matches their UID.
+      // You might want to add more granular field-level validation here if needed
+      // (e.g., request.resource.data.email == resource.data.email to prevent email changes).
+      allow update: if request.auth != null && request.auth.uid == userId;
+
+      // Generally, do not allow users to delete their own profile directly via client SDK for safety.
+      // Handle deletions via a backend function (e.g., Firebase Cloud Function) or an admin process if needed.
+      allow delete: if false; // Or specific admin role check: request.auth.token.admin == true
     }
 
-    // PAPERS collection
-    // Authenticated users can create new papers.
-    // The owner of the paper (document's userId field matches auth.uid) can read, update, delete.
-    // Admins (with custom claim isAdmin=true) can read, update, delete any paper.
+    // Papers collection (example, adjust to your needs)
     match /papers/{paperId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null && 
-                                      ( (resource.data.userId == request.auth.uid) || 
-                                        (request.auth.token.isAdmin == true) );
+      // Allow authenticated users to read papers (adjust if public access is needed)
+      allow read: if request.auth != null; // Or allow read: if true; for public papers
+
+      // Allow authenticated users to create papers if the paper's userId matches their UID
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+      // Allow users to update their own papers
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // Allow users to delete their own papers
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // Potentially add admin override for papers
+      // allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Add rules for other collections as your application grows.
-    // For example:
-    // match /publicInfo/{docId} {
-    //   allow read: if true; // Allow public read access
-    // }
-
-    // IMPORTANT: Default deny all access to any other path not explicitly matched above.
-    // This ensures that if you forget to add a rule for a new collection,
-    // it's not accidentally left open to unauthorized access.
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // Add rules for other collections as needed following similar principles.
   }
 }

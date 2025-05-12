@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User } from '@/types';
@@ -69,14 +70,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.removeItem('profileIncomplete');
           }
         } else {
+          // User exists in Firebase Auth but not in Firestore DB (e.g., first social login)
+          // Create a basic profile. User will be prompted to complete it.
           const newUser: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             isAdmin: false, 
-            username: null, 
-            role: null,     
+            username: null, // Mark as incomplete
+            role: null,     // Mark as incomplete
             phoneNumber: firebaseUser.phoneNumber || null,
             institution: null, 
             researcherId: null,
@@ -88,11 +91,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (pathname !== '/profile/settings') {
               router.push('/profile/settings?complete=true');
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error("Error creating user document in Firestore:", error);
-            toast({variant: "destructive", title: "Profile Creation Error", description: "Could not save user profile. Please try again or contact support."});
-            // Potentially log out the user or handle this more gracefully
-            setUser(null); // User exists in auth but not in DB, critical error
+            let userMessage = "Could not save user profile. Please try again or contact support.";
+            if (error.code === 'permission-denied') {
+                userMessage = "Firestore permission denied. Please check your security rules to allow profile creation.";
+            }
+            toast({variant: "destructive", title: "Profile Creation Error", description: userMessage});
+            // Sign out the user if profile creation is critical and failed
+            await signOut(firebaseAuth);
+            setUser(null);
           }
         }
       } else {
@@ -134,7 +142,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!userDocSnap.exists()) {
         setLoading(false);
-        throw new Error("User profile not found. Please sign up or contact support.");
+        // This case should ideally be handled by the onAuthStateChanged listener creating a profile
+        // but as a fallback:
+        const newUser: User = {
+          id: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL,
+          isAdmin: false, username: null, role: null, phoneNumber: firebaseUser.phoneNumber || null, institution: null, researcherId: null,
+        };
+        await setDoc(userDocRef, newUser);
+        handleSuccessfulLogin(newUser); // Will redirect to complete profile
+        return;
       }
       const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
       handleSuccessfulLogin(appUser);
@@ -198,7 +214,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setShowLoginModal(false); 
 
-      localStorage.removeItem('profileIncomplete');
+      localStorage.removeItem('profileIncomplete'); // Profile is complete on signup form
       const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
       localStorage.removeItem('redirectAfterLogin');
       router.push(redirectPath);
@@ -248,7 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (userDocSnap.exists()) {
       appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-      if (appUser.isAdmin === undefined) { // Ensure isAdmin is set
+      if (appUser.isAdmin === undefined) { 
         appUser.isAdmin = false;
       }
     } else {
@@ -258,19 +274,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
         isAdmin: false, 
-        username: null, 
-        role: null,    
+        username: null, // Mark as incomplete
+        role: null,     // Mark as incomplete
         phoneNumber: firebaseUser.phoneNumber || null, 
         institution: null, 
         researcherId: null, 
       };
       try {
         await setDoc(userDocRef, appUser);
-      } catch (dbError) {
-         console.error("Error creating user document for social login:", dbError);
-         toast({variant: "destructive", title: "Login Error", description: "Failed to set up user profile. Please try again."});
-         setLoading(false);
-         return; // Abort further processing
+      } catch (dbError: any) { // Catch explicitly as any to inspect properties
+         console.error("Error creating/updating user document for social login:", dbError);
+         let userMessage = "Failed to set up user profile. Please try again.";
+         if (dbError.code === 'permission-denied') {
+            userMessage = "Firestore permission denied. Please check your security rules to allow users to create/update their own profiles in the 'users' collection.";
+         }
+         toast({variant: "destructive", title: "Login Error", description: userMessage});
+         // Attempt to sign out the user from Firebase Auth if profile creation failed
+          try {
+            await signOut(firebaseAuth);
+          } catch (signOutError) {
+            console.error("Error signing out user after profile creation failure:", signOutError);
+          }
+          setUser(null); // Clear local user state
+          setLoading(false);
+          return; 
       }
     }
     handleSuccessfulLogin(appUser);
@@ -294,8 +321,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
                 break;
+            case 'auth/unauthorized-domain':
+                toastMessage = "This domain is not authorized for Google Sign-In. Please contact support or check your Firebase project configuration.";
+                break;
             default:
-              // Use the default message for other Firebase errors or if message is present
               toastMessage = firebaseError.message || toastMessage; 
         }
       }
@@ -321,6 +350,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 break;
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method (e.g., Google or Email).";
+                break;
+             case 'auth/unauthorized-domain':
+                toastMessage = "This domain is not authorized for GitHub Sign-In. Please contact support or check your Firebase project configuration.";
                 break;
             default:
               toastMessage = firebaseError.message || toastMessage;
@@ -368,6 +400,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     allowedFields.forEach(field => {
       if (updatedData[field] !== undefined) {
+        // Store empty strings as null in Firestore for consistency with how optional fields are handled
         dataToUpdate[field] = updatedData[field] === "" ? null : updatedData[field];
       }
     });
@@ -385,7 +418,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("Failed to retrieve updated user profile from database.");
       }
       const updatedUser = { id: updatedUserDoc.id, ...updatedUserDoc.data() } as User;
-      if (updatedUser.isAdmin === undefined) { // Ensure isAdmin is set
+      if (updatedUser.isAdmin === undefined) { 
         updatedUser.isAdmin = false;
       }
       
@@ -397,14 +430,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
       }
       setLoading(false);
-    } catch(error) {
+    } catch(error: any) {
       setLoading(false);
       console.error("Error updating user profile in Firestore:", error);
-      // Check if it's a Firebase permissions error
-      if ((error as any)?.code === 'permission-denied') {
-        throw new Error("You do not have permission to update this profile. Please check Firestore rules.");
+      let userMessage = "Failed to update profile in the database.";
+      if (error.code === 'permission-denied') {
+        userMessage = "Firestore permission denied. Please check your security rules to allow profile updates.";
       }
-      throw new Error("Failed to update profile in the database.");
+      throw new Error(userMessage);
     }
   };
 
