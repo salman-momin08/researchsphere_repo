@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare } from 'lucide-react'; // Added Sparkles for AI Pre-Check
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -71,11 +71,9 @@ export default function Header() {
        <Button variant="ghost" onClick={handleSubmitPaperClick} className="w-full justify-start hover:text-primary text-foreground">
         Submit Paper
       </Button>
-      {user && (
-         <NavLink href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
-           AI Pre-Check
-          </NavLink>
-      )}
+      <NavLink href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
+       AI Pre-Check
+      </NavLink>
       <NavLink href="/registration" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Registration & Pricing</NavLink>
       <NavLink href="/key-committee" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Key Committee</NavLink>
       <NavLink href="/sample-templates" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Sample Templates</NavLink>
@@ -89,7 +87,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container px-4 sm:px-6 flex h-16 items-center">
+      <div className="container px-4 sm:px-6 flex h-16 items-center justify-between">
         <Link href="/" className="mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
           <span className="text-xl font-bold">ResearchSphere</span>
@@ -106,11 +104,9 @@ export default function Header() {
           >
             Submit Paper
           </Button>
-           {user && (
-            <Link href="/ai-pre-check" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center">
-              <Sparkles className="mr-1 h-4 w-4" /> AI Pre-Check
-            </Link>
-          )}
+          <Link href="/ai-pre-check" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center">
+            <Sparkles className="mr-1 h-4 w-4" /> AI Pre-Check
+          </Link>
           <Link href="/registration" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Registration</Link>
           <Link href="/key-committee" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Committee</Link>
           <Link href="/sample-templates" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Templates</Link>
@@ -121,7 +117,7 @@ export default function Header() {
         </nav>
 
         {/* Auth buttons / User Menu for Desktop */}
-        <div className="ml-auto hidden md:flex items-center space-x-2">
+        <div className="hidden md:flex items-center space-x-2">
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
