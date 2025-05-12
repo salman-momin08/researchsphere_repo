@@ -1,4 +1,4 @@
-"use client";
+// use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, DollarSign, Users } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, DollarSign, Users, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
@@ -51,6 +51,9 @@ export default function Header() {
           </Link>
           <Link href="/key-committee" className="transition-colors hover:text-primary">
             Key Committee
+          </Link>
+          <Link href="/contact-us" className="transition-colors hover:text-primary">
+            Contact Us
           </Link>
            {user && isAdmin && (
             <Link href="/admin/dashboard" className="transition-colors hover:text-primary">
@@ -92,6 +95,10 @@ export default function Header() {
                 <DropdownMenuItem onClick={() => router.push('/key-committee')}>
                   <Users className="mr-2 h-4 w-4" />
                   <span>Key Committee</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => router.push('/contact-us')}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  <span>Contact Us</span>
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
