@@ -4,25 +4,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
-    // - Authenticated users can create their own profile document where the document ID
-    //   and the 'id' field within the document match their UID.
-    // - Authenticated users can read, update, and delete their own profile document.
+    // Users Collection
+    // Allow users to read and write their own user document.
     match /users/{userId} {
       allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      // Ensure the user is creating their own document and the 'id' field in the document matches their UID.
-      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == request.auth.uid;
+      allow create: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Papers collection
-    // - Authenticated users can create paper documents, and the 'userId' field in the paper
-    //   document must match their UID.
-    // - Users can read, update, and delete only papers where the 'userId' field
-    //   matches their UID.
+    // Papers Collection
+    // Allow users to manage (CRUD) their own papers.
     match /papers/{paperId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
-      // Ensure the user is authenticated and is setting their own UID in the 'userId' field.
+      // Allow read if the user is the owner of the paper.
+      // Allow list if the query constraints ensure only user's papers are returned (handled by frontend query).
+      // For general list operations that don't filter by userId on the backend,
+      // you might need broader read access or implement server-side filtering with functions.
+      // This rule assumes frontend queries will include `where("userId", "==", request.auth.uid)` for listing.
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Allow create if the authenticated user is setting their own UID as the userId.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Allow update and delete if the user is the owner of the paper.
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }
