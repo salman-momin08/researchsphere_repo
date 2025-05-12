@@ -20,17 +20,16 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    // Fix for 'async_hooks' module not found error.
-    // This error typically occurs when a Node.js-specific module (like async_hooks,
-    // often used by tracing libraries such as OpenTelemetry) is incorrectly
-    // included in the client-side bundle.
-    // By setting `async_hooks: false` in `resolve.fallback` for non-server builds,
-    // we instruct Webpack (or Turbopack, which respects this config) to treat
-    // `async_hooks` as an empty module on the client, preventing the error.
+    // Fix for Node.js-specific modules (like async_hooks, fs)
+    // being incorrectly included in the client-side bundle.
+    // By setting them to `false` in `resolve.fallback` for non-server builds,
+    // we instruct Webpack (or Turbopack) to treat them as empty modules on the client,
+    // preventing "Module not found" errors.
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         async_hooks: false,
+        fs: false, // Add fs to fallback
       };
     }
 
@@ -40,3 +39,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

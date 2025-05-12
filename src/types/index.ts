@@ -1,9 +1,17 @@
 export interface User {
   id: string;
   email: string | null;
-  displayName: string | null;
+  displayName: string | null; // This will store Full Name
   photoURL?: string | null;
   isAdmin?: boolean; // For admin panel access
+
+  // New fields from registration
+  username?: string;
+  phoneNumber?: string | null;
+  institution?: string | null;
+  role?: "Author" | "Reviewer" | "Admin"; // Role selected during registration or set by admin
+  researcherId?: string | null; // ORCID ID or other researcher ID
+  // termsAccepted is usually for validation and not stored, but can be if needed for audit
 }
 
 export type PaperStatus = 
