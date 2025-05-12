@@ -1,9 +1,8 @@
-
 "use client";
 
 import type { User } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, SetStateAction, Dispatch } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname } from 'next/navigation'; 
 import type { SignupFormValues } from '@/components/auth/SignupForm'; 
 import { 
   auth as firebaseAuth,
@@ -18,11 +17,11 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   type UserCredential,
   type User as FirebaseUser,
-  signInWithEmailAndPassword, // Added for actual email/password login
-  createUserWithEmailAndPassword // Added for actual email/password signup
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { toast } from '@/hooks/use-toast'; // Ensured toast is imported
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { toast } from '@/hooks/use-toast'; 
 
 interface AuthContextType {
   user: User | null;
@@ -46,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname(); 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
@@ -54,9 +53,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
-          const appUser = userDocSnap.data() as User;
+          const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+           // Ensure isAdmin defaults to false if not present
+          if (appUser.isAdmin === undefined) {
+            appUser.isAdmin = false;
+          }
           setUser(appUser);
-          // Check profile completeness for users logged in via onAuthStateChanged
           const isProfileComplete = appUser.username && appUser.role;
           if (!isProfileComplete) {
             localStorage.setItem('profileIncomplete', 'true');
@@ -67,29 +69,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.removeItem('profileIncomplete');
           }
         } else {
-          // This case handles users who authenticated with Firebase (e.g. social)
-          // but don't have a corresponding document in Firestore yet.
-          // This can happen on the very first social login if processSocialLogin didn't complete
-          // or if the Firestore document was somehow deleted.
-          const partialUser: User = {
+          const newUser: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             isAdmin: false, 
-            username: null, // Will be filled during profile completion
-            role: null,     // Will be filled during profile completion
+            username: null, 
+            role: null,     
             phoneNumber: firebaseUser.phoneNumber || null,
-            // institution and researcherId will be null initially for social logins
             institution: null, 
             researcherId: null,
           };
-          await setDoc(userDocRef, partialUser); // Create the basic profile
-          setUser(partialUser);
-          localStorage.setItem('profileIncomplete', 'true');
-           if (pathname !== '/profile/settings') {
-             router.push('/profile/settings?complete=true');
-           }
+          try {
+            await setDoc(userDocRef, newUser); 
+            setUser(newUser);
+            localStorage.setItem('profileIncomplete', 'true');
+            if (pathname !== '/profile/settings') {
+              router.push('/profile/settings?complete=true');
+            }
+          } catch (error) {
+            console.error("Error creating user document in Firestore:", error);
+            toast({variant: "destructive", title: "Profile Creation Error", description: "Could not save user profile. Please try again or contact support."});
+            // Potentially log out the user or handle this more gracefully
+            setUser(null); // User exists in auth but not in DB, critical error
+          }
         }
       } else {
         setUser(null);
@@ -102,11 +106,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const handleSuccessfulLogin = (appUser: User) => {
-    setUser(appUser);
+    // Ensure isAdmin defaults to false if not present
+    const userWithDefaultAdmin = { ...appUser, isAdmin: appUser.isAdmin || false };
+    setUser(userWithDefaultAdmin);
     setLoading(false);
     setShowLoginModal(false);
 
-    const isProfileComplete = appUser.username && appUser.role;
+    const isProfileComplete = userWithDefaultAdmin.username && userWithDefaultAdmin.role;
     if (!isProfileComplete) {
       localStorage.setItem('profileIncomplete', 'true');
       router.push('/profile/settings?complete=true');
@@ -127,12 +133,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        // This case should ideally not happen if signup flow is correct
-        // but as a safeguard:
         setLoading(false);
-        throw new Error("User profile not found in database. Please sign up or contact support.");
+        throw new Error("User profile not found. Please sign up or contact support.");
       }
-      const appUser = userDocSnap.data() as User;
+      const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
       handleSuccessfulLogin(appUser);
     } catch (error) {
       setLoading(false);
@@ -143,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         switch (firebaseError.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential': // More generic error for email/password issues
+          case 'auth/invalid-credential': 
             errorMessage = 'Invalid email or password.';
             break;
           case 'auth/invalid-email':
@@ -163,7 +167,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (data: SignupFormValues) => {
     setLoading(true);
     
-    // Check for unique username
     const usersRef = collection(db, "users");
     const usernameQuery = query(usersRef, where("username", "==", data.username));
     const usernameSnapshot = await getDocs(usernameQuery);
@@ -171,40 +174,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
         throw new Error("Username already exists. Please choose another one.");
     }
-    // Email uniqueness is handled by Firebase Auth itself (auth/email-already-in-use)
     
     try {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
       const firebaseUser = userCredential.user;
 
-      // Create the full user profile in Firestore
       const newUserProfile: User = {
         id: firebaseUser.uid, 
         email: data.email,
         displayName: data.fullName, 
-        username: data.username, // From form
+        username: data.username, 
         phoneNumber: data.phoneNumber || null,
         institution: data.institution || null,
-        role: data.role, // From form
+        role: data.role, 
         researcherId: data.researcherId || null,
-        isAdmin: false, // Default to false
-        photoURL: firebaseUser.photoURL || null, // Firebase might provide a default or null
+        isAdmin: false, 
+        photoURL: firebaseUser.photoURL || null, 
       };
       
       await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile);
-      // No need to call handleSuccessfulLogin directly, onAuthStateChanged will pick it up
-      // and handle profile completion if necessary. Just set user and loading.
-      setUser(newUserProfile); // Optimistically set user
+      
+      setUser(newUserProfile); 
       setLoading(false);
-      setShowLoginModal(false); // Close modal if signup was from modal
+      setShowLoginModal(false); 
 
-      // Profile completion check is now primarily handled by onAuthStateChanged
-      // But for direct signup, we know username and role are provided.
       localStorage.removeItem('profileIncomplete');
       const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
       localStorage.removeItem('redirectAfterLogin');
       router.push(redirectPath);
-
 
     } catch (error) {
         setLoading(false);
@@ -250,31 +247,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let appUser: User;
 
     if (userDocSnap.exists()) {
-      appUser = userDocSnap.data() as User;
+      appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+      if (appUser.isAdmin === undefined) { // Ensure isAdmin is set
+        appUser.isAdmin = false;
+      }
     } else {
-      // Create a new user profile in Firestore for the social login
-      // Username and role will be null initially, prompting profile completion.
       appUser = {
         id: firebaseUser.uid,
-        email: firebaseUser.email, // This might be a provider-specific email
+        email: firebaseUser.email, 
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
-        isAdmin: false, // Default for new users
-        username: null, // To be completed by user
-        role: null,     // To be completed by user
-        phoneNumber: firebaseUser.phoneNumber || null, // Might be available from provider
-        institution: null, // To be completed by user
-        researcherId: null, // To be completed by user
+        isAdmin: false, 
+        username: null, 
+        role: null,    
+        phoneNumber: firebaseUser.phoneNumber || null, 
+        institution: null, 
+        researcherId: null, 
       };
-      await setDoc(userDocRef, appUser);
-      // No need to re-fetch userDocSnap, appUser is now the correct representation
+      try {
+        await setDoc(userDocRef, appUser);
+      } catch (dbError) {
+         console.error("Error creating user document for social login:", dbError);
+         toast({variant: "destructive", title: "Login Error", description: "Failed to set up user profile. Please try again."});
+         setLoading(false);
+         return; // Abort further processing
+      }
     }
-    // onAuthStateChanged will handle setting the user and profile completion logic
-    // We ensure loading is false and modal is closed. Redirect handled by onAuthStateChanged or handleSuccessfulLogin.
-    setLoading(false);
-    setShowLoginModal(false);
-    // The redirect and profile completion logic is now more centralized in onAuthStateChanged
-    // but we can still call handleSuccessfulLogin if we want an immediate redirect for social login
     handleSuccessfulLogin(appUser);
   };
 
@@ -296,14 +294,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
                 break;
-            case 'auth/auth-domain-config-required':
-            case 'auth/operation-not-supported-in-this-environment':
-            case 'auth/unauthorized-domain':
-                toastMessage = "Google Sign-In is not configured correctly for this website. Please contact support.";
-                break;
+            default:
+              // Use the default message for other Firebase errors or if message is present
+              toastMessage = firebaseError.message || toastMessage; 
         }
       }
-      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "Google Login", description: toastMessage });
+      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "Google Login Error", description: toastMessage });
       setLoading(false);
     }
   };
@@ -326,29 +322,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method (e.g., Google or Email).";
                 break;
-            case 'auth/auth-domain-config-required':
-            case 'auth/operation-not-supported-in-this-environment':
-            case 'auth/unauthorized-domain':
-                toastMessage = "GitHub Sign-In is not configured correctly for this website. Please contact support.";
-                break;
-             case 'auth/web-storage-unsupported':
-                toastMessage = "Your browser does not support storage needed for GitHub Sign-In. Please enable cookies/storage or try a different browser.";
-                break;
+            default:
+              toastMessage = firebaseError.message || toastMessage;
         }
       }
-      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "GitHub Login", description: toastMessage });
+      toast({ variant: firebaseError.code && (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", title: "GitHub Login Error", description: toastMessage });
       setLoading(false);
     }
   };
 
-  const sendPasswordResetEmail = async (email: string) => {
+  const sendPasswordResetEmail = async (emailAddress: string) => {
     setLoading(true);
     try {
-        await firebaseSendPasswordResetEmail(firebaseAuth, email);
-        // Toast success is handled in the ForgotPasswordPage component for better UX there
+        await firebaseSendPasswordResetEmail(firebaseAuth, emailAddress);
     } catch (error) {
         setLoading(false); 
-        throw error; // Re-throw to be caught by the calling component
+        throw error; 
     }
     setLoading(false);
   };
@@ -361,56 +350,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const userDocRef = doc(db, "users", user.id);
 
-    // Check for username uniqueness if it's being changed
     if (updatedData.username && updatedData.username !== user.username) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("username", "==", updatedData.username));
         const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-             // Ensure the found username doesn't belong to the current user (it shouldn't if logic is right, but good check)
-            const conflictingUser = querySnapshot.docs.find(d => d.id !== user.id);
-            if (conflictingUser) {
-                setLoading(false);
-                throw new Error("Username already taken. Please choose another one.");
-            }
+        
+        const conflictingUser = querySnapshot.docs.find(d => d.id !== user.id);
+        if (conflictingUser) {
+            setLoading(false);
+            throw new Error("Username already taken. Please choose another one.");
         }
     }
     
-    // Construct object with only the fields that are actually being updated
     const dataToUpdate: { [key: string]: any } = {};
-    if (updatedData.displayName !== undefined) dataToUpdate.displayName = updatedData.displayName;
-    if (updatedData.username !== undefined) dataToUpdate.username = updatedData.username;
-    if (updatedData.role !== undefined) dataToUpdate.role = updatedData.role;
-    if (updatedData.phoneNumber !== undefined) dataToUpdate.phoneNumber = updatedData.phoneNumber === "" ? null : updatedData.phoneNumber;
-    if (updatedData.institution !== undefined) dataToUpdate.institution = updatedData.institution === "" ? null : updatedData.institution;
-    if (updatedData.researcherId !== undefined) dataToUpdate.researcherId = updatedData.researcherId === "" ? null : updatedData.researcherId;
+    const allowedFields: (keyof Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>)[] = 
+      ['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId'];
 
+    allowedFields.forEach(field => {
+      if (updatedData[field] !== undefined) {
+        dataToUpdate[field] = updatedData[field] === "" ? null : updatedData[field];
+      }
+    });
+    
     if (Object.keys(dataToUpdate).length === 0) {
       setLoading(false);
-      // toast({ title: "No Changes", description: "No information was changed." });
-      return; // No actual data to update
+      return; 
     }
 
-    await updateDoc(userDocRef, dataToUpdate);
-    
-    // Fetch the updated user document to refresh local state
-    const updatedUserDoc = await getDoc(userDocRef);
-    if (!updatedUserDoc.exists()) {
+    try {
+      await updateDoc(userDocRef, dataToUpdate);
+      const updatedUserDoc = await getDoc(userDocRef);
+      if (!updatedUserDoc.exists()) {
+        setLoading(false);
+        throw new Error("Failed to retrieve updated user profile from database.");
+      }
+      const updatedUser = { id: updatedUserDoc.id, ...updatedUserDoc.data() } as User;
+      if (updatedUser.isAdmin === undefined) { // Ensure isAdmin is set
+        updatedUser.isAdmin = false;
+      }
+      
+      setUser(updatedUser); 
+
+      if (localStorage.getItem('profileIncomplete') === 'true') {
+          if (updatedUser.username && updatedUser.role) { 
+              localStorage.removeItem('profileIncomplete');
+          }
+      }
       setLoading(false);
-      // This should not happen if the update was successful
-      throw new Error("Failed to retrieve updated user profile from database.");
+    } catch(error) {
+      setLoading(false);
+      console.error("Error updating user profile in Firestore:", error);
+      // Check if it's a Firebase permissions error
+      if ((error as any)?.code === 'permission-denied') {
+        throw new Error("You do not have permission to update this profile. Please check Firestore rules.");
+      }
+      throw new Error("Failed to update profile in the database.");
     }
-    const updatedUser = updatedUserDoc.data() as User;
-    
-    setUser(updatedUser); // Update local user state
-
-    // Handle profile completion flag
-    if (localStorage.getItem('profileIncomplete') === 'true') {
-        if (updatedUser.username && updatedUser.role) { // Core fields for completion
-            localStorage.removeItem('profileIncomplete');
-        }
-    }
-    setLoading(false);
   };
 
   const isAdmin = user?.isAdmin || false;
@@ -421,4 +416,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
