@@ -62,6 +62,15 @@ const contactPersons: ContactPerson[] = [
     // No phone
     imageUrl: "https://picsum.photos/seed/clara/100/100",
     dataAiHint: "coordinator woman"
+  },
+  {
+    id: "4", // New unique ID for the contactPersons array
+    name: "Dr. Evelyn Reed",
+    designation: "Conference Chair (Key Committee Liaison)", // Combining title and indicating role
+    email: "evelyn.r.committee@researchsphere.com", // Placeholder email
+    // phone is optional and not provided here as it's not in committee data
+    imageUrl: "https://picsum.photos/seed/evelyn/100/100", // From original committee data for Dr. Evelyn Reed
+    dataAiHint: "scientist woman" // From original committee data
   }
 ];
 
@@ -113,7 +122,7 @@ export default function ContactUsPage() {
         {/* Contact Persons Section */}
         <section className="mb-12 md:mb-16">
           <h2 className="text-3xl font-semibold text-center mb-10">Meet Our Support Team</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8"> {/* Changed lg:grid-cols-3 to lg:grid-cols-4 */}
             {contactPersons.map((person) => (
               <Card key={person.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
                 <CardHeader className="items-center text-center">
@@ -134,7 +143,7 @@ export default function ContactUsPage() {
                     )}
                   </Avatar>
                   <CardTitle className="text-xl">{person.name}</CardTitle>
-                  <p className="text-sm text-primary font-medium flex items-center">
+                  <p className="text-sm text-primary font-medium flex items-center justify-center">
                     <Briefcase size={16} className="mr-2" /> {person.designation}
                   </p>
                 </CardHeader>
@@ -241,3 +250,4 @@ export default function ContactUsPage() {
     </div>
   );
 }
+
