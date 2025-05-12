@@ -4,36 +4,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection:
-    // - Authenticated users can create their own user document.
-    // - Authenticated users can read, update, and delete their own user document.
+    // Users collection
+    // - Authenticated users can create their own profile document where the document ID
+    //   and the 'id' field within the document match their UID.
+    // - Authenticated users can read, update, and delete their own profile document.
     match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
       allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Ensure the user is creating their own document and the 'id' field in the document matches their UID.
+      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == request.auth.uid;
     }
 
-    // Papers collection (Example - customize as needed):
-    // - Authenticated users can create papers.
-    // - Authenticated users can read, update, and delete their own papers.
-    //   (Assumes a 'userId' field in paper documents that matches request.auth.uid)
-    // - Optionally, allow admins to read all papers (if you have an 'isAdmin' field in user docs).
+    // Papers collection
+    // - Authenticated users can create paper documents, and the 'userId' field in the paper
+    //   document must match their UID.
+    // - Users can read, update, and delete only papers where the 'userId' field
+    //   matches their UID.
     match /papers/{paperId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      // Example admin read access:
-      // allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-
-    // Default deny for any other paths not explicitly matched if you want to be very strict.
-    // Or, for a more general authenticated access for other collections:
-    // match /{document=**} {
-    //   allow read, write: if request.auth != null;
-    // }
-    // For now, to ensure security, let's explicitly deny unmatched paths unless authenticated.
-    // If other collections need different rules, they should be specified.
-    // This is a restrictive rule for any path not explicitly defined above.
-     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Ensure the user is authenticated and is setting their own UID in the 'userId' field.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
   }
 }
