@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -50,27 +51,40 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         toast({ variant: "destructive", title: "Payment Error", description: "Please fill in all card details." });
         return;
       }
+      // Basic validation for card details (length, format) can be added here for better UX
     } else if (paymentMethod === "upi") {
-      if (!upiId && !confirm("You have not entered a UPI ID. Do you want to proceed assuming QR code scan? (Mock behavior)")) {
-         // In a real app, you'd likely require UPI ID or scan.
-         // For mock, we can allow proceeding or prompt. Here, we'll just check if empty.
-        if (!upiId) {
-          toast({ variant: "destructive", title: "Payment Error", description: "Please enter your UPI ID."});
-          return;
+      if (!upiId) {
+          // For mock purposes, we can allow proceeding if UPI ID is empty (assuming QR scan)
+          // In a real app, this logic would be stricter or involve QR scan confirmation
+          const proceedWithoutUpiId = confirm("You have not entered a UPI ID. Do you want to proceed assuming QR code scan? (Mock behavior)");
+          if (!proceedWithoutUpiId) {
+            toast({ variant: "destructive", title: "Payment Error", description: "Please enter your UPI ID or scan the QR code."});
+            return;
+          }
         }
-      }
+        // Basic UPI ID format validation can be added here
     }
 
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate payment processing
-    
-    onPaymentSuccess(paper.id);
-    setPaymentStep("success");
-    toast({ 
-      title: "Payment Successful!", 
-      description: `Your payment of $${SUBMISSION_FEE.toFixed(2)} for "${paper.title}" via ${paymentMethod === 'card' ? 'Card' : 'UPI'} has been processed.` 
-    });
-    setIsProcessing(false);
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      
+      // Call the success callback
+      onPaymentSuccess(paper.id);
+      setPaymentStep("success");
+      toast({ 
+        title: "Payment Successful!", 
+        description: `Your payment of $${SUBMISSION_FEE.toFixed(2)} for "${paper.title}" via ${paymentMethod === 'card' ? 'Card' : 'UPI'} has been processed.` 
+      });
+    } catch (error) {
+      console.error("Payment processing error:", error);
+      toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
+      // Potentially reset to form step or keep modal open for retry, depending on UX requirements
+      // setPaymentStep("form"); // Optionally reset to form
+    } finally {
+      setIsProcessing(false); // Ensure loading state is reset regardless of outcome
+    }
   };
 
   const resetAndClose = () => {
@@ -102,22 +116,22 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
 
             <div className="py-4 space-y-4">
               <div>
-                <Label className="mb-2 block">Select Payment Method</Label>
+                <Label className="mb-2 block font-medium">Select Payment Method</Label>
                 <RadioGroup
-                  defaultValue="card"
+                  value={paymentMethod}
                   onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                  className="flex space-x-4"
+                  className="flex gap-4"
                   disabled={isProcessing}
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="card" id="card" />
-                    <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
+                    <RadioGroupItem value="card" id="card-method" />
+                    <Label htmlFor="card-method" className="flex items-center gap-2 cursor-pointer text-sm">
                       <CreditCard className="h-5 w-5" /> Credit/Debit Card
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="upi" id="upi" />
-                    <Label htmlFor="upi" className="flex items-center gap-2 cursor-pointer">
+                    <RadioGroupItem value="upi" id="upi-method" />
+                    <Label htmlFor="upi-method" className="flex items-center gap-2 cursor-pointer text-sm">
                       <AtSign className="h-5 w-5" /> UPI
                     </Label>
                   </div>
@@ -125,53 +139,52 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </div>
 
               {paymentMethod === "card" && (
-                <div className="space-y-4 animate-in fade-in-50">
+                <div className="space-y-3 animate-in fade-in-50">
                   <div>
                     <Label htmlFor="cardNumber">Card Number</Label>
-                    <Input id="cardNumber" placeholder="•••• •••• •••• ••••" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} disabled={isProcessing} />
+                    <Input id="cardNumber" placeholder="0000 0000 0000 0000" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} disabled={isProcessing} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="expiryDate">Expiry Date (MM/YY)</Label>
+                      <Label htmlFor="expiryDate">Expiry Date</Label>
                       <Input id="expiryDate" placeholder="MM/YY" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} disabled={isProcessing} />
                     </div>
                     <div>
                       <Label htmlFor="cvc">CVC</Label>
-                      <Input id="cvc" placeholder="•••" value={cvc} onChange={(e) => setCvc(e.target.value)} disabled={isProcessing} />
+                      <Input id="cvc" placeholder="123" value={cvc} onChange={(e) => setCvc(e.target.value)} disabled={isProcessing} />
                     </div>
                   </div>
                 </div>
               )}
 
               {paymentMethod === "upi" && (
-                <div className="space-y-4 animate-in fade-in-50">
+                <div className="space-y-3 animate-in fade-in-50">
                   <div>
                     <Label htmlFor="upiId">UPI ID</Label>
-                    <Input id="upiId" placeholder="yourname@bank" value={upiId} onChange={(e) => setUpiId(e.target.value)} disabled={isProcessing} />
+                    <Input id="upiId" placeholder="yourname@bankupi" value={upiId} onChange={(e) => setUpiId(e.target.value)} disabled={isProcessing} />
                   </div>
-                  <div className="text-center text-muted-foreground">OR</div>
+                  <div className="text-center text-sm text-muted-foreground my-2">OR</div>
                   <div className="flex flex-col items-center space-y-2">
-                    <Label>Scan QR Code</Label>
-                    <div className="p-4 border rounded-md bg-muted flex items-center justify-center">
-                      {/* Placeholder for QR Code Image */}
+                    <Label className="font-medium">Scan QR Code</Label>
+                    <div className="p-2 border rounded-md bg-muted inline-block">
                        <Image 
                         src="https://picsum.photos/seed/qrpayment/150/150" 
                         alt="Scan QR Code for UPI Payment" 
-                        width={150} 
-                        height={150} 
+                        width={120} 
+                        height={120} 
                         className="rounded"
                         data-ai-hint="qr code" 
                       />
                     </div>
-                     <p className="text-xs text-muted-foreground">Scan using any UPI app.</p>
+                     <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="sm:justify-between gap-2 sm:gap-0">
               <Button variant="outline" onClick={resetAndClose} disabled={isProcessing}>Cancel</Button>
-              <Button onClick={handlePayment} disabled={isProcessing}>
+              <Button onClick={handlePayment} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentMethod === 'card' ? <CreditCard className="mr-2 h-4 w-4" /> : <AtSign className="mr-2 h-4 w-4" />)}
                 {isProcessing ? "Processing..." : `Pay $${SUBMISSION_FEE.toFixed(2)}`}
               </Button>
@@ -182,16 +195,16 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         {paymentStep === "success" && (
           <>
             <DialogHeader>
-              <div className="mx-auto mb-4 h-16 w-16 text-green-500">
+              <div className="mx-auto mb-4 h-16 w-16 text-green-500 flex items-center justify-center">
                 <CheckCircle size={64} strokeWidth={1.5}/>
               </div>
               <DialogTitle className="text-2xl font-bold text-center">Payment Successful!</DialogTitle>
-              <DialogDescription className="text-center">
+              <DialogDescription className="text-center px-4">
                 Your paper &quot;{paper.title}&quot; has been officially submitted. You can track its status on your dashboard.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
-              <Button onClick={resetAndClose}>Close</Button>
+            <DialogFooter className="mt-2">
+              <Button onClick={resetAndClose} className="w-full">Close</Button>
             </DialogFooter>
           </>
         )}
@@ -199,3 +212,4 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     </Dialog>
   );
 }
+
