@@ -28,12 +28,18 @@ const nextConfig: NextConfig = {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        async_hooks: false,
-        fs: false, 
-        tls: false,
-        net: false,
-        http2: false,
-        dns: false, 
+        'async_hooks': false,
+        'node:async_hooks': false, // Added to handle "node:async_hooks"
+        'fs': false,
+        'node:fs': false,          // Added for consistency
+        'tls': false,
+        'node:tls': false,         // Added for consistency
+        'net': false,
+        'node:net': false,         // Added for consistency
+        'http2': false,
+        'node:http2': false,       // Added for consistency
+        'dns': false,
+        'node:dns': false,         // Added for consistency
       };
     }
 
@@ -43,6 +49,7 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
 
 
 

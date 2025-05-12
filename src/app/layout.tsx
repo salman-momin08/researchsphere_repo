@@ -24,12 +24,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
+      {/* Next.js automatically creates the <head> tag.
+          Ensure no characters, including comments or newlines that might be misinterpreted,
+          exist between the <html> tag and the <body> tag. */}
       <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
           <Header />
-          <main className="flex-grow">
-            {children}
-          </main>
+          <main className="flex-grow">{children}</main>
           <LoginModal />
           <Footer />
           <Toaster />
