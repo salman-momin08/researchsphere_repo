@@ -1,4 +1,5 @@
-// use server'
+
+'use server';
 
 /**
  * @fileOverview Provides an AI flow to determine the acceptance probability score of a research paper.
@@ -57,3 +58,4 @@ const acceptanceProbabilityFlow = ai.defineFlow(
     return output!;
   }
 );
+
