@@ -24,9 +24,10 @@ const paperSchema = z.object({
   abstract: z.string().min(50, "Abstract must be at least 50 characters.").max(2000, "Abstract must be less than 2000 characters."),
   authors: z.string().min(1, "At least one author is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
-  file: z.instanceof(FileList).refine(files => files.length > 0, "A paper file is required.")
-    .refine(files => files?.[0]?.size <= 5 * 1024 * 1024, "File size must be less than 5MB.") // Max 5MB
-    .refine(files => ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files?.[0]?.type), "Only PDF or DOCX files are allowed."),
+  file: z.any()
+    .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0), "A paper file is required.")
+    .refine(files => typeof window === 'undefined' || (files instanceof FileList && files?.[0]?.size <= 5 * 1024 * 1024), "File size must be less than 5MB.") // Max 5MB
+    .refine(files => typeof window === 'undefined' || (files instanceof FileList && ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files?.[0]?.type)), "Only PDF or DOCX files are allowed."),
 });
 
 type PaperFormValues = z.infer<typeof paperSchema>;
@@ -150,7 +151,7 @@ export default function PaperUploadForm() {
     } catch (error) {
       console.error("Submission error:", error);
       setFormError(error instanceof Error ? error.message : "An unexpected error occurred during submission.");
-      toast({ variant: "destructive", title: "Submission Failed", description: formError });
+      toast({ variant: "destructive", title: "Submission Failed", description: formError ?? "Unknown error" });
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +221,7 @@ export default function PaperUploadForm() {
                 )}
               </div>
             </div>
-            {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{form.formState.errors.file.message}</p>}
+            {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{ (form.formState.errors.file as any)?.message || "Invalid file"}</p>}
           </div>
 
           {(isProcessingAI) && (
