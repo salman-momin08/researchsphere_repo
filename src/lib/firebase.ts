@@ -20,25 +20,21 @@ const requiredConfigs: { [key: string]: string | undefined } = {
   NEXT_PUBLIC_FIREBASE_APP_ID: firebaseAppId,
 };
 
+let allConfigsPresent = true;
 for (const key in requiredConfigs) {
   if (!requiredConfigs[key]) {
-    // Throwing error during module load might be too disruptive for server components
-    // Console.error is a safer way to inform during development
-    // On the client-side, this will be visible in the browser console.
-    // On the server-side (build or SSR), this will be visible in the terminal.
-    const message = 
+    allConfigsPresent = false;
+    const message =
       `Firebase configuration variable ${key} is missing. ` +
       "Please ensure it is set in your .env.local file and the development server has been restarted. " +
-      "This can lead to Firebase initialization errors (e.g., auth/api-key-not-valid).";
-    
+      "This can lead to Firebase initialization errors (e.g., auth/api-key-not-valid or auth/configuration-not-found).";
+
     if (typeof window !== 'undefined') {
       console.error(message); // Log error in browser
     } else {
-      // For server-side, throwing an error might be preferable to stop the build/start
-      // But to keep app potentially running for other parts, we can log it.
-      // For a hard stop, uncomment the throw new Error(message) below.
       console.error(`CRITICAL SETUP ERROR: ${message}`);
-      // throw new Error(message); // Uncomment this if you want the build/server start to fail hard
+      // Consider throwing an error here if running in a Node.js environment (e.g., build time)
+      // to make the failure more explicit: throw new Error(message);
     }
   }
 }
@@ -52,22 +48,37 @@ const firebaseConfig: FirebaseOptions = {
   appId: firebaseAppId,
 };
 
+// Log the authDomain to help debug auth/unauthorized-domain issues
+if (typeof window !== 'undefined') { // Only log on client-side where auth happens
+  console.log("Firebase SDK attempting to use Auth Domain:", firebaseAuthDomain);
+  if (!firebaseAuthDomain) {
+    console.error("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is undefined. This will likely cause auth/unauthorized-domain or auth/configuration-not-found errors.");
+  }
+}
+
+
 // Initialize Firebase
 let app;
 // Check if Firebase has already been initialized to avoid re-initialization error
 if (!getApps().length) {
   // Only initialize if no apps exist and all required configs are present
-  // The check above only logs; for a hard stop, you'd need to prevent initialization here
-  // if any requiredConfigs[key] was undefined.
-  // However, Firebase SDK itself will throw an error if critical parts like apiKey are missing.
-  app = initializeApp(firebaseConfig);
+  if (allConfigsPresent) { // Check if all configurations were found
+    app = initializeApp(firebaseConfig);
+  } else {
+    console.error("Firebase initialization skipped due to missing configuration variables. Firebase services will not be available.");
+    // Optionally, you could throw an error here to halt execution if Firebase is critical
+    // throw new Error("Firebase initialization failed due to missing configuration.");
+  }
 } else {
   app = getApp(); // Get the default app if already initialized
 }
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Export auth, db, storage conditionally based on app initialization
+// This prevents errors if initialization failed.
+export const auth = app ? getAuth(app) : null!; // Use null assertion for now, but handle potential null elsewhere
+export const db = app ? getFirestore(app) : null!;
+export const storage = app ? getStorage(app) : null!;
+
 
 // Export providers for convenience
 export const googleAuthCredentialProvider = new GoogleAuthProvider();
