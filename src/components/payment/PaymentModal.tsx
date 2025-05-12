@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -18,6 +17,7 @@ import { CreditCard, Loader2, CheckCircle, QrCode, AtSign } from "lucide-react";
 import type { Paper } from "@/types";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Image from "next/image";
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -33,15 +33,28 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   
-  // Card details
   const [cardNumber, setCardNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [cvc, setCvc] = useState("");
-
-  // UPI details
   const [upiId, setUpiId] = useState("");
-
   const [paymentStep, setPaymentStep] = useState<"form" | "success">("form");
+
+  const resetLocalState = () => {
+    setCardNumber("");
+    setExpiryDate("");
+    setCvc("");
+    setUpiId("");
+    setPaymentMethod("card");
+    setPaymentStep("form");
+    setIsProcessing(false); 
+  };
+
+  const handleModalVisibilityChange = (newOpenState: boolean) => {
+    if (!newOpenState) {
+      resetLocalState(); 
+    }
+    onOpenChange(newOpenState); 
+  };
 
   const handlePayment = async () => {
     if (!paper) return;
@@ -51,26 +64,19 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         toast({ variant: "destructive", title: "Payment Error", description: "Please fill in all card details." });
         return;
       }
-      // Basic validation for card details (length, format) can be added here for better UX
     } else if (paymentMethod === "upi") {
       if (!upiId) {
-          // For mock purposes, we can allow proceeding if UPI ID is empty (assuming QR scan)
-          // In a real app, this logic would be stricter or involve QR scan confirmation
           const proceedWithoutUpiId = confirm("You have not entered a UPI ID. Do you want to proceed assuming QR code scan? (Mock behavior)");
           if (!proceedWithoutUpiId) {
             toast({ variant: "destructive", title: "Payment Error", description: "Please enter your UPI ID or scan the QR code."});
             return;
           }
         }
-        // Basic UPI ID format validation can be added here
     }
 
     setIsProcessing(true);
     try {
-      // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000)); 
-      
-      // Call the success callback
       onPaymentSuccess(paper.id);
       setPaymentStep("success");
       toast({ 
@@ -80,29 +86,20 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     } catch (error) {
       console.error("Payment processing error:", error);
       toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
-      // Potentially reset to form step or keep modal open for retry, depending on UX requirements
-      // setPaymentStep("form"); // Optionally reset to form
     } finally {
-      setIsProcessing(false); // Ensure loading state is reset regardless of outcome
+      setIsProcessing(false); 
     }
   };
 
-  const resetAndClose = () => {
-    setCardNumber("");
-    setExpiryDate("");
-    setCvc("");
-    setUpiId("");
-    setPaymentMethod("card"); // Reset to default payment method
-    setPaymentStep("form");
-    onOpenChange(false);
-  }
-
-  if (!paper) return null;
-
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) resetAndClose(); else onOpenChange(open);}}>
+    <Dialog open={isOpen} onOpenChange={handleModalVisibilityChange}>
       <DialogContent className="sm:max-w-md">
-        {paymentStep === "form" && (
+        {!paper && isOpen ? (
+           <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
+            <LoadingSpinner size={32} />
+            <p className="mt-3 text-muted-foreground">Loading paper details...</p>
+          </div>
+        ) : paymentStep === "form" && paper ? (
           <>
             <DialogHeader>
               <div className="mx-auto mb-4 h-12 w-12 text-primary">
@@ -183,16 +180,14 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </div>
 
             <DialogFooter className="sm:justify-between gap-2 sm:gap-0">
-              <Button variant="outline" onClick={resetAndClose} disabled={isProcessing}>Cancel</Button>
+              <Button variant="outline" onClick={() => handleModalVisibilityChange(false)} disabled={isProcessing}>Cancel</Button>
               <Button onClick={handlePayment} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentMethod === 'card' ? <CreditCard className="mr-2 h-4 w-4" /> : <AtSign className="mr-2 h-4 w-4" />)}
                 {isProcessing ? "Processing..." : `Pay $${SUBMISSION_FEE.toFixed(2)}`}
               </Button>
             </DialogFooter>
           </>
-        )}
-
-        {paymentStep === "success" && (
+        ) : paymentStep === "success" && paper ? (
           <>
             <DialogHeader>
               <div className="mx-auto mb-4 h-16 w-16 text-green-500 flex items-center justify-center">
@@ -204,12 +199,11 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-2">
-              <Button onClick={resetAndClose} className="w-full">Close</Button>
+              <Button onClick={() => handleModalVisibilityChange(false)} className="w-full">Close</Button>
             </DialogFooter>
           </>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );
 }
-
