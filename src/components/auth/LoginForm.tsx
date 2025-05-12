@@ -1,4 +1,4 @@
-"use client";
+// use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
+import Link from "next/link";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -40,10 +41,12 @@ export default function LoginForm() {
     try {
       await login(data.email, data.password);
       toast({ title: "Login Successful", description: "Welcome back!" });
-      router.push("/dashboard");
+      // Router push is handled in AuthContext after successful login
+      // router.push("/dashboard"); 
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred.");
-      toast({ variant: "destructive", title: "Login Failed", description: error || "Please check your credentials." });
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setError(errorMessage);
+      toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +75,15 @@ export default function LoginForm() {
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="password"
           type="password"
@@ -90,3 +101,4 @@ export default function LoginForm() {
     </form>
   );
 }
+

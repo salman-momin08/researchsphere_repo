@@ -13,6 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithGitHub: () => Promise<void>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
@@ -44,6 +45,9 @@ const MOCK_USER_ADMIN: User = {
   role: 'Admin',
   researcherId: '0000-0000-0000-000X',
 };
+
+// Array of existing mock users for uniqueness checks
+const mockExistingUsers: User[] = [MOCK_USER_NORMAL, MOCK_USER_ADMIN];
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -82,19 +86,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loggedInUser = MOCK_USER_NORMAL;
     }
      else {
-      // For other emails, create a basic user profile
-      loggedInUser = { 
-        id: String(Date.now()),
-        email, 
-        displayName: email.split('@')[0], // Default display name from email
-        username: email.split('@')[0], // Default username from email
-        role: 'Author', // Default role
-        isAdmin: false,
-        // Other fields can be undefined or have defaults
-        phoneNumber: null,
-        institution: null,
-        researcherId: null,
-       };
+      // For other emails, create a basic user profile if not found in localStorage users
+      const allUsers = [...mockExistingUsers];
+      const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
+      if (localUsersRaw) {
+          try {
+              const localUsersParsed = JSON.parse(localUsersRaw) as User[];
+              localUsersParsed.forEach(lu => {
+                  if (!allUsers.find(u => u.id === lu.id)) allUsers.push(lu);
+              });
+          } catch (e) { console.error("Failed to parse localUsersRaw", e); }
+      }
+      const existing = allUsers.find(u => u.email === email);
+      if (existing) {
+        loggedInUser = existing;
+      } else {
+        // This case should ideally not happen if signup creates users correctly.
+        // If it does, it means trying to log in with a non-existent email.
+        setLoading(false);
+        throw new Error("Invalid credentials. Please check your email and password.");
+      }
     }
     setUser(loggedInUser);
     localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
@@ -107,6 +118,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signup = async (data: SignupFormValues) => {
     setLoading(true);
+    
+    // Uniqueness check
+    const allRegisteredUsers: User[] = [...mockExistingUsers];
+    const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
+    if (localUsersRaw) {
+        try {
+            const localUsersParsed = JSON.parse(localUsersRaw) as User[];
+            localUsersParsed.forEach(lu => {
+                if (!allRegisteredUsers.find(u => u.id === lu.id)) allRegisteredUsers.push(lu);
+            });
+        } catch (e) { console.error("Error parsing local users for signup check", e); }
+    }
+
+    if (allRegisteredUsers.some(u => u.username === data.username)) {
+      setLoading(false);
+      throw new Error("Username already exists. Please choose another one.");
+    }
+    if (allRegisteredUsers.some(u => u.email === data.email)) {
+      setLoading(false);
+      throw new Error("Email already registered. Please log in or use a different email.");
+    }
+
     // Simulate Firebase Auth user creation
     await new Promise(resolve => setTimeout(resolve, 1000));
     // In a real app, Firebase Auth would return a user object with a uid.
@@ -129,11 +162,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // For this mock, we update the AuthContext's user state and localStorage
     setUser(newUserProfile);
     localStorage.setItem('researchSphereUser', JSON.stringify(newUserProfile));
-    
-    // It's important to also update the Firebase Auth user's display name if possible
-    // For example, with a real Firebase user: `updateProfile(auth.currentUser, { displayName: data.fullName })`
-    // This is mocked here.
 
+    // Add to our list of "all users" in localStorage for persistence of mock data
+    allRegisteredUsers.push(newUserProfile);
+    localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
+    
     setLoading(false);
     setShowLoginModal(false);
   };
@@ -147,50 +180,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push('/'); 
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithSocial = async (provider: 'Google' | 'GitHub') => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    const googleUser: User = { 
-        ...MOCK_USER_NORMAL, // Base normal user fields
-        id: 'google-user', 
-        email: 'googleuser@example.com', 
-        displayName: 'Google User',
-        username: 'googleuser',
-        role: 'Author', // Default role
+    const baseUser: User = {
+      ...MOCK_USER_NORMAL, // Base normal user fields
+      id: `${provider.toLowerCase()}-user-${Date.now()}`,
+      email: `${provider.toLowerCase()}user${Date.now()}@example.com`,
+      displayName: `${provider} User ${Date.now().toString().slice(-4)}`,
+      username: `${provider.toLowerCase()}user${Date.now().toString().slice(-4)}`,
+      role: 'Author',
     };
-    setUser(googleUser);
-    localStorage.setItem('researchSphereUser', JSON.stringify(googleUser));
-    setLoading(false);
-    setShowLoginModal(false);
-    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
-    localStorage.removeItem('redirectAfterLogin');
-    router.push(redirectPath);
-  };
 
-  const loginWithGitHub = async () => {
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const githubUser: User = { 
-        ...MOCK_USER_NORMAL, // Base normal user fields
-        id: 'github-user', 
-        email: 'githubuser@example.com', 
-        displayName: 'GitHub User',
-        username: 'githubuser',
-        role: 'Author', // Default role
-    };
-    setUser(githubUser);
-    localStorage.setItem('researchSphereUser', JSON.stringify(githubUser));
+     // Check for uniqueness and add to localStorage for all users
+    const allRegisteredUsers: User[] = [...mockExistingUsers];
+    const localUsersRaw = localStorage.getItem('researchSphereAllUsers');
+    if (localUsersRaw) {
+        try {
+            const localUsersParsed = JSON.parse(localUsersRaw) as User[];
+            localUsersParsed.forEach(lu => {
+                if (!allRegisteredUsers.find(u => u.id === lu.id)) allRegisteredUsers.push(lu);
+            });
+        } catch (e) { console.error("Error parsing local users for social login check", e); }
+    }
+    // Ensure email/username from social is unique if it's a new user
+    // For simplicity, assuming social logins always create "new" mock users if not an exact match
+    // This mock doesn't handle linking social accounts to existing email accounts
+    if (allRegisteredUsers.some(u => u.email === baseUser.email)) {
+        // If email collision, find that user and log them in
+        const existingSocialUser = allRegisteredUsers.find(u => u.email === baseUser.email);
+        if(existingSocialUser) setUser(existingSocialUser);
+    } else {
+        setUser(baseUser);
+        allRegisteredUsers.push(baseUser);
+        localStorage.setItem('researchSphereAllUsers', JSON.stringify(allRegisteredUsers));
+    }
+    localStorage.setItem('researchSphereUser', JSON.stringify(user || baseUser)); // user might be set if email collided
     setLoading(false);
     setShowLoginModal(false);
     const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
     localStorage.removeItem('redirectAfterLogin');
     router.push(redirectPath);
+  }
+
+  const loginWithGoogle = () => loginWithSocial('Google');
+  const loginWithGitHub = () => loginWithSocial('GitHub');
+
+  const sendPasswordResetEmail = async (email: string) => {
+    setLoading(true);
+    console.log(`Mock password reset email requested for: ${email}`);
+    // Simulate API call (e.g., Firebase's sendPasswordResetEmail)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    // In a real app, Firebase handles sending the email.
+    // No need to check if email exists; Firebase does this and for security,
+    // you typically don't confirm/deny if an email is registered on this form.
+    setLoading(false);
+    // The UI will show a generic success message.
   };
 
   const isAdmin = user?.isAdmin || false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, showLoginModal, setShowLoginModal, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, showLoginModal, setShowLoginModal, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
