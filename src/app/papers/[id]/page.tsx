@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -143,7 +144,7 @@ function PaperDetailsContent() {
 
   if (!paper) {
     return (
-      <div className="container py-12 text-center">
+      <div className="container py-12 text-center px-4">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found</h2>
         <p className="text-muted-foreground">The paper you are looking for does not exist or you do not have permission to view it.</p>
@@ -164,7 +165,7 @@ function PaperDetailsContent() {
   };
 
   return (
-    <div className="container py-8 md:py-12">
+    <div className="container py-8 md:py-12 px-4">
       <Card className="shadow-xl">
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
@@ -178,12 +179,12 @@ function PaperDetailsContent() {
               </CardDescription>
             </div>
             {paper.status === 'Payment Pending' && !isAdmin && (
-              <Button onClick={() => setIsPaymentModalOpen(true)} size="lg">
+              <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                 <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
               </Button>
             )}
             {isAdmin && (
-                 <Button onClick={() => router.push(`/admin/dashboard?edit=${paper.id}`)} variant="outline">
+                 <Button onClick={() => router.push(`/admin/dashboard?edit=${paper.id}`)} variant="outline" className="w-full md:w-auto">
                     <Edit className="mr-2 h-4 w-4" /> Manage Paper
                   </Button>
             )}
@@ -241,6 +242,7 @@ function PaperDetailsContent() {
                       <Button 
                         key={statusOption}
                         variant={paper.status === statusOption ? "default" : "outline"}
+                        size="sm"
                         onClick={() => handleStatusChange(statusOption)}
                         disabled={paper.status === statusOption}
                       >
@@ -258,15 +260,19 @@ function PaperDetailsContent() {
                 <CardTitle className="text-lg">Paper Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-2 text-primary" />
-                  <strong>Authors:</strong>&nbsp;
-                  <span className="text-muted-foreground">{paper.authors.join(', ')}</span>
+                <div className="flex items-start">
+                  <Users className="h-4 w-4 mr-2 mt-1 text-primary flex-shrink-0" />
+                  <div>
+                    <strong>Authors:</strong>&nbsp;
+                    <span className="text-muted-foreground">{paper.authors.join(', ')}</span>
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <Tag className="h-4 w-4 mr-2 text-primary" />
-                  <strong>Keywords:</strong>&nbsp;
-                  <span className="text-muted-foreground">{paper.keywords.join(', ')}</span>
+                <div className="flex items-start">
+                  <Tag className="h-4 w-4 mr-2 mt-1 text-primary flex-shrink-0" />
+                   <div>
+                    <strong>Keywords:</strong>&nbsp;
+                    <span className="text-muted-foreground">{paper.keywords.join(', ')}</span>
+                  </div>
                 </div>
                 <div className="flex items-center">
                   <CalendarDays className="h-4 w-4 mr-2 text-primary" />

@@ -1,3 +1,4 @@
+
 "use client";
 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -84,7 +85,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="container py-8 md:py-12">
+    <div className="container py-8 md:py-12 px-4">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center">
           <Shield className="mr-3 h-8 w-8 text-primary" /> Admin Panel

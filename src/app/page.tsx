@@ -98,18 +98,18 @@ export default function HomePage() {
     <>
       {/* Hero Section */}
       <section className="py-20 md:py-32 bg-secondary">
-        <div className="container mx-auto text-center">
+        <div className="container mx-auto text-center px-4">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
             Welcome to <span className="text-primary">ResearchSphere</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
             The premier platform for students and researchers to upload, manage, and enhance their academic papers with cutting-edge AI evaluation tools.
           </p>
-          <div className="space-x-4">
-            <Button size="lg" onClick={handleSubmitPaperClick}>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-10">
+            <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
               <UploadCloud className="mr-2 h-5 w-5" /> Submit Your Paper
             </Button>
-            <Button size="lg" variant="outline" onClick={() => router.push('#features')}>
+            <Button size="lg" variant="outline" onClick={() => router.push('#features')} className="w-full sm:w-auto">
               Learn More
             </Button>
           </div>
@@ -118,7 +118,7 @@ export default function HomePage() {
 
       {/* Features Section */}
       <section id="features" className="py-16 md:py-24">
-        <div className="container mx-auto">
+        <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             Platform <span className="text-primary">Features</span>
           </h2>
@@ -140,7 +140,7 @@ export default function HomePage() {
 
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-secondary">
-        <div className="container mx-auto">
+        <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             How It <span className="text-primary">Works</span>
           </h2>
@@ -166,7 +166,7 @@ export default function HomePage() {
 
       {/* Guidelines Section */}
       <section id="guidelines" className="py-16 md:py-24">
-        <div className="container mx-auto">
+        <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             Platform <span className="text-primary">Guidelines</span>
           </h2>
@@ -174,7 +174,7 @@ export default function HomePage() {
             <Accordion type="single" collapsible className="w-full">
               {guidelines.map((guideline) => (
                 <AccordionItem value={guideline.id} key={guideline.id}>
-                  <AccordionTrigger className="text-xl font-semibold hover:no-underline">
+                  <AccordionTrigger className="text-xl font-semibold hover:no-underline text-left">
                     <div className="flex items-center">
                       {guideline.icon}
                       {guideline.title}
@@ -196,21 +196,24 @@ export default function HomePage() {
 
       {/* Call to Action Section */}
       <section className="py-20 md:py-32 bg-secondary">
-        <div className="container mx-auto text-center">
-          <Image 
-            src="https://picsum.photos/1200/400?random=1" 
-            alt="Academic research collaboration" 
-            width={1200} height={400} 
-            className="rounded-lg shadow-md mb-12 mx-auto" 
-            data-ai-hint="research collaboration" 
-          />
+        <div className="container mx-auto text-center px-4">
+          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12">
+            <Image 
+              src="https://picsum.photos/1200/400?random=1" 
+              alt="Academic research collaboration" 
+              fill
+              className="rounded-lg shadow-md object-cover" 
+              data-ai-hint="research collaboration" 
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Ready to Elevate Your Research?
           </h2>
           <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
             Join ResearchSphere today and take the first step towards publishing your impactful work.
           </p>
-          <Button size="lg" onClick={handleSubmitPaperClick}>
+          <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
             Get Started Now
           </Button>
         </div>
