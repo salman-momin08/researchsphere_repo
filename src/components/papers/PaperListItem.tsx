@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Paper } from '@/types';
@@ -8,13 +7,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FileText, Eye, Edit3, Trash2, DollarSign, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import React from 'react'; // Import React for React.memo
 
 interface PaperListItemProps {
   paper: Paper;
   onDelete?: (paperId: string) => void; // Optional: if delete functionality is added
 }
 
-export default function PaperListItem({ paper, onDelete }: PaperListItemProps) {
+const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
   const router = useRouter();
 
   const getStatusBadgeVariant = (status: Paper['status']) => {
@@ -95,4 +95,8 @@ export default function PaperListItem({ paper, onDelete }: PaperListItemProps) {
       </CardFooter>
     </Card>
   );
-}
+});
+
+PaperListItem.displayName = 'PaperListItem'; // Adding display name for the memoized component
+
+export default PaperListItem;
