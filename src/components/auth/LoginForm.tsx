@@ -75,15 +75,7 @@ export default function LoginForm() {
         )}
       </div>
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           type="password"
@@ -91,6 +83,14 @@ export default function LoginForm() {
           {...form.register("password")}
           disabled={isLoading}
         />
+        <div className="text-right">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         {form.formState.errors.password && (
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
@@ -101,4 +101,3 @@ export default function LoginForm() {
     </form>
   );
 }
-
