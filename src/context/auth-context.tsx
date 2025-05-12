@@ -52,70 +52,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-          if (appUser.isAdmin === undefined) {
-            appUser.isAdmin = false;
-          }
-          // Sync Firebase Auth profile (displayName, photoURL) with Firestore user document if different
-          let firestoreUpdates: Partial<User> = {};
-          if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
-            firestoreUpdates.displayName = firebaseUser.displayName;
-          }
-          if (firebaseUser.photoURL && firebaseUser.photoURL !== appUser.photoURL) {
-            firestoreUpdates.photoURL = firebaseUser.photoURL;
-          }
-          if (Object.keys(firestoreUpdates).length > 0) {
-            try {
-              await updateDoc(userDocRef, firestoreUpdates);
-              appUser = { ...appUser, ...firestoreUpdates };
-            } catch (updateError) {
-              console.error("Error syncing Firebase Auth profile to Firestore:", updateError);
+        try {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          let appUser: User;
+          if (userDocSnap.exists()) {
+            appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+            if (appUser.isAdmin === undefined) {
+              appUser.isAdmin = false;
             }
-          }
-          setUser(appUser);
-          const isProfileComplete = appUser.username && appUser.role;
-          if (!isProfileComplete) {
-            localStorage.setItem('profileIncomplete', 'true');
-            if (pathname !== '/profile/settings') {
-                 router.push('/profile/settings?complete=true');
+            // Sync Firebase Auth profile (displayName, photoURL) with Firestore user document if different
+            let firestoreUpdates: Partial<User> = {};
+            if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
+              firestoreUpdates.displayName = firebaseUser.displayName;
+            }
+            if (firebaseUser.photoURL && firebaseUser.photoURL !== appUser.photoURL) {
+              firestoreUpdates.photoURL = firebaseUser.photoURL;
+            }
+            if (Object.keys(firestoreUpdates).length > 0) {
+              try {
+                await updateDoc(userDocRef, firestoreUpdates);
+                appUser = { ...appUser, ...firestoreUpdates };
+              } catch (updateError) {
+                console.error("Error syncing Firebase Auth profile to Firestore:", updateError);
+                 // Non-critical, continue with existing appUser data
+              }
+            }
+            setUser(appUser);
+            const isProfileComplete = appUser.username && appUser.role;
+            if (!isProfileComplete) {
+              localStorage.setItem('profileIncomplete', 'true');
+              if (pathname !== '/profile/settings') {
+                   router.push('/profile/settings?complete=true');
+              }
+            } else {
+              localStorage.removeItem('profileIncomplete');
             }
           } else {
-            localStorage.removeItem('profileIncomplete');
-          }
-        } else {
-          // New user, create Firestore document
-          const newUser: User = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
-            isAdmin: false, 
-            username: null, // Needs to be completed
-            role: null, // Needs to be completed
-            phoneNumber: firebaseUser.phoneNumber || null,
-            institution: null,
-            researcherId: null,
-          };
-          try {
-            await setDoc(userDocRef, newUser);
-            setUser(newUser);
+            // New user, create Firestore document
+             appUser = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              photoURL: firebaseUser.photoURL,
+              isAdmin: false, 
+              username: null, 
+              role: null, 
+              phoneNumber: firebaseUser.phoneNumber || null,
+              institution: null,
+              researcherId: null,
+            };
+            await setDoc(userDocRef, appUser);
+            setUser(appUser);
             localStorage.setItem('profileIncomplete', 'true');
             if (pathname !== '/profile/settings') {
               router.push('/profile/settings?complete=true');
             }
-          } catch (error: any) {
-            console.error("Error creating user document in Firestore:", error);
-            let userMessage = "Could not save user profile. Please try again or contact support.";
-            if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
-                userMessage = "Firestore permission denied. Please check your Firestore security rules to allow new users to create their own profile in the 'users' collection. The rules should permit 'create' on '/users/{userId}' if 'request.auth.uid == userId'.";
-            }
-            toast({variant: "destructive", title: "Profile Creation Error", description: userMessage, duration: 10000 });
-            await signOut(firebaseAuth);
-            setUser(null);
           }
+        } catch (error: any) {
+            console.error("Error fetching/creating user document in Firestore onAuthStateChanged:", error);
+            let userMessage = "Could not load your profile. Please try again or contact support.";
+            if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
+                userMessage = "Permission denied while accessing your profile. Please check your internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
+            }
+            toast({variant: "destructive", title: "Profile Load Error", description: userMessage, duration: 10000 });
+            await signOut(firebaseAuth); // Sign out if profile can't be loaded/created
+            setUser(null);
         }
       } else {
         setUser(null);
@@ -154,7 +156,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        setLoading(false);
+        // This case implies a problem: auth successful but no Firestore profile.
+        // Attempt to create a minimal profile.
+        console.warn("User authenticated but Firestore profile missing. Attempting to create minimal profile.");
         const newUser: User = {
           id: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL,
           isAdmin: false, username: null, role: null, phoneNumber: firebaseUser.phoneNumber || null, institution: null, researcherId: null,
@@ -164,13 +168,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           handleSuccessfulLogin(newUser);
         } catch (dbError: any) {
           console.error("Error creating user document on login (fallback):", dbError);
-          let userMessage = "Failed to initialize user profile. Please try again.";
+          let userMessage = "Failed to initialize user profile after login. Please try again.";
           if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
-             userMessage = "Firestore permission denied during login profile setup. Check security rules for 'users' collection ('create' on '/users/{userId}' if 'request.auth.uid == userId').";
+             userMessage = "Permission denied during profile setup after login. Please check your internet connection or contact support.";
           }
           toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000});
           await signOut(firebaseAuth); 
           setUser(null);
+          setLoading(false);
+          throw new Error(userMessage); // Re-throw to indicate login failure
         }
         return;
       }
@@ -244,11 +250,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const firebaseUser = userCredential.user;
 
     try {
-        // Update Firebase Auth profile (optional, but good for consistency)
         await updateFirebaseProfile(firebaseUser, { displayName: data.fullName });
     } catch (profileUpdateError) {
         console.warn("Could not update Firebase Auth profile displayName during signup:", profileUpdateError);
-        // Non-critical, so we don't throw, just log. Firestore profile is more important.
     }
 
 
@@ -262,7 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       role: data.role,
       researcherId: data.researcherId || null,
       isAdmin: false,
-      photoURL: firebaseUser.photoURL || null, // Initially might be null
+      photoURL: firebaseUser.photoURL || null, 
     };
 
     try {
@@ -272,9 +276,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Firestore profile creation error during signup:", firestoreError);
         let errorMessage = "An unknown error occurred while saving your profile.";
         if (firestoreError.code === 'permission-denied' || firestoreError.message?.includes('permission-denied') || firestoreError.message?.includes('Missing or insufficient permissions')) {
-            errorMessage = "Firestore permission denied during signup profile creation. Check security rules for 'users' collection ('create' on '/users/{userId}' if 'request.auth.uid == userId').";
+            errorMessage = "Could not save your profile due to a permission issue. Please ensure you are connected to the internet and try again. If the problem persists, please contact support.";
+            toast({
+                variant: "destructive",
+                title: "Profile Creation Error",
+                description: errorMessage,
+                duration: 9000
+            });
+        } else {
+             toast({
+                variant: "destructive",
+                title: "Signup Failed",
+                description: errorMessage
+             });
         }
-        // Attempt to delete the auth user if Firestore save fails, to avoid orphaned auth account
         try {
             await firebaseUser.delete();
             console.log("Firebase Auth user deleted due to Firestore profile creation failure.");
@@ -285,11 +300,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(errorMessage);
     }
 
-    setUser(newUserProfile); // Set context user
+    setUser(newUserProfile); 
     setLoading(false);
     setShowLoginModal(false);
 
-    localStorage.removeItem('profileIncomplete'); // Should be complete after signup
+    localStorage.removeItem('profileIncomplete'); 
     const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
     localStorage.removeItem('redirectAfterLogin');
     router.push(redirectPath);
@@ -316,7 +331,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (appUser.isAdmin === undefined) {
         appUser.isAdmin = false;
       }
-      // Ensure displayName and photoURL from provider are synced if they changed
       let firestoreUpdates: Partial<User> = {};
       if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
           firestoreUpdates.displayName = firebaseUser.displayName;
@@ -328,22 +342,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           try {
               await updateDoc(userDocRef, firestoreUpdates);
               appUser = { ...appUser, ...firestoreUpdates };
-          } catch (updateError) {
+          } catch (updateError: any) {
               console.error("Error syncing social login profile to Firestore:", updateError);
-              // Non-critical, continue with existing appUser data
+              if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied')) {
+                toast({
+                    variant: "destructive",
+                    title: "Profile Sync Error",
+                    description: "Could not update your profile from social login due to a permission issue. Some information might be outdated.",
+                    duration: 7000
+                });
+              }
           }
       }
 
     } else {
-      // New user via social login
       appUser = {
         id: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL,
         isAdmin: false, 
-        username: null, // Will require profile completion
-        role: null, // Will require profile completion
+        username: null, 
+        role: null, 
         phoneNumber: firebaseUser.phoneNumber || null,
         institution: null,
         researcherId: null,
@@ -354,9 +374,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
          console.error("Error creating/updating user document for social login:", dbError);
          let userMessage = "Failed to set up user profile. Please try again.";
          if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
-            userMessage = "Firestore permission denied. Please check your Firestore security rules to allow new users to create their own profile in the 'users' collection. The rules should permit 'create' or 'write' on '/users/{userId}' if 'request.auth.uid == userId'.";
+            userMessage = "Could not save your profile due to a permission issue after social login. Please try again or contact support if the problem persists.";
+            toast({variant: "destructive", title: "Profile Save Error", description: userMessage, duration: 10000 });
+         } else {
+            toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000 });
          }
-         toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000 });
           try {
             await signOut(firebaseAuth);
           } catch (signOutError) {
@@ -364,7 +386,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           setUser(null);
           setLoading(false);
-          return; // Critical error, stop processing
+          return; 
       }
     }
     handleSuccessfulLogin(appUser);
@@ -443,16 +465,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
         }
-        // For security, it's often better to show a generic success message
-        // regardless of whether the email exists, to prevent email enumeration.
-        // However, since the original code re-throws, we'll stick to specific errors for now.
         throw new Error(errorMessage);
     }
     setLoading(false);
   };
 
  const updateUserProfile = async (updatedData: Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>) => {
-    if (!user || !firebaseAuth.currentUser) { // Check firebaseAuth.currentUser as well
+    if (!user || !firebaseAuth.currentUser) { 
       throw new Error("User not logged in. Cannot update profile.");
     }
     setLoading(true);
@@ -481,13 +500,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
     
-    // Update Firebase Auth profile if displayName changed
     if (updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
         try {
             await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
         } catch (authProfileError) {
             console.warn("Could not update Firebase Auth profile displayName:", authProfileError);
-            // Non-critical, proceed with Firestore update
         }
     }
 
@@ -509,10 +526,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updatedUser.isAdmin = false;
       }
 
-      setUser(updatedUser); // Update context user
+      setUser(updatedUser); 
 
       if (localStorage.getItem('profileIncomplete') === 'true') {
-          if (updatedUser.username && updatedUser.role) { // Check if essential fields are now filled
+          if (updatedUser.username && updatedUser.role) { 
               localStorage.removeItem('profileIncomplete');
           }
       }
@@ -522,7 +539,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error updating user profile in Firestore:", error);
       let userMessage = "Failed to update profile in the database.";
       if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
-        userMessage = "Firestore permission denied. Check security rules for 'users' collection ('update' on '/users/{userId}' if 'request.auth.uid == userId').";
+        userMessage = "Could not update your profile due to a permission issue. Please check your internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
+        toast({
+            variant: "destructive",
+            title: "Profile Update Error",
+            description: userMessage,
+            duration: 9000
+        });
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: userMessage
+        });
       }
       throw new Error(userMessage);
     }

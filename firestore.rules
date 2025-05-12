@@ -1,41 +1,55 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users Collection:
-    // - Authenticated users can create their own user document upon signup.
-    // - Authenticated users can read, update, and delete their own user document.
-    // - No one else can read/write other users' documents unless they are an admin (admin rule not explicitly shown here for users collection, typically admins use trusted server environments or specific admin roles).
+    // Users collection
+    // Only authenticated users can interact with their own documents.
+    // Admins have broader access.
     match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Allow users to read their own document.
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to create their own document (e.g., during signup).
+      // The document ID must match the authenticated user's UID.
       allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to update their own document.
+      // Consider which fields are updatable by the user vs. admin.
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Admins can read and write any user document.
+      // This requires an `isAdmin` field in the admin's user document.
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      
+      // Generally, users should not be able to delete their own accounts directly through Firestore rules.
+      // Account deletion should be handled via Firebase Auth and a Cloud Function if cleanup is needed.
+      allow delete: if false; // Or restrict to admins: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Papers Collection (Example):
-    // - Authenticated users can create new papers.
-    // - Users can read their own papers.
-    // - Users can update or delete their own papers.
-    // - Admin users (identified by an 'isAdmin' field in their user document) can read, update, or delete any paper.
+    // Papers collection
+    // Authenticated users can manage their own papers.
+    // Admins have broader access.
     match /papers/{paperId} {
-      allow create: if request.auth != null;
+      // Allow authenticated users to create papers if they are the owner.
+      // The `userId` in the paper document must match the authenticated user's UID.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       
-      // Allow read if the user is the owner OR if the user is an admin
-      allow read: if request.auth != null && 
-                    (resource.data.userId == request.auth.uid || 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      // Allow authenticated users to read papers if they are the owner OR if the paper is marked as public (if such a field exists).
+      // For now, only owners can read.
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       
-      // Allow update/delete if the user is the owner OR if the user is an admin
-      allow update, delete: if request.auth != null &&
-                              (resource.data.userId == request.auth.uid ||
-                               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-    }
+      // Allow authenticated users to update their own papers.
+      // Consider field-level security for status updates (e.g., only admin can change status to 'Accepted').
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      
+      // Allow authenticated users to delete their own papers.
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
 
-    // Add rules for other collections as your application grows.
-    // For example, if you have a 'reviews' collection:
-    // match /reviews/{reviewId} {
-    //   // Define who can read/write reviews
-    // }
+      // Admins can read, write, and delete any paper.
+      allow read, write, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
   }
 }
+// IMPORTANT: Deploy these rules to your Firebase project using the Firebase CLI or the Firebase Console.
+// Firebase CLI: firebase deploy --only firestore:rules
