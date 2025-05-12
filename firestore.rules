@@ -1,55 +1,39 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
-    // Only authenticated users can interact with their own documents.
-    // Admins have broader access.
+    // Users collection:
+    // - Authenticated users can create their own user document.
+    // - Authenticated users can read, update, and delete their own user document.
     match /users/{userId} {
-      // Allow users to read their own document.
-      allow read: if request.auth != null && request.auth.uid == userId;
-      
-      // Allow users to create their own document (e.g., during signup).
-      // The document ID must match the authenticated user's UID.
       allow create: if request.auth != null && request.auth.uid == userId;
-      
-      // Allow users to update their own document.
-      // Consider which fields are updatable by the user vs. admin.
-      allow update: if request.auth != null && request.auth.uid == userId;
-      
-      // Admins can read and write any user document.
-      // This requires an `isAdmin` field in the admin's user document.
-      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-      
-      // Generally, users should not be able to delete their own accounts directly through Firestore rules.
-      // Account deletion should be handled via Firebase Auth and a Cloud Function if cleanup is needed.
-      allow delete: if false; // Or restrict to admins: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Papers collection
-    // Authenticated users can manage their own papers.
-    // Admins have broader access.
+    // Papers collection (Example - customize as needed):
+    // - Authenticated users can create papers.
+    // - Authenticated users can read, update, and delete their own papers.
+    //   (Assumes a 'userId' field in paper documents that matches request.auth.uid)
+    // - Optionally, allow admins to read all papers (if you have an 'isAdmin' field in user docs).
     match /papers/{paperId} {
-      // Allow authenticated users to create papers if they are the owner.
-      // The `userId` in the paper document must match the authenticated user's UID.
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      
-      // Allow authenticated users to read papers if they are the owner OR if the paper is marked as public (if such a field exists).
-      // For now, only owners can read.
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      
-      // Allow authenticated users to update their own papers.
-      // Consider field-level security for status updates (e.g., only admin can change status to 'Accepted').
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
-      
-      // Allow authenticated users to delete their own papers.
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Example admin read access:
+      // allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
 
-      // Admins can read, write, and delete any paper.
-      allow read, write, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // Default deny for any other paths not explicitly matched if you want to be very strict.
+    // Or, for a more general authenticated access for other collections:
+    // match /{document=**} {
+    //   allow read, write: if request.auth != null;
+    // }
+    // For now, to ensure security, let's explicitly deny unmatched paths unless authenticated.
+    // If other collections need different rules, they should be specified.
+    // This is a restrictive rule for any path not explicitly defined above.
+     match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
-// IMPORTANT: Deploy these rules to your Firebase project using the Firebase CLI or the Firebase Console.
-// Firebase CLI: firebase deploy --only firestore:rules

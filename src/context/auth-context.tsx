@@ -214,6 +214,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           case 'auth/user-disabled':
             errorMessage = 'This user account has been disabled.';
             break;
+           case 'auth/missing-or-insufficient-permissions':
+           case 'permission-denied':
+             errorMessage = "Login failed due to insufficient permissions. Please check your connection or contact support.";
+             break;
           default:
             errorMessage = firebaseError.message || errorMessage;
         }
@@ -237,7 +241,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
         console.error("Error checking username uniqueness:", queryError);
         let userMessage = "Could not verify username uniqueness. Please try again.";
-        if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied')) {
+        if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
             userMessage = "Permission denied while checking username. Please check your internet connection or contact support.";
         }
         toast({variant: "destructive", title: "Signup Error", description: userMessage, duration: 7000});
@@ -265,6 +269,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           case 'auth/weak-password':
               errorMessage = 'The password is too weak. Please choose a stronger one.';
               break;
+          case 'auth/missing-or-insufficient-permissions':
+          case 'permission-denied':
+            errorMessage = "Signup failed due to insufficient permissions. Please check your connection or contact support.";
+            break;
           default:
               errorMessage = authError.message || errorMessage;
           }
@@ -378,7 +386,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               } catch (updateError: any) {
                   console.error("Error syncing social login profile to Firestore:", updateError);
                   let userMessage = "Could not sync your profile from social login. Some information might be outdated.";
-                  if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied')) {
+                  if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied') || updateError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while syncing your profile. Some information might be outdated. Please check your internet connection or contact support.";
                   }
                   toast({ variant: "destructive", title: "Profile Sync Error", description: userMessage, duration: 7000 });
@@ -439,6 +447,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 toastMessage = "This domain is not authorized for Google Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted.";
                 break;
             case 'auth/missing-or-insufficient-permissions':
+            case 'permission-denied':
                  toastMessage = "Missing or insufficient permissions to perform Google Sign-In. Please contact support.";
                  break;
             default:
@@ -478,6 +487,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 toastMessage = "This domain is not authorized for GitHub Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted.";
                 break;
             case 'auth/missing-or-insufficient-permissions':
+            case 'permission-denied':
                  toastMessage = "Missing or insufficient permissions to perform GitHub Sign-In. Please contact support.";
                  break;
             default:
@@ -506,7 +516,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             errorMessage = "No user found with this email address.";
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
-        }  else if (error.code === 'auth/missing-or-insufficient-permissions') {
+        }  else if (error.code === 'auth/missing-or-insufficient-permissions' || error.code === 'permission-denied') {
              errorMessage = "Missing or insufficient permissions to send password reset email. Please contact support.";
         }
         throw new Error(errorMessage);
@@ -537,7 +547,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             console.error("Error checking username uniqueness during profile update:", queryError);
             let userMessage = "Could not verify username uniqueness for update. Please try again.";
-            if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied')) {
+            if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
                  userMessage = "Permission denied while checking username for update. Please check your internet connection or contact support.";
             }
             toast({variant: "destructive", title: "Profile Update Error", description: userMessage, duration: 7000});

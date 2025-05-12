@@ -20,10 +20,12 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
 
   useEffect(() => {
+    // Only proceed with checks if Firebase Auth is no longer loading
     if (!loading) {
       if (!user) {
         // User not logged in
-        if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/forgot-password') { // Avoid loop if already on public auth pages
+        // Avoid redirect loops for public auth pages
+        if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/forgot-password') { 
           localStorage.setItem('redirectAfterLogin', pathname);
           if (!modalOpenAttempted && !showLoginModal) { 
             setShowLoginModal(true);
@@ -32,22 +34,28 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
         }
       } else {
         // User is logged in
-        setModalOpenAttempted(false); 
+        setModalOpenAttempted(false); // Reset flag if user becomes available
 
         // Check for profile completion
-        const profileIncomplete = localStorage.getItem('profileIncomplete') === 'true';
+        // This check should only happen if the user object is confirmed
+        const profileIncomplete = !user.username || !user.role;
         if (profileIncomplete && pathname !== '/profile/settings') {
+          localStorage.setItem('profileIncomplete', 'true'); // Ensure flag is set if navigating away
           router.push('/profile/settings?complete=true');
-          return; // Prevent further checks or rendering children until profile is complete
+          return; 
+        } else if (!profileIncomplete) {
+          localStorage.removeItem('profileIncomplete');
         }
         
         if (adminOnly && !isAdmin) {
+          toast({title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
           router.push("/dashboard"); 
         }
       }
     }
   }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal]);
 
+  // Show loading spinner while Firebase Auth is initializing
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -56,31 +64,35 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
     );
   }
 
-  if (!user && pathname !== '/' && !pathname.startsWith('/login') && !pathname.startsWith('/signup') && !pathname.startsWith('/forgot-password') && !pathname.startsWith('/terms') && !pathname.startsWith('/privacy') && !pathname.startsWith('/contact-us') && !pathname.startsWith('/key-committee') && !pathname.startsWith('/sample-templates') && !pathname.startsWith('/registration') && !pathname.startsWith('/ai-pre-check')) {
-    // This condition handles scenarios where user is not logged in and trying to access a protected page.
-    // The modal logic in useEffect should handle prompting for login.
-    // This return is a fallback or placeholder if modal logic doesn't immediately cause a re-render/redirect.
-    // For pages that are explicitly public (like '/', '/login', '/signup'), they should render without this block.
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
-        <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
-        <h2 className="text-2xl font-semibold mb-3">Authentication Required</h2>
-        <p className="text-muted-foreground mb-6 max-w-md">
-          You need to be logged in to access this page.
-        </p>
-        {!showLoginModal && (
-             <Button onClick={() => {
-                 localStorage.setItem('redirectAfterLogin', pathname); 
-                 setShowLoginModal(true)
-             }} className="mt-2">
-            Log In / Sign Up
-          </Button>
-        )}
-      </div>
-    );
+  // If still loading (though above check should catch it) or no user and it's a protected route:
+  // (Additional check to ensure children don't render if user becomes null after initial load for some reason)
+  if (!user) {
+    // For truly public pages, they should not be wrapped by ProtectedRoute or should have a different handling.
+    // This fallback is for pages that *are* protected.
+     const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check'];
+     if (!publicPaths.includes(pathname)) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
+            <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
+            <h2 className="text-2xl font-semibold mb-3">Authentication Required</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              You need to be logged in to access this page. Please wait while we check your session or log in.
+            </p>
+            {!showLoginModal && (
+                 <Button onClick={() => {
+                     localStorage.setItem('redirectAfterLogin', pathname); 
+                     setShowLoginModal(true)
+                 }} className="mt-2">
+                Log In / Sign Up
+              </Button>
+            )}
+          </div>
+        );
+     }
   }
   
-  if (adminOnly && user && !isAdmin) { // Ensure user exists before checking isAdmin
+  // Admin-only check after confirming user is logged in
+  if (adminOnly && user && !isAdmin) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
         <ShieldAlert className="h-16 w-16 text-destructive mb-6" />
@@ -92,11 +104,8 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
     );
   }
   
-  // If profile is incomplete and current page is not settings, children might not be rendered due to redirect in useEffect.
-  // This ensures children are rendered if checks pass.
-  const profileIncomplete = localStorage.getItem('profileIncomplete') === 'true';
-  if (user && profileIncomplete && pathname !== '/profile/settings') {
-      // Placeholder or loading state while redirecting for profile completion
+  // Profile completion check after confirming user is logged in
+  if (user && (!user.username || !user.role) && pathname !== '/profile/settings') {
       return (
            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
              <LoadingSpinner size={48} />
@@ -105,7 +114,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
       );
   }
 
-
+  // If all checks pass, render children
   return <>{children}</>;
 }
 
