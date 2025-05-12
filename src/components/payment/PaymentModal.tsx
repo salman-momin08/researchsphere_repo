@@ -164,7 +164,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-muted inline-block">
                        <Image 
-                        src="https://picsum.photos/seed/generic-qr-placeholder/120/120?grayscale&blur=1" 
+                        src="https://picsum.photos/seed/upi-qr-code/120/120" 
                         alt="Scan QR Code for UPI Payment" 
                         width={120} 
                         height={120} 
