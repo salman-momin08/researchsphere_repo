@@ -1,10 +1,11 @@
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/auth-context';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
 import LoginModal from '@/components/auth/LoginModal';
 
 const inter = Inter({
@@ -24,9 +25,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      {/* Next.js automatically creates the <head> tag.
-          Ensure no characters, including comments or newlines that might be misinterpreted,
-          exist between the <html> tag and the <body> tag. */}
       <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
           <Header />
