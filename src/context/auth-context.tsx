@@ -468,13 +468,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         switch (firebaseError.code) {
             case 'auth/popup-closed-by-user':
             case 'auth/cancelled-popup-request':
-                toastMessage = "The sign-in popup was closed before completing. This can happen if pop-ups are blocked by your browser or an extension. Please check your browser settings to allow pop-ups for this site and try again.";
+                toastMessage = "The sign-in popup was closed. This can happen if popups are blocked, your network is unstable, or due to browser/extension interference. Please check your browser's popup settings, ensure a stable internet connection, and try disabling extensions. Also verify your Google/Firebase Redirect URIs are correct.";
                 break;
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
                 break;
             case 'auth/unauthorized-domain':
-                toastMessage = "This domain is not authorized for Google Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted.";
+                toastMessage = "This domain is not authorized for Google Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted in your Google Cloud Console OAuth settings.";
                 break;
             case 'auth/missing-or-insufficient-permissions':
             case 'permission-denied':
@@ -491,7 +491,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", 
           title: "Google Login Error", 
           description: toastMessage, 
-          duration: 9000 
+          duration: 10000 
       });
     } finally {
         setLoading(false);
@@ -515,13 +515,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         switch (firebaseError.code) {
             case 'auth/popup-closed-by-user':
             case 'auth/cancelled-popup-request':
-                toastMessage = "The sign-in popup was closed before completing. This can happen if pop-ups are blocked by your browser or an extension. Please check your browser settings to allow pop-ups for this site and try again.";
+                 toastMessage = "The sign-in popup was closed. This can happen if popups are blocked, your network is unstable, or due to browser/extension interference. Please check your browser's popup settings, ensure a stable internet connection, and try disabling extensions. Also verify your GitHub/Firebase Redirect URIs are correct.";
                 break;
             case 'auth/account-exists-with-different-credential':
                 toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method (e.g., Google or Email).";
                 break;
              case 'auth/unauthorized-domain':
-                toastMessage = "This domain is not authorized for GitHub Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted.";
+                toastMessage = "This domain is not authorized for GitHub Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted in your GitHub OAuth App settings.";
                 break;
             case 'auth/missing-or-insufficient-permissions':
             case 'permission-denied':
@@ -538,7 +538,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", 
           title: "GitHub Login Error", 
           description: toastMessage, 
-          duration: 9000 
+          duration: 10000
       });
     } finally {
         setLoading(false);
@@ -557,9 +557,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Password reset error:", error);
         let errorMessage = "Could not send password reset email.";
         if (error.code === 'auth/user-not-found') {
-            // For security reasons, it's better not to reveal if an email exists or not.
-            // The message in ForgotPasswordPage handles this generically.
-            // So, re-throw the original error or a generic one.
             throw error; 
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
