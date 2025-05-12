@@ -15,7 +15,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 h-12 w-12 text-primary">
              <BookOpenText size={48} strokeWidth={1.5}/>
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight">Log in to ScholarSubmit</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">Log in to ResearchSphere</CardTitle>
           <CardDescription>
             Access your dashboard and manage your submissions.
           </CardDescription>

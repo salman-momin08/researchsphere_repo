@@ -44,7 +44,7 @@ export default function SignupForm() {
     setError(null);
     try {
       await signup(data.email, data.password);
-      toast({ title: "Signup Successful", description: "Welcome to ScholarSubmit!" });
+      toast({ title: "Signup Successful", description: "Welcome to ResearchSphere!" });
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred.");

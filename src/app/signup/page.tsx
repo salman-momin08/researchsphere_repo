@@ -15,7 +15,7 @@ export default function SignupPage() {
            <div className="mx-auto mb-4 h-12 w-12 text-primary">
              <UserPlus size={48} strokeWidth={1.5}/>
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight">Create your ScholarSubmit Account</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">Create your ResearchSphere Account</CardTitle>
           <CardDescription>
             Join our platform to submit and manage your research papers.
           </CardDescription>

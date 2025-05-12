@@ -49,7 +49,7 @@ export default function HomePage() {
       <section className="py-20 md:py-32 bg-secondary">
         <div className="container mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
-            Welcome to <span className="text-primary">ScholarSubmit</span>
+            Welcome to <span className="text-primary">ResearchSphere</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
             The premier platform for students and researchers to upload, manage, and enhance their academic papers with cutting-edge AI evaluation tools.
@@ -121,7 +121,7 @@ export default function HomePage() {
             Ready to Elevate Your Research?
           </h2>
           <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
-            Join ScholarSubmit today and take the first step towards publishing your impactful work.
+            Join ResearchSphere today and take the first step towards publishing your impactful work.
           </p>
           <Button size="lg" onClick={handleSubmitPaperClick}>
             Get Started Now

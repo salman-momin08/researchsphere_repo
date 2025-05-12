@@ -9,10 +9,10 @@ export default function Footer() {
       <div className="container py-8 flex flex-col md:flex-row justify-between items-center">
         <div className="flex items-center gap-2 mb-4 md:mb-0">
           <BookOpenText className="h-5 w-5 text-primary" />
-          <span className="text-md font-semibold">ScholarSubmit</span>
+          <span className="text-md font-semibold">ResearchSphere</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} ScholarSubmit. All rights reserved.
+          &copy; {new Date().getFullYear()} ResearchSphere. All rights reserved.
         </p>
         <div className="flex space-x-4 mt-4 md:mt-0">
           <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary">

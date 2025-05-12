@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'ScholarSubmit - Academic Paper Publishing',
+  title: 'ResearchSphere - Academic Paper Publishing',
   description: 'Upload, manage, and evaluate research papers with AI-powered tools.',
 };
 
@@ -24,8 +24,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      {/* Next.js injects <head> based on metadata.
-          The <body > tag must follow without any intermediate text/whitespace nodes. */}
       <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
           <Header />

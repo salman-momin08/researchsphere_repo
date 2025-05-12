@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Simulate checking auth state
-    const storedUser = localStorage.getItem('scholarSubmitUser');
+    const storedUser = localStorage.getItem('researchSphereUser');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loggedInUser = { ...MOCK_USER_NORMAL, email, displayName: email.split('@')[0] };
     }
     setUser(loggedInUser);
-    localStorage.setItem('scholarSubmitUser', JSON.stringify(loggedInUser));
+    localStorage.setItem('researchSphereUser', JSON.stringify(loggedInUser));
     setLoading(false);
     setShowLoginModal(false); // Close modal on successful login
   };
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     const newUser: User = { ...MOCK_USER_NORMAL, email, displayName: email.split('@')[0], id: String(Date.now()) };
     setUser(newUser);
-    localStorage.setItem('scholarSubmitUser', JSON.stringify(newUser));
+    localStorage.setItem('researchSphereUser', JSON.stringify(newUser));
     setLoading(false);
     setShowLoginModal(false);
   };
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     setUser(null);
-    localStorage.removeItem('scholarSubmitUser');
+    localStorage.removeItem('researchSphereUser');
     setLoading(false);
     router.push('/'); // Redirect to home on logout
   };
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     const googleUser: User = { ...MOCK_USER_NORMAL, id: 'google-user', email: 'googleuser@example.com', displayName: 'Google User' };
     setUser(googleUser);
-    localStorage.setItem('scholarSubmitUser', JSON.stringify(googleUser));
+    localStorage.setItem('researchSphereUser', JSON.stringify(googleUser));
     setLoading(false);
     setShowLoginModal(false);
   };
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     const githubUser: User = { ...MOCK_USER_NORMAL, id: 'github-user', email: 'githubuser@example.com', displayName: 'GitHub User' };
     setUser(githubUser);
-    localStorage.setItem('scholarSubmitUser', JSON.stringify(githubUser));
+    localStorage.setItem('researchSphereUser', JSON.stringify(githubUser));
     setLoading(false);
     setShowLoginModal(false);
   };

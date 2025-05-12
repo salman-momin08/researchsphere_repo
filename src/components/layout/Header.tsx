@@ -32,7 +32,7 @@ export default function Header() {
       <div className="container flex h-16 items-center">
         <Link href="/" className="mr-auto flex items-center gap-2">
           <BookOpenText className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">ScholarSubmit</span>
+          <span className="text-xl font-bold">ResearchSphere</span>
         </Link>
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
           <Link href="/" className="transition-colors hover:text-primary">
