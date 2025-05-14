@@ -25,7 +25,7 @@ function SearchPapersContent() {
   const { toast } = useToast();
   const router = useRouter();
 
-  console.log("SearchPapersContent component mounted or re-rendered"); // Added console.log
+  console.log("SearchPapersContent: Component initialized.");
 
   const handleSearch = () => {
     if (!searchTerm.trim()) {
@@ -43,6 +43,10 @@ function SearchPapersContent() {
     // Simulate API call delay
     setTimeout(() => {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      // The following filter logic ensures that:
+      // 1. The search is case-insensitive.
+      // 2. It performs a partial match (e.g., "Doe" matches "Dr. Jane Doe").
+      // 3. If a paper has multiple authors, it will be found if the search term matches *any* of those authors.
       const results = allMockPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
