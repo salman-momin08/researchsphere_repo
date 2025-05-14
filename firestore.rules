@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,21 +6,20 @@ service cloud.firestore {
 
     // Helper functions
     function isAdmin() {
-      // Check if the request is authenticated and the user has isAdmin set to true in their user document.
       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     function isPaperOwner() {
-      // Check if the request is authenticated and the paper's userId matches the authenticated user's UID.
-      // Assumes 'resource.data' is available (for get, update, delete).
+      // This checks if the currently evaluated document's userId matches the authenticated user.
+      // It's suitable for 'get', 'update', 'delete' on a specific document.
       return request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Users Collection
     match /users/{userId} {
-      // 1. Authenticated users can read their own profile.
-      // 2. Admins can read any user profile.
-      // 3. Any authenticated user can list user data (needed for client-side uniqueness checks).
+      // Authenticated users can read their own profile.
+      // Admins can read any user profile.
+      // Any authenticated user can list user data (needed for client-side uniqueness checks).
       allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow list: if request.auth != null; // For username/phone uniqueness checks
 
@@ -38,27 +38,26 @@ service cloud.firestore {
     // Papers Collection
     match /papers/{paperId} {
       // Read operations (get)
-      // User can get their own paper, admin can get any paper, authenticated user can get a published paper.
-      allow get: if (request.auth != null && resource.data.userId == request.auth.uid) || // isPaperOwner (direct check)
-                    isAdmin() ||
-                    (request.auth != null && resource.data.status == 'Published');
-
-      // List operations
-      // - Admins can list all papers.
-      // - Authenticated users can list papers they own (e.g., for their dashboard).
-      // - Authenticated users can list papers that are 'Published' (e.g., for public search).
-      allow list: if isAdmin() ||
-                     (request.auth != null && request.query.filters.find(f => f[0] == 'userId' && f[1] == '==' && f[2] == request.auth.uid) != null) ||
-                     (request.auth != null && request.query.filters.find(f => f[0] == 'status' && f[1] == '==' && f[2] == 'Published') != null);
+      // Paper owner, admin, or anyone authenticated if paper is 'Published' can get it.
+      allow get: if request.auth != null &&
+                    (isPaperOwner() || isAdmin() || resource.data.status == 'Published');
 
       // Create operations
-      // Authenticated users can create papers, and the paper's userId must match their auth uid.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
       // Update and Delete operations
-      // Only the paper owner or an admin can update/delete.
-      allow update, delete: if (request.auth != null && resource.data.userId == request.auth.uid) || // isPaperOwner (direct check)
-                              isAdmin();
+      allow update, delete: if isPaperOwner() || isAdmin();
+
+      // List operations
+      // Authenticated users can list papers if:
+      // 1. They are an admin (can list all).
+      // 2. OR The query is for their own papers (client must filter by userId, rule verifies against potential results).
+      // 3. OR The query is for published papers (client must filter by status, rule verifies against potential results).
+      allow list: if request.auth != null &&
+                     (isAdmin() || // Admins can list all
+                      (resource.data.userId == request.auth.uid) || // For user's own papers query
+                      (resource.data.status == 'Published')       // For listing published papers
+                     );
     }
   }
 }
