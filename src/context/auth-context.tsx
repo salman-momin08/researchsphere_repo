@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User } from '@/types';
@@ -19,10 +20,14 @@ import {
   type User as FirebaseUser,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile as updateFirebaseProfile
+  updateProfile as updateFirebaseProfile,
+  signInWithRedirect, // Added for redirect option
+  getRedirectResult // Added for redirect option
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // For popup closed message
+import { Info } from 'lucide-react'; // For popup closed message
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +42,7 @@ interface AuthContextType {
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
+  isSocialLoginInProgress: boolean; // To disable other buttons
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,8 +51,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isSocialLoginInProgress, setIsSocialLoginInProgress] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Handle redirect result for social logins
+  useEffect(() => {
+    if (!firebaseAuth) return;
+    getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (result) {
+          setIsSocialLoginInProgress(true);
+          processSocialLogin(result);
+        }
+      })
+      .catch((error) => {
+        console.error("Error getting redirect result:", error);
+        toast({ variant: "destructive", title: "Social Login Error", description: error.message || "Failed to complete social login."});
+      })
+      .finally(() => {
+        setIsSocialLoginInProgress(false);
+      });
+  }, []);
+
 
   useEffect(() => {
     if (!firebaseAuth) {
@@ -68,10 +95,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userDocSnap = await getDoc(userDocRef);
           let appUser: User;
           if (userDocSnap.exists()) {
-            appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-            if (appUser.isAdmin === undefined) {
-              appUser.isAdmin = false;
-            }
+            const docData = userDocSnap.data();
+            appUser = { 
+              id: userDocSnap.id, 
+              ...docData,
+              isAdmin: docData.isAdmin || false // Ensure isAdmin defaults to false
+            } as User;
             
             let firestoreUpdates: Partial<User> = {};
             if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
@@ -115,6 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               phoneNumber: firebaseUser.phoneNumber || null,
               institution: null,
               researcherId: null,
+              userId: firebaseUser.uid, // ensure userId is set
             };
             try {
                 await setDoc(userDocRef, appUser);
@@ -188,7 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn("User authenticated but Firestore profile missing. Attempting to create minimal profile.");
         const newUser: User = {
           id: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName, photoURL: firebaseUser.photoURL,
-          isAdmin: false, username: null, role: null, phoneNumber: firebaseUser.phoneNumber || null, institution: null, researcherId: null,
+          isAdmin: false, username: null, role: null, phoneNumber: firebaseUser.phoneNumber || null, institution: null, researcherId: null, userId: firebaseUser.uid,
         };
         try {
           await setDoc(userDocRef, newUser);
@@ -207,7 +237,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return;
       }
-      const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+      const docData = userDocSnap.data();
+      const appUser = { id: userDocSnap.id, ...docData, isAdmin: docData.isAdmin || false } as User;
       handleSuccessfulLogin(appUser);
     } catch (error) {
       setLoading(false);
@@ -314,6 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const newUserProfile: User = {
       id: firebaseUser.uid,
+      userId: firebaseUser.uid, // Ensure userId is set
       email: data.email,
       displayName: data.fullName, 
       username: data.username,
@@ -321,7 +353,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       institution: data.institution || null,
       role: data.role,
       researcherId: data.researcherId || null,
-      isAdmin: false,
+      isAdmin: false, // New users are never admins by default
       photoURL: firebaseUser.photoURL || null, 
     };
 
@@ -394,10 +426,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
-          appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-          if (appUser.isAdmin === undefined) {
-            appUser.isAdmin = false;
-          }
+          const docData = userDocSnap.data();
+          appUser = { id: userDocSnap.id, ...docData, isAdmin: docData.isAdmin || false } as User;
+
           let firestoreUpdates: Partial<User> = {};
           if (firebaseUser.displayName && firebaseUser.displayName !== appUser.displayName) {
               firestoreUpdates.displayName = firebaseUser.displayName;
@@ -421,10 +452,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           appUser = {
             id: firebaseUser.uid,
+            userId: firebaseUser.uid, // Ensure userId is set
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            isAdmin: false, 
+            isAdmin: false, // New users are never admins by default
             username: null, 
             role: null, 
             phoneNumber: firebaseUser.phoneNumber || null,
@@ -447,103 +479,104 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error("Error signing out user after profile creation failure:", signOutError);
           }
           setUser(null);
-          setLoading(false);
-    }
-  };
-
-  const loginWithGoogle = async () => {
-    if (!firebaseAuth || !googleAuthCredentialProvider) {
-      toast({variant: "destructive", title: "Login Error", description: "Google Sign-In service not available.", duration: 7000});
-      return;
-    }
-    setLoading(true);
-    try {
-      const credential = await signInWithPopup(firebaseAuth, googleAuthCredentialProvider);
-      await processSocialLogin(credential);
-    } catch (error) {
-      console.error("Google login error:", error);
-      const firebaseError = error as { code?: string; message?: string };
-      let toastMessage = "Google Sign-In failed. Please try again.";
-      if (firebaseError.code) {
-        switch (firebaseError.code) {
-            case 'auth/popup-closed-by-user':
-            case 'auth/cancelled-popup-request':
-                toastMessage = "The sign-in popup was closed. This can happen if popups are blocked, your network is unstable, or due to browser/extension interference. Please check your browser's popup settings, ensure a stable internet connection, and try disabling extensions. Also verify your Google/Firebase Redirect URIs are correct.";
-                break;
-            case 'auth/account-exists-with-different-credential':
-                toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
-                break;
-            case 'auth/unauthorized-domain':
-                toastMessage = "This domain is not authorized for Google Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted in your Google Cloud Console OAuth settings.";
-                break;
-            case 'auth/missing-or-insufficient-permissions':
-            case 'permission-denied':
-                 toastMessage = "Missing or insufficient permissions to perform Google Sign-In. Please contact support.";
-                 break;
-            case 'auth/network-request-failed':
-                toastMessage = "Google Sign-In failed due to a network error. Please check your internet connection and try again.";
-                break;
-            default:
-              toastMessage = firebaseError.message || toastMessage;
-        }
-      }
-      toast({ 
-          variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", 
-          title: "Google Login Error", 
-          description: toastMessage, 
-          duration: 10000 
-      });
     } finally {
+        setIsSocialLoginInProgress(false); // Ensure this is always reset
         setLoading(false);
     }
   };
 
-  const loginWithGitHub = async () => {
-    if (!firebaseAuth || !githubAuthCredentialProvider) {
-      toast({variant: "destructive", title: "Login Error", description: "GitHub Sign-In service not available.", duration: 7000});
+  const handleSocialLoginError = (error: any, providerName: string) => {
+    console.error(`${providerName} login error:`, error);
+    const firebaseError = error as { code?: string; message?: string };
+    let toastMessage = `${providerName} Sign-In failed. Please try again.`;
+
+    if (firebaseError.code) {
+      switch (firebaseError.code) {
+        case 'auth/popup-closed-by-user':
+        case 'auth/cancelled-popup-request':
+          toast({
+            title: `${providerName} Sign-In Cancelled`,
+            description: (
+              <div className="space-y-2">
+                <p>The sign-in popup was closed. This can happen if:</p>
+                <ul className="list-disc list-inside text-xs space-y-1">
+                  <li>Popups are blocked by your browser or an extension.</li>
+                  <li>Your internet connection is unstable.</li>
+                  <li>There's an issue with your browser extensions.</li>
+                  <li>The OAuth Redirect URIs are not correctly configured in Firebase and the Google/GitHub console.</li>
+                </ul>
+                <p className="text-xs">Please check your browser's popup settings and ensure a stable internet connection. If the issue persists, try using the redirect method or contact support.</p>
+                 <Alert variant="default" className="mt-2">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Tip: Try Redirect Sign-In</AlertTitle>
+                    <AlertDescription>
+                      If popups continue to be an issue, you can try the redirect-based sign-in method which is often more reliable with restrictive browser settings. (This would be an alternative implementation).
+                    </AlertDescription>
+                  </Alert>
+              </div>
+            ),
+            duration: 15000, 
+          });
+          return; // Don't show generic error toast
+        case 'auth/account-exists-with-different-credential':
+          toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
+          break;
+        case 'auth/unauthorized-domain':
+          toastMessage = `This domain is not authorized for ${providerName} Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted in your ${providerName} OAuth settings.`;
+          break;
+        case 'auth/missing-or-insufficient-permissions':
+        case 'permission-denied':
+          toastMessage = `Missing or insufficient permissions to perform ${providerName} Sign-In. This could be due to Firestore rules or API access settings. Please contact support.`;
+          break;
+        case 'auth/network-request-failed':
+          toastMessage = `${providerName} Sign-In failed due to a network error. Please check your internet connection and try again.`;
+          break;
+        default:
+          toastMessage = firebaseError.message || toastMessage;
+      }
+    }
+    toast({ variant: "destructive", title: `${providerName} Login Error`, description: toastMessage, duration: 10000 });
+  };
+
+  const loginWithProvider = async (provider: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: string) => {
+    if (!firebaseAuth || !provider) {
+      toast({variant: "destructive", title: "Login Error", description: `${providerName} Sign-In service not available.`, duration: 7000});
       return;
     }
-    setLoading(true);
+    
+    // Pre-login message for better UX
+    toast({
+        title: `Initiating ${providerName} Sign-In`,
+        description: "A popup window should appear. Please ensure popups are enabled for this site.",
+        duration: 5000,
+    });
+
+    setIsSocialLoginInProgress(true);
+    setLoading(true); // Keep global loading true as well
+
     try {
-      const credential = await signInWithPopup(firebaseAuth, githubAuthCredentialProvider);
+      // Option 1: signInWithPopup (current method)
+      const credential = await signInWithPopup(firebaseAuth, provider);
       await processSocialLogin(credential);
+
+      // Option 2: signInWithRedirect (alternative to try if popups are problematic)
+      // To use this, you'd call it here, and then the redirect result is handled by the useEffect hook with getRedirectResult.
+      // await signInWithRedirect(firebaseAuth, provider);
+      // Note: If using signInWithRedirect, the rest of processSocialLogin will happen
+      // after the redirect, in the useEffect hook that calls getRedirectResult.
+      // So, you might not call processSocialLogin directly here.
+
     } catch (error) {
-      console.error("GitHub login error:", error);
-      const firebaseError = error as { code?: string; message?: string };
-      let toastMessage = "GitHub Sign-In failed. Please try again.";
-       if (firebaseError.code) {
-        switch (firebaseError.code) {
-            case 'auth/popup-closed-by-user':
-            case 'auth/cancelled-popup-request':
-                 toastMessage = "The sign-in popup was closed. This can happen if popups are blocked, your network is unstable, or due to browser/extension interference. Please check your browser's popup settings, ensure a stable internet connection, and try disabling extensions. Also verify your GitHub/Firebase Redirect URIs are correct.";
-                break;
-            case 'auth/account-exists-with-different-credential':
-                toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method (e.g., Google or Email).";
-                break;
-             case 'auth/unauthorized-domain':
-                toastMessage = "This domain is not authorized for GitHub Sign-In. Please check your Firebase project configuration and ensure this domain is whitelisted in your GitHub OAuth App settings.";
-                break;
-            case 'auth/missing-or-insufficient-permissions':
-            case 'permission-denied':
-                 toastMessage = "Missing or insufficient permissions to perform GitHub Sign-In. Please contact support.";
-                 break;
-            case 'auth/network-request-failed':
-                toastMessage = "GitHub Sign-In failed due to a network error. Please check your internet connection and try again.";
-                break;
-            default:
-              toastMessage = firebaseError.message || toastMessage;
-        }
-      }
-      toast({ 
-          variant: (firebaseError.code === 'auth/popup-closed-by-user' || firebaseError.code === 'auth/cancelled-popup-request') ? "default" : "destructive", 
-          title: "GitHub Login Error", 
-          description: toastMessage, 
-          duration: 10000
-      });
+      handleSocialLoginError(error, providerName);
     } finally {
-        setLoading(false);
+      // setLoading(false); // setLoading(false) is handled in processSocialLogin or handleSocialLoginError
+      // setIsSocialLoginInProgress(false); // This is also handled in processSocialLogin or handleSocialLoginError
     }
   };
+
+  const loginWithGoogle = () => loginWithProvider(googleAuthCredentialProvider, "Google");
+  const loginWithGitHub = () => loginWithProvider(githubAuthCredentialProvider, "GitHub");
+
 
   const sendPasswordResetEmail = async (emailAddress: string) => {
     if (!firebaseAuth) {
@@ -557,6 +590,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Password reset error:", error);
         let errorMessage = "Could not send password reset email.";
         if (error.code === 'auth/user-not-found') {
+             // For security, don't reveal if user exists. Message is handled in UI.
             throw error; 
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
@@ -578,6 +612,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
 
     const userDocRef = doc(db, "users", user.id);
+
+    // Prevent isAdmin from being updated via this function
+    if ('isAdmin' in updatedData) {
+      delete (updatedData as any).isAdmin; 
+      console.warn("Attempt to update 'isAdmin' field via updateUserProfile was blocked.");
+    }
+
 
     if (updatedData.username && updatedData.username !== user.username) {
         const usersRef = collection(db, "users");
@@ -602,7 +643,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const dataToUpdateInFirestore: { [key: string]: any } = {};
-    const allowedFields: (keyof Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL'>>)[] =
+    const allowedFields: (keyof Partial<Omit<User, 'id' | 'email' | 'isAdmin' | 'photoURL' | 'userId'>>)[] = // Added userId here as it might be part of type but not updatable
       ['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId'];
 
     allowedFields.forEach(field => {
@@ -616,12 +657,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (firebaseAuth.currentUser) await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
         } catch (authProfileError) {
             console.warn("Could not update Firebase Auth profile displayName:", authProfileError);
+            // Don't block Firestore update for this, but maybe log or inform user if critical
         }
     }
 
 
     if (Object.keys(dataToUpdateInFirestore).length === 0) {
       setLoading(false);
+      toast({ title: "No Changes", description: "No information was changed."});
       return;
     }
 
@@ -631,11 +674,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!updatedUserDoc.exists()) {
         throw new Error("Failed to retrieve updated user profile from database.");
       }
-      const updatedUser = { id: updatedUserDoc.id, ...updatedUserDoc.data() } as User;
-      if (updatedUser.isAdmin === undefined) {
-        updatedUser.isAdmin = false;
-      }
-
+      const docData = updatedUserDoc.data();
+      const updatedUser = { id: updatedUserDoc.id, ...docData, isAdmin: docData.isAdmin || false } as User;
+      
       setUser(updatedUser); 
 
       if (localStorage.getItem('profileIncomplete') === 'true') {
@@ -664,7 +705,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = user?.isAdmin || false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, updateUserProfile, showLoginModal, setShowLoginModal, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, updateUserProfile, showLoginModal, setShowLoginModal, isAdmin, isSocialLoginInProgress }}>
       {children}
     </AuthContext.Provider>
   );

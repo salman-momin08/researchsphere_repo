@@ -1,31 +1,50 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // Users Collection
-    // Allow users to read and write their own user document.
     match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Authenticated users can read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Authenticated users can create their own profile (on signup)
+      // Ensure userId in the document matches the authenticated user's UID
+      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.userId == request.auth.uid;
+      // Authenticated users can update their own profile (specific fields)
+      // Admin status (isAdmin) should NOT be updatable by the user themselves.
+      // Other fields like email are usually managed via Firebase Auth SDK directly or specific backend functions.
+      allow update: if request.auth != null && request.auth.uid == userId 
+                    && !(request.resource.data.isAdmin is bool)
+                    && request.resource.data.keySet().hasOnly(['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId', 'photoURL', 'email', 'id', 'userId']); // Add all fields user can update, ensure userId is not changed by mistake
+
+      // Admins can read any user profile (for admin panel, etc.)
+      allow get, list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     // Papers Collection
-    // Allow users to manage (CRUD) their own papers.
     match /papers/{paperId} {
-      // Allow read if the user is the owner of the paper.
-      // Allow list if the query constraints ensure only user's papers are returned (handled by frontend query).
-      // For general list operations that don't filter by userId on the backend,
-      // you might need broader read access or implement server-side filtering with functions.
-      // This rule assumes frontend queries will include `where("userId", "==", request.auth.uid)` for listing.
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Authenticated users can read their own papers
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Authenticated users can list (query for) their own papers
+      // Note: For queries, rules often apply to the query result, not the query itself.
+      // Ensure your client-side queries for non-admins always include where("userId", "==", request.auth.uid)
+      allow list: if request.auth != null; // More permissive list, client must filter. OR be more restrictive:
+      // allow list: if request.auth != null && request.query.filters.find(f => f.fieldPath == "userId" && f.operator == "==" && f.value == request.auth.uid) != null;
 
-      // Allow create if the authenticated user is setting their own UID as the userId.
+
+      // Authenticated users can create papers for themselves
+      // Ensure userId in the document matches the authenticated user's UID
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Authenticated users can update their own papers
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Authenticated users can delete their own papers (optional, if needed)
+      // allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
 
-      // Allow update and delete if the user is the owner of the paper.
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Admins can read/list any paper for dashboard/management purposes
+      allow get, list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Admins can update any paper (e.g., change status, add feedback)
+      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Admins can delete any paper (optional)
+      // allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }
