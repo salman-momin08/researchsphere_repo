@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -22,10 +22,21 @@ const paperSchema = z.object({
   abstract: z.string().min(50, "Abstract must be at least 50 characters.").max(2000, "Abstract must be less than 2000 characters."),
   authors: z.string().min(1, "At least one author is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
-  file: z.instanceof(FileList)
-    .refine(files => files.length > 0, "A paper file is required.")
-    .refine(files => files.length > 0 && files[0].size <= 5 * 1024 * 1024, "File size must be less than 5MB.")
-    .refine(files => files.length > 0 && ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type), "Only PDF or DOCX files are allowed."),
+  file: z.any() // Use z.any() and refine on client
+    .refine(files => {
+      // This validation runs on the client.
+      // Ensure 'files' is a FileList and has at least one file.
+      if (typeof window === 'undefined') return true; // Allow server-side to pass
+      return files instanceof FileList && files.length > 0;
+    }, "A paper file is required.")
+    .refine(files => {
+      if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
+      return files[0].size <= 5 * 1024 * 1024; // 5MB
+    }, "File size must be less than 5MB.")
+    .refine(files => {
+      if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
+      return ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type);
+    }, "Only PDF or DOCX files are allowed."),
 });
 
 type PaperFormValues = z.infer<typeof paperSchema>;
@@ -42,16 +53,15 @@ export default function PaperUploadForm() {
     defaultValues: {
       title: "",
       abstract: "",
-      authors: [], // This should be a string initially based on Input, Zod transform handles it
-      keywords: [], // This should be a string initially, Zod transform handles it
-      file: undefined, // RHF will manage this as FileList
+      authors: [],
+      keywords: [],
+      file: undefined,
     },
   });
 
-  // Watch for changes in the 'file' field to update the displayed file name
   const watchedFile = form.watch("file");
   useEffect(() => {
-    if (watchedFile && watchedFile.length > 0) {
+    if (watchedFile && typeof window !== 'undefined' && watchedFile instanceof FileList && watchedFile.length > 0) {
       setFileName(watchedFile[0].name);
     } else {
       setFileName(null);
@@ -68,10 +78,10 @@ export default function PaperUploadForm() {
     setFormError(null);
 
     try {
-      // data.file is already a FileList here due to Zod validation and RHF handling
-      const fileToUpload = data.file[0];
+      // data.file is a FileList here due to Zod validation and RHF handling on the client
+      const fileToUpload = (data.file as FileList)[0];
 
-      if (!fileToUpload) { // Should not happen if Zod validation passed
+      if (!fileToUpload) { 
         throw new Error("File not available for submission.");
       }
 
@@ -82,8 +92,8 @@ export default function PaperUploadForm() {
         userId: user.id,
         title: data.title,
         abstract: data.abstract,
-        authors: data.authors, // Already transformed by Zod
-        keywords: data.keywords, // Already transformed by Zod
+        authors: data.authors,
+        keywords: data.keywords,
         fileName: fileToUpload.name,
         uploadDate: new Date().toISOString(),
         status: "Submitted", 
@@ -97,11 +107,11 @@ export default function PaperUploadForm() {
       localStorage.setItem(`newPaperAbstract-${newPaperId}`, newPaper.abstract);
       localStorage.setItem(`newPaperFileName-${newPaperId}`, newPaper.fileName || 'unknown.pdf');
 
-      console.log("Submitting paper:", newPaper);
+      // console.log("Submitting paper:", newPaper); // Removed mock message
       await new Promise(resolve => setTimeout(resolve, 1500)); 
       
       toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been uploaded.` });
-      form.reset(); // This will also reset the watchedFile, triggering useEffect to clear fileName
+      form.reset();
       
       router.push(`/papers/${newPaperId}`);
 
@@ -147,13 +157,13 @@ export default function PaperUploadForm() {
             <div>
               <Label htmlFor="authors">Authors (comma-separated)</Label>
               <Input id="authors" placeholder="e.g., John Doe, Jane Smith" {...form.register("authors")} disabled={isSubmitting} />
-              {form.formState.errors.authors && <p className="text-sm text-destructive mt-1">{form.formState.errors.authors.message}</p>}
+              {form.formState.errors.authors && <p className="text-sm text-destructive mt-1">{form.formState.errors.authors.message as string}</p>}
             </div>
 
             <div>
               <Label htmlFor="keywords">Keywords (comma-separated)</Label>
               <Input id="keywords" placeholder="e.g., AI, Machine Learning, Academia" {...form.register("keywords")} disabled={isSubmitting} />
-              {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message}</p>}
+              {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message as string}</p>}
             </div>
             
             <div>
@@ -169,8 +179,7 @@ export default function PaperUploadForm() {
                       <span>Upload a file</span>
                       <input id="file-upload" type="file" className="sr-only" 
                             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            {...form.register("file")} // RHF register will handle the FileList
-                            // onChange prop removed, RHF handles it via register
+                            {...form.register("file")}
                             disabled={isSubmitting}
                       />
                     </label>
@@ -183,7 +192,7 @@ export default function PaperUploadForm() {
                   )}
                 </div>
               </div>
-              {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{form.formState.errors.file.message}</p>}
+              {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{form.formState.errors.file.message as string}</p>}
             </div>
           </CardContent>
           <CardFooter>
