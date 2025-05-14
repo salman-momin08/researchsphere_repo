@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   webpack: (config, { isServer, webpack: webpackInstance }) => { // Destructure webpackInstance from options
