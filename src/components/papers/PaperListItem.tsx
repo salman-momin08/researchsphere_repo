@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react'; 
 import CountdownTimer from '../shared/CountdownTimer';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth'; 
 
 interface PaperListItemProps {
   paper: Paper;
@@ -21,7 +21,7 @@ interface PaperListItemProps {
 const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useAuth(); // Get current user
+  const { user } = useAuth(); 
   const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
   const [isOverdue, setIsOverdue] = useState(false);
 
@@ -77,18 +77,42 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
     }
   }
 
+  const triggerTextFileDownload = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Download Started", description: `${filename} is being downloaded.` });
+  };
+
   const handleViewDownload = () => {
     if (paper.fileUrl) {
-        // In a real app, this would open the URL: window.open(paper.fileUrl, '_blank');
-        toast({
-            title: "Simulating File Action",
-            description: `Displaying/downloading: ${paper.fileName || 'paper'}. URL: ${paper.fileUrl}`,
-        });
+        // Create mock content for the text file download
+        const fileContent = `
+Paper Title: ${paper.title}
+Authors: ${paper.authors.join(', ')}
+Abstract: ${paper.abstract}
+Keywords: ${paper.keywords.join(', ')}
+Status: ${paper.status}
+Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
+File Name: ${paper.fileName || 'N/A'}
+Original File URL (for reference, not directly downloadable in this mock): ${paper.fileUrl}
+
+This is a mock text file containing details for the paper.
+In a real application, this button would initiate a download of the actual paper document.
+        `;
+        const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+        triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Details.txt`);
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing.",
+            description: "The URL for this paper file is missing or the file was not processed.",
         });
     }
   };
@@ -132,7 +156,7 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
           </Button>
         )}
         <Button variant="outline" size="sm" onClick={handleViewDownload} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> View/Download
+            <Download className="mr-2 h-4 w-4" /> Download Details
         </Button>
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
           <Eye className="mr-2 h-4 w-4" /> Details
@@ -145,4 +169,3 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
 PaperListItem.displayName = 'PaperListItem';
 
 export default PaperListItem;
-

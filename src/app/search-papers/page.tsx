@@ -9,8 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Search as SearchIcon, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper } from '@/types';
-// import { allMockPapers } from '@/lib/mock-data'; // No longer using mock data directly
-import { getPublishedPapers } from '@/lib/paper-service'; // Import Firestore service
+import { getPublishedPapers } from '@/lib/paper-service'; 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -26,8 +25,6 @@ function SearchPapersContent() {
   const { toast } = useToast();
   const router = useRouter();
 
-  console.log("SearchPapersContent: Component initialized. Will use Firestore for search.");
-
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast({
@@ -41,14 +38,14 @@ function SearchPapersContent() {
     }
     setIsLoading(true);
     setHasSearched(true);
-    setSearchResults([]); // Clear previous results
+    setSearchResults([]); 
 
     try {
-      // Fetch all "Published" papers from Firestore
       const publishedPapers = await getPublishedPapers();
       console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
 
       // Client-side filtering for author name (case-insensitive, partial match)
+      // This logic already handles multiple authors correctly.
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
@@ -66,8 +63,20 @@ function SearchPapersContent() {
     }
   };
 
+  const triggerTextFileDownload = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Download Started", description: `${filename} is being downloaded.` });
+  };
+
   const handleDownload = (paper: Paper) => {
-    // Mock download: create a text file with paper details
     const fileContent = `
 Paper Title: ${paper.title}
 Authors: ${paper.authors.join(', ')}
@@ -78,23 +87,11 @@ Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
 File Name: ${paper.fileName || 'N/A'}
 Mock File URL: ${paper.fileUrl || 'N/A'}
 
-This is a mock downloaded file from ResearchSphere.
-In a real application, this would be the actual paper document.
+This is a downloaded text file containing details for the paper from ResearchSphere.
+In a real application, if a direct file URL exists, it would be used for actual file download.
     `;
-    const blob = new Blob([fileContent.trim()], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
     const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
-    a.download = `${safeTitle}_Details.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({
-      title: "Mock Download Started",
-      description: `Details for "${paper.title}" are being downloaded.`,
-    });
+    triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Details.txt`);
   };
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
@@ -179,7 +176,7 @@ In a real application, this would be the actual paper document.
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <ExternalLink className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownload(paper)} title="Download Paper Details (Mock)">
+                        <Button variant="outline" size="sm" onClick={() => handleDownload(paper)} title="Download Paper Details">
                           <Download className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -211,3 +208,4 @@ export default function SearchPapersPage() {
     </ProtectedRoute>
   );
 }
+

@@ -83,7 +83,7 @@ function PaperDetailsContent() {
     }
   }, [searchParams, currentPaper, isPaperOverdue, user, isAdmin]);
 
-  const handlePaymentSuccess = async (paperId?: string) => { // paperId is optional for "Pay Now" from form
+  const handlePaymentSuccess = async (paperId?: string) => { 
     const targetPaperId = paperId || currentPaper?.id;
     if (!targetPaperId) return;
 
@@ -126,7 +126,7 @@ function PaperDetailsContent() {
       } else {
         toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
       }
-       // If status changed to something that resolves payment pending/overdue, reset isPaperOverdue
+       
       if (newStatus !== "Payment Pending") {
         setIsPaperOverdue(false);
       }
@@ -187,17 +187,41 @@ function PaperDetailsContent() {
     }
   };
 
+  const triggerTextFileDownload = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Download Started", description: `${filename} is being downloaded.` });
+  };
+
   const handleViewDownloadPaper = () => {
     if (currentPaper?.fileUrl) {
-        toast({
-            title: "Simulating File Action",
-            description: `Displaying/downloading: ${currentPaper.fileName || 'paper'}. URL: ${currentPaper.fileUrl}`,
-        });
+        const fileContent = `
+Paper Title: ${currentPaper.title}
+Authors: ${currentPaper.authors.join(', ')}
+Abstract: ${currentPaper.abstract}
+Keywords: ${currentPaper.keywords.join(', ')}
+Status: ${currentPaper.status}
+Upload Date: ${new Date(currentPaper.uploadDate).toLocaleDateString()}
+File Name: ${currentPaper.fileName || 'N/A'}
+Original File URL (for reference): ${currentPaper.fileUrl}
+
+This is a mock text file containing details for the paper "${currentPaper.title}".
+In a real application, this button would initiate a download of the actual paper document.
+        `;
+        const safeTitle = currentPaper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+        triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Details.txt`);
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing.",
+            description: "The URL for this paper file is missing or the file was not processed.",
         });
     }
   };
@@ -259,14 +283,14 @@ function PaperDetailsContent() {
             </div>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-stretch md:items-center">
                  <Button onClick={handleViewDownloadPaper} size="lg" variant="outline" className="w-full md:w-auto">
-                    <Download className="mr-2 h-5 w-5" /> View/Download Paper
+                    <Download className="mr-2 h-5 w-5" /> Download Details
                 </Button>
                 {effectiveStatus === 'Payment Pending' && user && user.id === currentPaper.userId && !isAdmin && !isPaperOverdue && (
                 <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
-                {isAdmin && ( // Admin might still want to go back to dashboard or an edit page if one existed
+                {isAdmin && ( 
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full md:w-auto">
                         <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
@@ -318,7 +342,7 @@ function PaperDetailsContent() {
               </div>
             )}
             
-            {/* User-facing display of Admin Feedback */}
+            
             {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdmin) && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Admin/Reviewer Feedback</h3>
@@ -330,7 +354,7 @@ function PaperDetailsContent() {
               </div>
             )}
 
-            {/* Admin's form to PROVIDE feedback */}
+            
             {isAdmin && effectiveStatus !== "Payment Overdue" && (
               <div className="mt-6 p-4 border rounded-md">
                 <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
@@ -443,4 +467,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-
