@@ -79,7 +79,6 @@ export default function SignupForm() {
       confirmPassword: "",
       phoneNumber: "",
       institution: "",
-      // role: undefined, // Will be handled by Select placeholder
       researcherId: "",
       termsAccepted: false,
     },
@@ -89,11 +88,9 @@ export default function SignupForm() {
     setIsLoading(true);
     setError(null);
     try {
-      // The signup function in AuthContext will handle creating auth user
-      // and saving the extended profile.
       await signup(data); 
       toast({ title: "Signup Successful", description: "Welcome to ResearchSphere!" });
-      router.push("/dashboard");
+      router.push("/"); // Redirect to home page
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
@@ -204,3 +201,4 @@ export default function SignupForm() {
     </form>
   );
 }
+

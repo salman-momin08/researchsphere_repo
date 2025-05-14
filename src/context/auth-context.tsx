@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    if (!db) { // Check if Firestore db instance is available
+    if (!db) { 
       console.error("AuthContext: Firestore service (db) is not available. This might indicate a problem with Firestore initialization or configuration specifically. Check Firebase project settings.");
       toast({
         variant: "destructive",
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             appUser = {
               id: userDocSnap.id,
               ...docData,
-              isAdmin: docData.isAdmin || false,
+              isAdmin: docData.isAdmin || false, // Default isAdmin to false if not present
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || docData.displayName,
               photoURL: firebaseUser.photoURL || docData.photoURL,
@@ -120,11 +120,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied') || updateError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while syncing your profile. Some information might be outdated. Please check your internet connection or contact support.";
                 } else {
-                  console.error("AuthContext: Profile sync error details:", updateError);
+                  // console.error("AuthContext: Profile sync error details:", updateError);
                 }
                 toast({variant: "destructive", title: "Profile Sync Error", description: userMessage, duration: 7000 });
               }
             }
+            handleSuccessfulLogin(appUser);
           } else {
              const isInitialAdmin = firebaseUser.email === ADMIN_CREATOR_EMAIL;
              appUser = {
@@ -141,22 +142,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               researcherId: null,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            } as User; // Type assertion needed because serverTimestamp() returns a sentinel
+            } as User; 
             try {
-                // For setDoc, serverTimestamp() needs to be cast if the type expects Date.
-                // It's better to ensure User type can handle Timestamp or use a converter.
-                // For simplicity here, assuming Firestore handles it or type is flexible.
                 await setDoc(userDocRef, {
                   ...appUser,
-                  createdAt: serverTimestamp(), // Ensure these are set if not done above
+                  createdAt: serverTimestamp(), 
                   updatedAt: serverTimestamp(),
                 });
+                handleSuccessfulLogin(appUser);
             } catch (dbError: any) {
                 let userMessage = "Could not initialize your profile. Please try again or contact support.";
                 if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while setting up your profile. Please check your Firestore rules, internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
                 } else {
-                    console.error("AuthContext: Profile setup error details:", dbError);
+                    // console.error("AuthContext: Profile setup error details:", dbError);
                 }
                 toast({variant: "destructive", title: "Profile Setup Error", description: userMessage, duration: 10000 });
                 if (firebaseAuth) await signOut(firebaseAuth);
@@ -166,23 +165,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           // console.log(`AuthContext: Hydrated appUser for ${appUser.id}:`, JSON.stringify(appUser, null, 2));
-          setUser(appUser);
-          const isProfileComplete = appUser.username && appUser.role;
-          if (!isProfileComplete) {
-            localStorage.setItem('profileIncomplete', 'true');
-            if (pathname !== '/profile/settings') {
-                  router.push('/profile/settings?complete=true');
-            }
-          } else {
-            localStorage.removeItem('profileIncomplete');
-          }
+          // setUser(appUser); // Set user is now handled by handleSuccessfulLogin
+          // const isProfileComplete = appUser.username && appUser.role;
+          // if (!isProfileComplete) {
+          //   localStorage.setItem('profileIncomplete', 'true');
+          //   if (pathname !== '/profile/settings') {
+          //         router.push('/profile/settings?complete=true');
+          //   }
+          // } else {
+          //   localStorage.removeItem('profileIncomplete');
+          // }
 
         } catch (error: any) {
             let userMessage = "Could not load your profile. Please try again or contact support.";
             if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
                 userMessage = "Permission denied while accessing your profile. Please check your Firestore rules, internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
             } else {
-                 console.error("AuthContext: Profile load error details:", error);
+                 // console.error("AuthContext: Profile load error details:", error);
             }
             toast({variant: "destructive", title: "Profile Load Error", description: userMessage, duration: 10000 });
             if (firebaseAuth) await signOut(firebaseAuth);
@@ -193,6 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('profileIncomplete');
       }
       setLoading(false);
+      setIsSocialLoginInProgress(false); // Reset social login flag here too
     });
     return () => unsubscribe();
   }, [router, pathname]); 
@@ -209,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       router.push('/profile/settings?complete=true');
     } else {
       localStorage.removeItem('profileIncomplete');
-      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/dashboard';
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/'; // Changed to redirect to home page
       localStorage.removeItem('redirectAfterLogin');
       router.push(redirectPath);
     }
@@ -223,6 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(firebaseAuth, email, pass);
+      // onAuthStateChanged will handle setting user and redirecting
     } catch (error) {
       const firebaseError = error as { code?: string; message?: string };
       let errorMessage = "An unknown error occurred during login.";
@@ -248,10 +249,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             break;
           default:
             errorMessage = firebaseError.message || errorMessage;
-            console.error("Login error details:", firebaseError);
+            // console.error("Login error details:", firebaseError);
         }
       } else {
-        console.error("Login error (unknown type):", error);
+        // console.error("Login error (unknown type):", error);
       }
       setLoading(false);
       throw new Error(errorMessage); 
@@ -278,7 +279,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
             userMessage = "Permission denied while checking username. Please check your Firestore rules, internet connection or contact support.";
         } else {
-           console.error("Username query error details:", queryError);
+           // console.error("Username query error details:", queryError);
         }
         toast({variant: "destructive", title: "Signup Error", description: userMessage, duration: 7000});
         setLoading(false);
@@ -313,10 +314,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             break;
           default:
               errorMessage = authError.message || errorMessage;
-              console.error("Firebase Auth signup error details:", authError);
+              // console.error("Firebase Auth signup error details:", authError);
           }
       } else {
-        console.error("Signup error (unknown type):", authError);
+        // console.error("Signup error (unknown type):", authError);
       }
       setLoading(false);
       throw new Error(errorMessage);
@@ -327,12 +328,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         if (firebaseUser) await updateFirebaseProfile(firebaseUser, { displayName: data.fullName });
     } catch (profileUpdateError) {
-        console.warn("AuthContext: Could not update Firebase Auth display name during signup:", profileUpdateError);
+        // console.warn("AuthContext: Could not update Firebase Auth display name during signup:", profileUpdateError);
     }
 
     const isInitialAdmin = data.email === ADMIN_CREATOR_EMAIL;
 
-    const newUserProfile: Omit<User, 'id'> & { createdAt: any; updatedAt: any } = { // Use Omit and add serverTimestamp types
+    const newUserProfile: Omit<User, 'id'> & { createdAt: any; updatedAt: any } = { 
       userId: firebaseUser.uid,
       email: data.email,
       displayName: data.fullName, 
@@ -349,19 +350,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile);
+      // onAuthStateChanged will handle setting user and redirecting after profile creation
     } catch (firestoreError: any) {
         let errorMessage = "An unknown error occurred while saving your profile.";
         if (firestoreError.code === 'permission-denied' || firestoreError.message?.includes('permission-denied') || firestoreError.message?.includes('Missing or insufficient permissions')) {
             errorMessage = "Could not save your profile due to a permission issue. Please check your Firestore rules, ensure you are connected to the internet and try again. If the problem persists, please contact support.";
         } else {
-          console.error("Firestore profile creation error details:", firestoreError);
+          // console.error("Firestore profile creation error details:", firestoreError);
         }
         toast({ variant: "destructive", title: "Profile Creation Error", description: errorMessage, duration: 9000 });
         try {
             if (firebaseUser) await firebaseUser.delete();
         } catch (deleteError) {
             errorMessage += " Additionally, an orphaned auth account might exist. Please contact support.";
-            console.error("Error deleting orphaned auth user:", deleteError);
+            // console.error("Error deleting orphaned auth user:", deleteError);
         }
         setLoading(false);
         throw new Error(errorMessage);
@@ -378,13 +380,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await signOut(firebaseAuth);
         localStorage.removeItem('redirectAfterLogin');
         localStorage.removeItem('profileIncomplete');
-        setUser(null); // Explicitly set user to null on logout
+        setUser(null); 
         router.push('/');
     } catch (error) {
-        console.error("Logout error:", error);
+        // console.error("Logout error:", error);
         toast({variant: "destructive", title: "Logout Failed", description: "Could not log out. Please try again."});
     } finally {
-        // setLoading(false) will be handled by onAuthStateChanged setting user to null
+        // setLoading(false) will be handled by onAuthStateChanged
     }
   };
 
@@ -426,7 +428,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied') || updateError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while syncing your profile. Some information might be outdated. Please check your Firestore rules, internet connection or contact support.";
                   } else {
-                    console.error("Social login profile sync error details:", updateError);
+                    // console.error("Social login profile sync error details:", updateError);
                   }
                   toast({ variant: "destructive", title: "Profile Sync Error", description: userMessage, duration: 7000 });
               }
@@ -447,25 +449,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             researcherId: null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-          } as User; // Type assertion
+          } as User; 
           await setDoc(userDocRef, {
              ...appUser,
              createdAt: serverTimestamp(),
              updatedAt: serverTimestamp(),
           });
         }
+        // onAuthStateChanged will handle setting user and redirecting
     } catch (dbError: any) {
          let userMessage = "Failed to set up user profile after social login. Please try again.";
          if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
             userMessage = "Could not save your profile due to a permission issue after social login. Please check your Firestore rules or contact support if the problem persists.";
          } else {
-            console.error("Social login Firestore error details:", dbError);
+            // console.error("Social login Firestore error details:", dbError);
          }
          toast({variant: "destructive", title: "Login Error", description: userMessage, duration: 10000 });
           try {
             if (firebaseAuth) await signOut(firebaseAuth);
           } catch (signOutError) {
-             console.error("Error signing out after social login db error:", signOutError);
+             // console.error("Error signing out after social login db error:", signOutError);
           }
     } finally {
         setIsSocialLoginInProgress(false);
@@ -473,6 +476,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleSocialLoginError = (error: any, providerName: string) => {
+    setIsSocialLoginInProgress(false); // Ensure this is reset on error
+    setLoading(false); // Ensure loading is reset
+
     const firebaseError = error as { code?: string; message?: string };
     let toastMessage = `${providerName} Sign-In failed. Please try again.`;
     let toastTitle = `${providerName} Login Error`;
@@ -495,6 +501,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       Please ensure popups are enabled for this site in your browser settings.
                       Also, check your internet connection and try again. If the problem persists, some browser extensions (like ad blockers or privacy tools) might interfere.
                       Consider temporarily disabling them or using an incognito window.
+                      Alternatively, you can try the other social login option if available.
                     </AlertDescription>
                   </Alert>
               </div>
@@ -517,16 +524,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           break;
         default:
           toastMessage = firebaseError.message || toastMessage;
-          console.error(`${providerName} social login error details:`, firebaseError);
+          // console.error(`${providerName} social login error details:`, firebaseError);
       }
     } else {
-       console.error(`${providerName} social login error (unknown type):`, error);
+       // console.error(`${providerName} social login error (unknown type):`, error);
     }
     if (firebaseError.code !== 'auth/popup-closed-by-user' && firebaseError.code !== 'auth/cancelled-popup-request') {
       toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
     }
-    setIsSocialLoginInProgress(false);
-    setLoading(false);
   };
 
   const loginWithProvider = async (providerInstance: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: string) => {
@@ -577,7 +582,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (error.code === 'auth/network-request-failed') {
             errorMessage = "Password reset request failed due to a network error. Please check your internet connection.";
         } else {
-          console.error("Password reset email error details:", error);
+          // console.error("Password reset email error details:", error);
         }
         setLoading(false);
         throw new Error(errorMessage);
@@ -599,7 +604,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId'];
 
     allowedFields.forEach(field => {
-        if (updatedData[field] !== undefined) { // Check if field exists in updatedData
+        if (updatedData[field] !== undefined) { 
             dataToUpdateInFirestore[field] = updatedData[field] === "" ? null : updatedData[field];
         }
     });
@@ -619,7 +624,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
                  userMessage = "Permission denied while checking username for update. Please check your Firestore rules, internet connection or contact support.";
             } else {
-                 console.error("Username query (update) error details:", queryError);
+                 // console.error("Username query (update) error details:", queryError);
             }
             toast({variant: "destructive", title: "Profile Update Error", description: userMessage, duration: 7000});
             setLoading(false);
@@ -631,7 +636,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             if (firebaseAuth.currentUser) await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
         } catch (authProfileError) {
-            console.warn("AuthContext: Could not update Firebase Auth display name during profile update:", authProfileError);
+            // console.warn("AuthContext: Could not update Firebase Auth display name during profile update:", authProfileError);
         }
     }
 
@@ -641,7 +646,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    dataToUpdateInFirestore.updatedAt = serverTimestamp(); // Always update the timestamp
+    dataToUpdateInFirestore.updatedAt = serverTimestamp(); 
 
     try {
       await updateDoc(userDocRef, dataToUpdateInFirestore);
@@ -669,9 +674,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch(error: any) {
       let userMessage = "Failed to update profile in the database.";
       if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
-        userMessage = "Could not update your profile due to a permission issue. Please check your Firestore rules, ensure you are connected to the internet and try again. If the problem persists, contact support.";
+        userMessage = "Could not update your profile due to a permission issue. Please check your Firestore rules, ensure you are connected to the internet and try again. If the problem persists, please contact support.";
       } else {
-        console.error("Firestore profile update error details:", error);
+        // console.error("Firestore profile update error details:", error);
       }
       toast({ variant: "destructive", title: "Profile Update Error", description: userMessage, duration: 9000 });
       setLoading(false); 
