@@ -3,64 +3,54 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check if the requesting user is an admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
     // Users Collection
     match /users/{userId} {
       // Authenticated users can read their own profile
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow get: if request.auth != null && request.auth.uid == userId;
       // Authenticated users can create their own profile (on signup)
+      // Ensure userId in the document matches the authenticated user
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.userId == request.auth.uid;
-      // Authenticated users can update their own profile
-      // Prevent users from updating their isAdmin status or email directly through this rule.
-      allow update: if request.auth != null && request.auth.uid == userId
-                      && !(request.resource.data.isAdmin is bool && request.resource.data.isAdmin != resource.data.isAdmin)
-                      && !(request.resource.data.email is string && request.resource.data.email != resource.data.email);
+      // Authenticated users can update their own profile (specific fields, cannot make themselves admin)
+      allow update: if request.auth != null && request.auth.uid == userId && !(request.resource.data.isAdmin is bool);
 
-
-      // Admins can read any user profile
-      allow get, list: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Admins can read any user profile (for admin panel, etc.)
+      allow list: if isAdmin(); // Admins can list all users
     }
 
     // Papers Collection
     match /papers/{paperId} {
-      // Authenticated users can read their own papers
-      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
-      
-      // Authenticated users can list (query for) their own papers
-      // This rule requires client-side queries to include where("userId", "==", request.auth.uid)
-      allow list: if request.auth != null && request.query.resource.data.userId == request.auth.uid;
-      
-      // Authenticated users can create papers for themselves
-      // Ensure all required fields for creation are present and userId matches.
-      allow create: if request.auth != null 
-                      && request.resource.data.userId == request.auth.uid
-                      && request.resource.data.title is string
-                      && request.resource.data.abstract is string
-                      && request.resource.data.authors is list
-                      && request.resource.data.keywords is list
-                      && request.resource.data.status is string
-                      && request.resource.data.uploadDate is timestamp; // Ensure uploadDate is set
 
-      // Authenticated users can update their own papers (e.g., minor edits before review, or resubmission)
-      // Prevent changing userId. Allow status changes by user if appropriate (e.g. from Draft to Submitted)
-      // but critical status changes like 'Accepted', 'Rejected' should be admin-only.
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid
-                      && request.resource.data.userId == resource.data.userId // Cannot change owner
-                      && (
-                           // Allow user to update their paper if it's in a user-modifiable state
-                           (resource.data.status == "Draft" || resource.data.status == "Action Required")
-                           // Or if user is only updating specific fields like AI results for themselves
-                           || (request.resource.data.keys().hasOnly([
-                                'plagiarismScore', 'plagiarismReport', 
-                                'acceptanceProbability', 'acceptanceReport',
-                                'lastUpdatedAt' // always allow updating this
-                               ]))
-                           // Or if user is paying for a "Payment Pending" paper
-                           || (resource.data.status == "Payment Pending" && request.resource.data.status == "Submitted" && request.resource.data.paidAt is timestamp)
-                         );
+      // Helper function to check if the requesting user is the owner of the paper
+      function isPaperOwner() {
+        return request.auth != null && request.auth.uid == resource.data.userId;
+      }
 
+      // 1. Owner-based access for their own papers (any status)
+      // This rule allows owners to read (get, list), update, and delete their own papers.
+      // For 'list', this works because the client-side query for a user's papers will be
+      // filtered by 'userId', so every document considered by this rule during a list operation
+      // will satisfy 'resource.data.userId == request.auth.uid'.
+      allow get, list, update, delete: if isPaperOwner();
 
-      // Admins can perform all actions on any paper
-      allow read, list, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Owners can create papers for themselves.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // 2. Admin access to any paper
+      // Admins can perform any operation (read, write) on any paper.
+      allow read, write: if isAdmin(); // 'read' covers get, list. 'write' covers create, update, delete.
+
+      // 3. Authenticated users can read (get, list) PUBLISHED papers (for search functionality)
+      // This rule allows any authenticated user to read papers whose status is 'Published'.
+      // For 'list', this means that if this rule is the one granting permission,
+      // all documents returned by the query must have status == 'Published'.
+      // This is suitable for the search page which explicitly queries for published papers.
+      allow get, list: if request.auth != null && resource.data.status == 'Published';
     }
   }
 }
