@@ -12,10 +12,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { allMockPapers } from "@/lib/mock-data"; // Import consolidated mock data
+import { allMockPapers } from "@/lib/mock-data"; 
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
 
 function AdminDashboardContent() {
-  const { user } = useAuth(); 
+  const { user, isAdmin, loading: authLoading } = useAuth(); 
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState(true);
 
@@ -26,13 +28,29 @@ function AdminDashboardContent() {
 
 
   useEffect(() => {
-    setIsLoadingPapers(true);
-    // Simulate fetching all papers
-    setTimeout(() => {
-      setPapers(allMockPapers); // Use consolidated mock data
+    // Only fetch papers if the user is loaded and confirmed to be an admin
+    if (!authLoading && user && isAdmin) {
+      setIsLoadingPapers(true);
+      // Simulate fetching all papers
+      console.log("AdminDashboard: User is admin, fetching all mock papers.");
+      setTimeout(() => {
+        setPapers(allMockPapers); 
+        setIsLoadingPapers(false);
+      }, 1000);
+    } else if (!authLoading && user && !isAdmin) {
+      // User is loaded but not an admin, clear papers and stop loading.
+      // The main access denial message handles the UI.
+      console.warn("AdminDashboard: User is not admin, access denied by component logic.");
+      setPapers([]);
       setIsLoadingPapers(false);
-    }, 1000);
-  }, []);
+    } else if (!authLoading && !user) {
+      // User is not logged in, clear papers. ProtectedRoute should handle redirect.
+      console.log("AdminDashboard: No user logged in.");
+      setPapers([]);
+      setIsLoadingPapers(false);
+    }
+    // If authLoading is true, we wait.
+  }, [user, isAdmin, authLoading]);
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
     switch (status) {
@@ -44,9 +62,59 @@ function AdminDashboardContent() {
     }
   };
 
-  if (isLoadingPapers) {
-    return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/></div>;
+  // This check is important. If auth is still loading, show a spinner.
+  if (authLoading) {
+    return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
+
+  // If user is loaded, but not an admin (according to client-side context)
+  if (user && !isAdmin) {
+    return (
+      <div className="container py-8 md:py-12 px-4 text-center">
+        <Alert variant="destructive" className="max-w-md mx-auto">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Admin Access Required</AlertTitle>
+          <AlertDescription>
+            Your account is not recognized as an administrator by the application.
+            This could be due to:
+            <ul className="list-disc list-inside text-left mt-2 text-xs">
+              <li>The 'isAdmin' field is missing or set to 'false' (boolean) in your user profile in the Firestore database.</li>
+              <li>A delay in user data propagation after login.</li>
+            </ul>
+            Please verify your Firestore user document or contact support if you believe this is an error.
+          </AlertDescription>
+        </Alert>
+        <Link href="/dashboard">
+          <Button className="mt-6">Go to User Dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+  
+  // If user is null, ProtectedRoute should have handled it, but as a fallback:
+  if (!user) {
+     return (
+        <div className="container py-8 md:py-12 px-4 text-center">
+            <Alert variant="default" className="max-w-md mx-auto">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Authentication Required</AlertTitle>
+                <AlertDescription>
+                    You need to be logged in as an admin to view this page.
+                </AlertDescription>
+            </Alert>
+             <Link href="/login">
+                <Button className="mt-6">Log In</Button>
+            </Link>
+        </div>
+     );
+  }
+
+
+  // If papers are still loading (and user is confirmed admin)
+  if (isLoadingPapers) {
+    return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
+  }
+
 
   return (
     <div className="container py-8 md:py-12 px-4">
@@ -97,7 +165,7 @@ function AdminDashboardContent() {
         </CardHeader>
         <CardContent>
           {papers.length === 0 ? (
-            <p className="text-muted-foreground">No papers have been submitted yet.</p>
+            <p className="text-muted-foreground">No papers have been submitted to the platform yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -145,3 +213,4 @@ export default function AdminDashboardPage() {
     </ProtectedRoute>
   );
 }
+
