@@ -56,33 +56,45 @@ function PaperDetailsContent() {
             }
           } else {
             setCurrentPaper(null); 
+            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper or it does not exist." });
+            router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
           }
         })
         .catch(err => {
           console.error("Error fetching paper:", err);
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Error", description: "Could not load paper details." });
+          router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
         })
         .finally(() => setLoadingPaper(false));
     } else if (!user && loadingPaper) { 
         // If user is null and we are still in initial loadingPaper state, wait for user.
     } else if (!user && !loadingPaper) {
+        // If user becomes null after initial loading attempt (e.g., session expired during fetch)
         setCurrentPaper(null); 
         setLoadingPaper(false);
+        // No redirect here as ProtectedRoute will handle unauthenticated access
     }
-  }, [params.id, user, isAdmin]); 
+  }, [params.id, user, isAdmin, router]); 
 
   useEffect(() => {
-    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && !isPaperOverdue) {
+    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
       setIsPaymentModalOpen(true);
     }
-  }, [searchParams, currentPaper, isPaperOverdue]);
+  }, [searchParams, currentPaper, isPaperOverdue, user, isAdmin]);
 
-  const handlePaymentSuccess = async (paperId: string) => {
-    if (!currentPaper) return;
+  const handlePaymentSuccess = async (paperId?: string) => { // paperId is optional for "Pay Now" from form
+    const targetPaperId = paperId || currentPaper?.id;
+    if (!targetPaperId) return;
+
     try {
-      await updatePaperStatus(paperId, 'Submitted', { paidAt: new Date().toISOString() });
-      setCurrentPaper(prev => prev ? { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString() } : null);
+      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
+      setCurrentPaper(prev => {
+        if (prev && prev.id === targetPaperId) {
+          return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString() };
+        }
+        return prev;
+      });
       setIsPaymentModalOpen(false);
       toast({title: "Payment Successful", description: "Paper status updated to Submitted."});
     } catch (error) {
@@ -109,15 +121,23 @@ function PaperDetailsContent() {
     try {
       await updatePaperStatus(currentPaper.id, newStatus);
       setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
-      toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
+      if (newStatus === "Rejected" && isPaperOverdue) {
+        toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
+      } else {
+        toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
+      }
+       // If status changed to something that resolves payment pending/overdue, reset isPaperOverdue
+      if (newStatus !== "Payment Pending") {
+        setIsPaperOverdue(false);
+      }
     } catch (error) {
       toast({variant: "destructive", title: "Status Update Failed"});
     }
   };
 
-  const handleRunPlagiarismCheck = async () => {
+  const handleRunPlagiarismValidation = async () => {
     if (!currentPaper || !currentPaper.abstract) {
-        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for plagiarism check." });
+        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for plagiarism validation." });
         return;
     }
     setIsCheckingPlagiarism(true);
@@ -132,18 +152,18 @@ function PaperDetailsContent() {
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
       } : null);
-      toast({ title: "Plagiarism Check Complete" });
+      toast({ title: "Plagiarism Validation Complete" });
     } catch (error) {
-      console.error("Plagiarism check error:", error);
-      toast({ variant: "destructive", title: "Plagiarism Check Failed", description: error instanceof Error ? error.message : "Unknown error" });
+      console.error("Plagiarism validation error:", error);
+      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setIsCheckingPlagiarism(false);
     }
   };
 
-  const handleRunAcceptanceCheck = async () => {
+  const handleRunAcceptanceValidation = async () => {
     if (!currentPaper || !currentPaper.abstract) {
-        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for acceptance check." });
+        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for acceptance validation." });
         return;
     }
     setIsCheckingAcceptance(true);
@@ -158,10 +178,10 @@ function PaperDetailsContent() {
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
-      toast({ title: "Acceptance Probability Check Complete" });
+      toast({ title: "Acceptance Probability Validation Complete" });
     } catch (error) {
-      console.error("Acceptance check error:", error);
-      toast({ variant: "destructive", title: "Acceptance Check Failed", description: error instanceof Error ? error.message : "Unknown error" });
+      console.error("Acceptance validation error:", error);
+      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setIsCheckingAcceptance(false);
     }
@@ -169,7 +189,6 @@ function PaperDetailsContent() {
 
   const handleViewDownloadPaper = () => {
     if (currentPaper?.fileUrl) {
-        // In a real app, this would open the URL: window.open(currentPaper.fileUrl, '_blank');
         toast({
             title: "Simulating File Action",
             description: `Displaying/downloading: ${currentPaper.fileName || 'paper'}. URL: ${currentPaper.fileUrl}`,
@@ -192,8 +211,8 @@ function PaperDetailsContent() {
     return (
       <div className="container py-12 text-center px-4">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-2xl font-semibold">Paper Not Found</h2>
-        <p className="text-muted-foreground">The paper you are looking for does not exist or you do not have permission to view it.</p>
+        <h2 className="text-2xl font-semibold">Paper Not Found or Access Denied</h2>
+        <p className="text-muted-foreground">The paper may have been removed, or you might not have permission to view it.</p>
         <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/dashboard')} className="mt-6">Go to Dashboard</Button>
       </div>
     );
@@ -242,14 +261,14 @@ function PaperDetailsContent() {
                  <Button onClick={handleViewDownloadPaper} size="lg" variant="outline" className="w-full md:w-auto">
                     <Download className="mr-2 h-5 w-5" /> View/Download Paper
                 </Button>
-                {effectiveStatus === 'Payment Pending' && !isAdmin && !isPaperOverdue && (
+                {effectiveStatus === 'Payment Pending' && user && user.id === currentPaper.userId && !isAdmin && !isPaperOverdue && (
                 <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
-                {isAdmin && (
-                    <Button onClick={() => router.push(`/admin/dashboard?edit=${currentPaper.id}`)} variant="outline" className="w-full md:w-auto">
-                        <Edit className="mr-2 h-4 w-4" /> Manage Paper
+                {isAdmin && ( // Admin might still want to go back to dashboard or an edit page if one existed
+                    <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full md:w-auto">
+                        <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}
             </div>
@@ -264,20 +283,19 @@ function PaperDetailsContent() {
             
             <Separator />
             
-            {/* AI Analysis Tools - Only for Admins */}
             {isAdmin && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools (Title & Abstract)
+                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation (Based on Title & Abstract)
                 </h3>
                 <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  <Button onClick={handleRunPlagiarismCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
-                    {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />} {/* Changed Icon */}
-                    {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Check' : 'Run Plagiarism Check'}
+                  <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                    {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Validation' : 'Run Plagiarism Validation'}
                   </Button>
-                  <Button onClick={handleRunAcceptanceCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
-                    {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />} {/* Changed Icon */}
-                    {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Check' : 'Run Acceptance Check'}
+                  <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                    {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Validation' : 'Run Acceptance Validation'}
                   </Button>
                 </div>
 
@@ -290,9 +308,9 @@ function PaperDetailsContent() {
                 {(!currentPaper.plagiarismScore && !currentPaper.acceptanceProbability && !isCheckingPlagiarism && !isCheckingAcceptance) && (
                     <Alert variant="default" className="mt-4">
                       <Sparkles className="h-4 w-4" />
-                      <AlertTitle>AI Analysis Available</AlertTitle>
+                      <AlertTitle>AI Validation Available</AlertTitle>
                       <AlertDescription>
-                        Run plagiarism and acceptance probability checks based on the paper's title and abstract using the buttons above.
+                        Run plagiarism and acceptance probability validations based on the paper's title and abstract using the buttons above.
                       </AlertDescription>
                     </Alert>
                 )}
@@ -300,7 +318,8 @@ function PaperDetailsContent() {
               </div>
             )}
             
-            {currentPaper.adminFeedback && (
+            {/* User-facing display of Admin Feedback */}
+            {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdmin) && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Admin/Reviewer Feedback</h3>
                 <Alert variant={currentPaper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
@@ -311,6 +330,7 @@ function PaperDetailsContent() {
               </div>
             )}
 
+            {/* Admin's form to PROVIDE feedback */}
             {isAdmin && effectiveStatus !== "Payment Overdue" && (
               <div className="mt-6 p-4 border rounded-md">
                 <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
@@ -330,6 +350,7 @@ function PaperDetailsContent() {
                 </Button>
               </div>
             )}
+
              {isAdmin && (
                 <div className="mt-6 p-4 border rounded-md">
                   <h3 className="text-lg font-semibold mb-2">Change Paper Status</h3>
@@ -403,12 +424,14 @@ function PaperDetailsContent() {
           </aside>
         </CardContent>
       </Card>
-      <PaymentModal 
-        isOpen={isPaymentModalOpen} 
-        onOpenChange={setIsPaymentModalOpen} 
-        paper={currentPaper} 
-        onPaymentSuccess={handlePaymentSuccess} 
-      />
+      {user && currentPaper && ( 
+        <PaymentModal 
+          isOpen={isPaymentModalOpen && currentPaper.userId === user.id && !isAdmin} 
+          onOpenChange={setIsPaymentModalOpen} 
+          paper={currentPaper} 
+          onPaymentSuccess={handlePaymentSuccess} 
+        />
+      )}
     </div>
   );
 }
@@ -420,4 +443,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-

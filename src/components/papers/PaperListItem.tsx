@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react'; 
 import CountdownTimer from '../shared/CountdownTimer';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
 interface PaperListItemProps {
   paper: Paper;
@@ -20,17 +21,22 @@ interface PaperListItemProps {
 const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth(); // Get current user
   const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
+  const [isOverdue, setIsOverdue] = useState(false);
 
   useEffect(() => {
     if (paper.status === "Payment Pending" && paper.paymentDueDate) {
       if (new Date() > new Date(paper.paymentDueDate)) {
         setDisplayStatus("Payment Overdue");
+        setIsOverdue(true);
       } else {
         setDisplayStatus(paper.status); 
+        setIsOverdue(false);
       }
     } else {
       setDisplayStatus(paper.status);
+      setIsOverdue(false);
     }
   }, [paper.status, paper.paymentDueDate]);
 
@@ -111,18 +117,16 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
           <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
         </div>
         
-        {displayStatus === 'Payment Pending' && paper.paymentDueDate && (
+        {displayStatus === 'Payment Pending' && paper.paymentDueDate && !isOverdue && (
           <div className="text-xs text-orange-600 flex items-center">
             <Clock className="h-3 w-3 mr-1" />
             <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" />
           </div>
         )}
         
-        {/* Plagiarism and Acceptance info REMOVED from user-facing list item */}
-
       </CardContent>
       <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row items-stretch md:items-center justify-end gap-2">
-        {displayStatus === 'Payment Pending' && (
+        {paper.status === 'Payment Pending' && displayStatus !== 'Payment Overdue' && user && user.id === paper.userId && (
           <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto">
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
           </Button>
@@ -141,3 +145,4 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
 PaperListItem.displayName = 'PaperListItem';
 
 export default PaperListItem;
+

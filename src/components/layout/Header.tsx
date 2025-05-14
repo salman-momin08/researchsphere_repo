@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,8 +21,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings, Search as SearchIcon } from 'lucide-react'; 
-import { useRouter } from 'next/navigation';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings, Search as SearchIcon } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,7 @@ const NavLink = ({ href, children, onClick, className }: { href: string, childre
 export default function Header() {
   const { user, logout, isAdmin, setShowLoginModal } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLoginClick = () => {
@@ -64,28 +66,29 @@ export default function Header() {
     }
   };
 
-  const commonNavLinks = (
-    <>
-      <NavLink href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Home</NavLink>
-      {user && <NavLink href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Dashboard</NavLink>}
-       <Button variant="ghost" onClick={handleSubmitPaperClick} className="w-full justify-start hover:text-primary text-foreground">
-        Submit Paper
-      </Button>
-      <NavLink href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
-       AI Pre-Check
-      </NavLink>
-      <NavLink href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground"> {/* New Link */}
-        Search Papers
-      </NavLink>
-      <NavLink href="/registration" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Registration & Pricing</NavLink>
-      <NavLink href="/key-committee" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Key Committee</NavLink>
-      <NavLink href="/sample-templates" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Sample Templates</NavLink>
-      <NavLink href="/contact-us" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Contact Us</NavLink>
-      {user && isAdmin && (
-        <NavLink href="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-primary font-semibold">Admin Panel</NavLink>
-      )}
-    </>
-  );
+  const isViewingAdminSection = isAdmin && pathname.startsWith('/admin');
+
+  const mainNavLinks = [
+    { href: "/", label: "Home", icon: null, adminOnlyPage: false, hideInAdminView: false },
+    { href: "/dashboard", label: "Dashboard", icon: null, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false },
+    { href: "/submit", label: "Submit Paper", icon: null, action: handleSubmitPaperClick, requiresAuthDynamic: true, adminOnlyPage: false, hideInAdminView: true },
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false }, // AI Pre-Check is a tool, might still be useful for admins
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false },
+    { href: "/registration", label: "Registration", icon: null, adminOnlyPage: false, hideInAdminView: true },
+    { href: "/key-committee", label: "Committee", icon: null, adminOnlyPage: false, hideInAdminView: false }, // Committee info might be relevant for admins too
+    { href: "/sample-templates", label: "Templates", icon: null, adminOnlyPage: false, hideInAdminView: true },
+    { href: "/contact-us", label: "Contact", icon: null, adminOnlyPage: false, hideInAdminView: true },
+    { href: "/admin/dashboard", label: "Admin", icon: null, requiresAuth: true, adminOnlyPage: true, hideInAdminView: false },
+  ];
+
+  const getFilteredNavLinks = (isMobile: boolean) => {
+    return mainNavLinks.filter(link => {
+      if (link.adminOnlyPage && !isAdmin) return false; 
+      if (isViewingAdminSection && link.hideInAdminView) return false; 
+      if (link.requiresAuth && !user && !isMobile) return false; 
+      return true;
+    });
+  };
 
 
   return (
@@ -98,28 +101,30 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
-          <Link href="/" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Home</Link>
-          {user && <Link href="/dashboard" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Dashboard</Link>}
-          <Button 
-            variant="ghost" 
-            onClick={handleSubmitPaperClick} 
-            className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
-          >
-            Submit Paper
-          </Button>
-          <Link href="/ai-pre-check" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center">
-            <Sparkles className="mr-1 h-4 w-4" /> AI Pre-Check
-          </Link>
-           <Link href="/search-papers" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center"> {/* New Link */}
-            <SearchIcon className="mr-1 h-4 w-4" /> Search
-          </Link>
-          <Link href="/registration" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Registration</Link>
-          <Link href="/key-committee" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Committee</Link>
-          <Link href="/sample-templates" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Templates</Link>
-          <Link href="/contact-us" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Contact</Link>
-           {user && isAdmin && (
-            <Link href="/admin/dashboard" className="px-3 py-2 transition-colors hover:text-primary text-primary font-semibold">Admin</Link>
-          )}
+          {getFilteredNavLinks(false).map(link => (
+            link.action ? (
+              <Button
+                key={link.href}
+                variant="ghost"
+                onClick={link.action}
+                className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
+              >
+                {link.icon}{link.label}
+              </Button>
+            ) : (
+              <Link 
+                key={link.href} 
+                href={link.href} 
+                className={cn(
+                  "px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center",
+                  pathname === link.href && "text-primary font-semibold",
+                  link.adminOnlyPage && pathname === link.href && "text-primary font-bold underline" 
+                )}
+              >
+                {link.icon}{link.label}
+              </Link>
+            )
+          ))}
         </nav>
 
         {/* Auth buttons / User Menu for Desktop */}
@@ -150,15 +155,17 @@ export default function Header() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSubmitPaperClick}>
-                  <UploadCloud className="mr-2 h-4 w-4" />
-                  <span>Submit Paper</span>
-                </DropdownMenuItem>
+                {!isViewingAdminSection && (
+                    <DropdownMenuItem onClick={handleSubmitPaperClick}>
+                        <UploadCloud className="mr-2 h-4 w-4" />
+                        <span>Submit Paper</span>
+                    </DropdownMenuItem>
+                )}
                  <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
                   <Sparkles className="mr-2 h-4 w-4" />
                   <span>AI Pre-Check</span>
                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => router.push('/search-papers')}> {/* New Link */}
+                 <DropdownMenuItem onClick={() => router.push('/search-papers')}>
                   <SearchIcon className="mr-2 h-4 w-4" />
                   <span>Search Papers</span>
                 </DropdownMenuItem>
@@ -199,7 +206,30 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1">
-                {commonNavLinks}
+                {getFilteredNavLinks(true).map(link => (
+                   link.action ? (
+                    <Button 
+                      key={link.href} 
+                      variant="ghost" 
+                      onClick={() => { link.action!(); setIsMobileMenuOpen(false); }} 
+                      className={cn("w-full justify-start hover:text-primary text-foreground", pathname === link.href && "text-primary bg-secondary")}
+                    >
+                      {link.icon && React.cloneElement(link.icon, {className: "mr-2 h-4 w-4"})} {link.label}
+                    </Button>
+                  ) : (
+                    <NavLink 
+                      key={link.href} 
+                      href={link.href} 
+                      onClick={() => setIsMobileMenuOpen(false)} 
+                      className={cn("text-foreground", 
+                                   pathname === link.href && "text-primary bg-secondary",
+                                   link.adminOnlyPage && pathname === link.href && "font-bold"
+                                  )}
+                    >
+                       {link.icon && React.cloneElement(link.icon, {className: "mr-2 h-4 w-4"})} {link.label}
+                    </NavLink>
+                  )
+                ))}
                 <DropdownMenuSeparator className="my-2"/>
                 {user ? (
                   <>
@@ -207,7 +237,7 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
+                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className={cn("text-foreground", pathname === "/profile/settings" && "text-primary bg-secondary")}>
                         <Settings className="mr-2 h-4 w-4" /> Profile Settings
                      </NavLink>
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive">
