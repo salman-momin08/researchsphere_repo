@@ -83,13 +83,19 @@ export default function ProfileUpdateForm() {
       
       if (isCompletingProfile && data.username && data.role) {
         localStorage.removeItem('profileIncomplete');
-        setTimeout(() => router.push('/dashboard'), 1000); 
+        setTimeout(() => router.push('/'), 1000); 
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-      setError(errorMessage);
-      toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
+      setError(errorMessage); // Display the error in the Alert component within the form.
+
+      // Only show a generic "Update Failed" toast if it's not a specific uniqueness error,
+      // as those are handled by the Alert within the form.
+      if (errorMessage !== "Username already taken. Please choose another one." &&
+          errorMessage !== "Phone number already in use. Please use a different one.") {
+        toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
+      }
     } finally {
       setIsSubmitting(false);
     }
