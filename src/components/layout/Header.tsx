@@ -58,35 +58,39 @@ export default function Header() {
   
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false); 
-    if (user && !isAdmin) { // Ensure admin cannot submit
+    if (user && !isAdmin) {
       router.push('/submit');
     } else if (!user) {
       localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
+    // If user is admin, this button action does nothing from here, which is intended.
   };
 
-  const isViewingAdminSection = isAdmin && pathname.startsWith('/admin');
-
   const mainNavLinks = [
-    { href: "/", label: "Home", icon: null, adminOnlyPage: false, hideInAdminView: false },
-    { href: "/dashboard", label: "Dashboard", icon: null, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false },
-    { href: "/submit", label: "Submit Paper", icon: null, action: handleSubmitPaperClick, requiresAuthDynamic: true, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: true }, // Added hideIfAdmin
-    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false },
-    { href: "/registration", label: "Registration", icon: null, adminOnlyPage: false, hideInAdminView: true },
-    { href: "/key-committee", label: "Committee", icon: null, adminOnlyPage: false, hideInAdminView: false },
-    { href: "/sample-templates", label: "Templates", icon: null, adminOnlyPage: false, hideInAdminView: true },
-    { href: "/contact-us", label: "Contact", icon: null, adminOnlyPage: false, hideInAdminView: true },
-    { href: "/admin/dashboard", label: "Admin", icon: null, requiresAuth: true, adminOnlyPage: true, hideInAdminView: false },
+    { href: "/", label: "Home", icon: null, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/dashboard", label: "Dashboard", icon: null, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/submit", label: "Submit Paper", icon: null, action: handleSubmitPaperClick, requiresAuthDynamic: true, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: true },
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/registration", label: "Registration", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
+    { href: "/key-committee", label: "Committee", icon: null, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/sample-templates", label: "Templates", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
+    { href: "/contact-us", label: "Contact", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
+    { href: "/admin/dashboard", label: "Admin", icon: null, requiresAuth: true, adminOnlyPage: true, hideInAdminView: false, hideIfAdmin: false },
   ];
 
   const getFilteredNavLinks = (isMobile: boolean) => {
+    const isViewingAdminSection = isAdmin && pathname.startsWith('/admin');
     return mainNavLinks.filter(link => {
-      if (link.adminOnlyPage && !isAdmin) return false; 
-      if (isViewingAdminSection && link.hideInAdminView) return false; 
-      if (link.hideIfAdmin && isAdmin) return false; // Hide "Submit Paper" for admins always
-      if (link.requiresAuth && !user && !isMobile) return false; 
+      if (link.adminOnlyPage && !isAdmin) return false;
+      if (link.hideIfAdmin && isAdmin) return false; // Completely hide if admin (e.g., Submit Paper)
+      
+      if (!isMobile && isAdmin && link.hideInAdminMainNavbar) return false; // Hide certain links from admin's main horizontal nav
+
+      if (isViewingAdminSection && link.hideInAdminView && !isMobile) return false; // Further hide links if admin is in admin section (main nav)
+      
+      if (link.requiresAuth && !user && !isMobile) return false;
       return true;
     });
   };
@@ -156,7 +160,7 @@ export default function Header() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {!isAdmin && ( // Only show if not an admin
+                {!isAdmin && ( 
                     <DropdownMenuItem onClick={handleSubmitPaperClick}>
                         <UploadCloud className="mr-2 h-4 w-4" />
                         <span>Submit Paper</span>
@@ -207,7 +211,7 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1">
-                {getFilteredNavLinks(true).map(link => (
+                {getFilteredNavLinks(true).map(link => ( // Pass true for isMobile
                    link.action ? (
                     <Button 
                       key={link.href} 
@@ -259,4 +263,3 @@ export default function Header() {
     </header>
   );
 }
-

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Search as SearchIcon, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react'; // Changed ExternalLink to Eye
 import Link from 'next/link';
 import type { Paper } from '@/types';
 import { getPublishedPapers } from '@/lib/paper-service'; 
@@ -42,7 +42,8 @@ function SearchPapersContent() {
 
     try {
       const publishedPapers = await getPublishedPapers();
-      console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
+      // This console.log is helpful for verifying data fetching during development
+      // console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
 
       // Client-side filtering for author name (case-insensitive, partial match)
       // This logic already handles multiple authors correctly.
@@ -73,10 +74,9 @@ function SearchPapersContent() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Download Started", description: `${filename} is being downloaded.` });
   };
 
-  const handleDownload = (paper: Paper) => {
+  const handleDownloadOriginalMock = (paper: Paper) => {
     const fileContent = `
 Paper Title: ${paper.title}
 Authors: ${paper.authors.join(', ')}
@@ -87,11 +87,12 @@ Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
 File Name: ${paper.fileName || 'N/A'}
 Mock File URL: ${paper.fileUrl || 'N/A'}
 
-This is a downloaded text file containing details for the paper from ResearchSphere.
-In a real application, if a direct file URL exists, it would be used for actual file download.
+This is a downloaded text file representing the paper from ResearchSphere.
+In a real application, this button would initiate a download of the actual paper document (${paper.fileName}).
     `;
-    const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
-    triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Details.txt`);
+    const safeTitle = paper.title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_');
+    triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Paper_Details.txt`);
+    toast({ title: "Mock Download Started", description: `A text summary for "${paper.title}" is being downloaded.` });
   };
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
@@ -174,9 +175,9 @@ In a real application, if a direct file URL exists, it would be used for actual 
                       </TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
-                          <ExternalLink className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownload(paper)} title="Download Paper Details">
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalMock(paper)} title="Download Original (Mock)">
                           <Download className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -208,4 +209,3 @@ export default function SearchPapersPage() {
     </ProtectedRoute>
   );
 }
-

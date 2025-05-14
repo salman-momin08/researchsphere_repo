@@ -87,12 +87,10 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Download Started", description: `${filename} is being downloaded.` });
   };
 
-  const handleViewDownload = () => {
+  const handleDownloadOriginalMock = () => {
     if (paper.fileUrl) {
-        // Create mock content for the text file download
         const fileContent = `
 Paper Title: ${paper.title}
 Authors: ${paper.authors.join(', ')}
@@ -101,13 +99,14 @@ Keywords: ${paper.keywords.join(', ')}
 Status: ${paper.status}
 Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
 File Name: ${paper.fileName || 'N/A'}
-Original File URL (for reference, not directly downloadable in this mock): ${paper.fileUrl}
+Original File URL (for reference): ${paper.fileUrl}
 
-This is a mock text file containing details for the paper.
-In a real application, this button would initiate a download of the actual paper document.
+This is a mock text file representing the paper "${paper.title}".
+In a real application, this button would initiate a download of the actual paper document (${paper.fileName}).
         `;
-        const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
-        triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Details.txt`);
+        const safeTitle = paper.title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_');
+        triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Paper_Details.txt`);
+        toast({ title: "Mock Download Started", description: `A text summary for "${paper.title}" is being downloaded.` });
     } else {
         toast({
             variant: "destructive",
@@ -155,11 +154,11 @@ In a real application, this button would initiate a download of the actual paper
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={handleViewDownload} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> Download Details
-        </Button>
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
-          <Eye className="mr-2 h-4 w-4" /> Details
+          <Eye className="mr-2 h-4 w-4" /> View Details
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleDownloadOriginalMock} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> Download Original (Mock)
         </Button>
       </CardFooter>
     </Card>
