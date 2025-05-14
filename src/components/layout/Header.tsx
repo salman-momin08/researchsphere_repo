@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings } from 'lucide-react'; 
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings, Search as SearchIcon } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -74,6 +74,9 @@ export default function Header() {
       <NavLink href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">
        AI Pre-Check
       </NavLink>
+      <NavLink href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground"> {/* New Link */}
+        Search Papers
+      </NavLink>
       <NavLink href="/registration" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Registration & Pricing</NavLink>
       <NavLink href="/key-committee" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Key Committee</NavLink>
       <NavLink href="/sample-templates" onClick={() => setIsMobileMenuOpen(false)} className="text-foreground">Sample Templates</NavLink>
@@ -106,6 +109,9 @@ export default function Header() {
           </Button>
           <Link href="/ai-pre-check" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center">
             <Sparkles className="mr-1 h-4 w-4" /> AI Pre-Check
+          </Link>
+           <Link href="/search-papers" className="px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center"> {/* New Link */}
+            <SearchIcon className="mr-1 h-4 w-4" /> Search
           </Link>
           <Link href="/registration" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Registration</Link>
           <Link href="/key-committee" className="px-3 py-2 transition-colors hover:text-primary text-foreground">Committee</Link>
@@ -152,6 +158,10 @@ export default function Header() {
                   <Sparkles className="mr-2 h-4 w-4" />
                   <span>AI Pre-Check</span>
                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => router.push('/search-papers')}> {/* New Link */}
+                  <SearchIcon className="mr-2 h-4 w-4" />
+                  <span>Search Papers</span>
+                </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
                     <Shield className="mr-2 h-4 w-4" />
@@ -174,7 +184,7 @@ export default function Header() {
         </div>
 
         {/* Mobile Navigation Trigger */}
-        <div className="flex items-center md:hidden"> {/* Ensures this is only for mobile, removes ml-auto that was here */}
+        <div className="flex items-center md:hidden"> 
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -218,4 +228,3 @@ export default function Header() {
     </header>
   );
 }
-

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -20,46 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-
-// Extended mock data with AI fields initially null
-const mockPapersDB: Paper[] = [
-   {
-    id: "1", userId: "1", title: "The Future of AI in Academic Research", abstract: "This paper explores the potential impact of artificial intelligence on academic research methodologies and publication processes. It covers areas like automated literature reviews, AI-assisted writing and peer review, and the ethical implications of AI in academia.",
-    authors: ["Dr. Alice Wonderland", "Dr. Bob The Builder"], keywords: ["AI", "Academia", "Future", "Research"],
-    uploadDate: new Date("2023-10-15T10:00:00Z").toISOString(), status: "Accepted",
-    plagiarismScore: 0.05, plagiarismReport: { highlightedSections: ["This specific phrase seems common.", "Another sentence here might be too similar."] },
-    acceptanceProbability: 0.85, acceptanceReport: { reasoning: "The paper is well-structured, presents novel ideas, and has strong evidence. Clarity is excellent." },
-    fileName: "future_of_ai.pdf"
-  },
-  {
-    id: "2", userId: "1", title: "Quantum Computing: A New Paradigm", abstract: "An in-depth analysis of quantum computing principles and its applications in solving complex problems such as drug discovery, materials science, and cryptography. The paper also discusses current challenges and future prospects of quantum technology.",
-    authors: ["Dr. Jane Doe"], keywords: ["Quantum Computing", "Physics", "Technology"],
-    uploadDate: new Date("2023-11-01T14:30:00Z").toISOString(), status: "Under Review",
-    plagiarismScore: null, plagiarismReport: null,
-    acceptanceProbability: null, acceptanceReport: null,
-    fileName: "quantum_paradigm.docx"
-  },
-  {
-    id: "3", userId: "1", title: "Sustainable Energy Solutions for Urban Environments",
-    abstract: "Investigating innovative sustainable energy solutions to address the growing demands of urban environments and mitigate climate change. This includes a review of solar, wind, and geothermal technologies, as well as smart grid implementations.",
-    authors: ["Prof. John Smith", "Dr. Emily White"], keywords: ["Sustainability", "Urban Planning", "Renewable Energy", "Climate Change"],
-    uploadDate: new Date("2024-01-20T09:15:00Z").toISOString(), status: "Payment Pending",
-    plagiarismScore: null, plagiarismReport: null,
-    acceptanceProbability: null, acceptanceReport: null,
-    fileName: "sustainable_urban_energy.pdf"
-  },
-    {
-    id: "4", userId: "1", title: "The Role of Gut Microbiota in Human Health",
-    abstract: "A comprehensive review of current research on the gut microbiota and its profound impact on various aspects of human health and disease, including metabolism, immunity, and neurological function. Potential therapeutic interventions are also discussed.",
-    authors: ["Dr. Sarah Miller", "Dr. Kevin Lee"], keywords: ["Microbiome", "Gut Health", "Immunology", "Medicine"],
-    uploadDate: new Date("2024-02-10T16:45:00Z").toISOString(), status: "Action Required",
-    adminFeedback: "Please address reviewer comments regarding the methodology section. Specifically, provide more details on the statistical analysis used and clarify the participant selection criteria.",
-    plagiarismScore: 0.03, plagiarismReport: { highlightedSections: [] },
-    acceptanceProbability: 0.65, acceptanceReport: { reasoning: "The review is comprehensive but lacks a critical perspective on conflicting studies. Methodology needs clarification as per reviewer feedback." },
-    fileName: "gut_microbiota_review.docx"
-  }
-];
-
+import { findMockPaperById, allMockPapers } from '@/lib/mock-data'; // Import new functions
 
 function PaperDetailsContent() {
   const params = useParams();
@@ -82,7 +44,7 @@ function PaperDetailsContent() {
       setLoadingPaper(true);
       // Simulate API call or data fetching
       setTimeout(() => {
-        let foundPaper = mockPapersDB.find(p => p.id === params.id);
+        let foundPaper = findMockPaperById(params.id as string);
 
         if (!foundPaper) {
             const paperTitleFromStorage = localStorage.getItem(`newPaperTitle-${params.id}`);
@@ -105,8 +67,9 @@ function PaperDetailsContent() {
                     acceptanceProbability: null,
                     acceptanceReport: null,
                 };
-                if (!mockPapersDB.find(p => p.id === foundPaper!.id)) {
-                    mockPapersDB.push(foundPaper!);
+                // Add to the main mock data store if not already present
+                if (!allMockPapers.find(p => p.id === foundPaper!.id)) {
+                    allMockPapers.push(foundPaper!); // This mutates the imported array, careful in real apps
                 }
                 localStorage.removeItem(`newPaperTitle-${params.id}`);
                 localStorage.removeItem(`newPaperAbstract-${params.id}`);
@@ -124,13 +87,11 @@ function PaperDetailsContent() {
       }, 500); 
     } else if (!user && loadingPaper) { 
         // If user is null and we are still in initial loadingPaper state, wait for user.
-        // If user is null and loadingPaper became false (meaning an attempt was made), then set currentPaper to null.
-        // This case is mostly to prevent setting currentPaper to null if auth is just slow.
     } else if (!user && !loadingPaper) {
-        setCurrentPaper(null); // User not available, and not initial load
+        setCurrentPaper(null); 
         setLoadingPaper(false);
     }
-  }, [params.id, user, isAdmin]); // Removed loadingPaper from dependencies
+  }, [params.id, user, isAdmin]); 
 
   useEffect(() => {
     if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending') {
@@ -140,10 +101,10 @@ function PaperDetailsContent() {
 
   const handlePaymentSuccess = (paperId: string) => {
     setCurrentPaper(prev => prev ? { ...prev, status: 'Submitted', submissionDate: new Date().toISOString() } : null);
-    const paperIndex = mockPapersDB.findIndex(p => p.id === paperId);
+    const paperIndex = allMockPapers.findIndex(p => p.id === paperId); // Use allMockPapers
     if (paperIndex !== -1) {
-      mockPapersDB[paperIndex].status = 'Submitted';
-      mockPapersDB[paperIndex].submissionDate = new Date().toISOString();
+      allMockPapers[paperIndex].status = 'Submitted';
+      allMockPapers[paperIndex].submissionDate = new Date().toISOString();
     }
     setIsPaymentModalOpen(false);
   };
@@ -154,10 +115,10 @@ function PaperDetailsContent() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText, status: "Action Required" } : null);
-    const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
     if (paperIndex !== -1) {
-      mockPapersDB[paperIndex].adminFeedback = adminFeedbackText;
-      mockPapersDB[paperIndex].status = "Action Required";
+      allMockPapers[paperIndex].adminFeedback = adminFeedbackText;
+      allMockPapers[paperIndex].status = "Action Required";
     }
     toast({title: "Feedback Submitted", description: "Author will be notified."});
     setIsSubmittingFeedback(false);
@@ -167,9 +128,9 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin) return;
     await new Promise(resolve => setTimeout(resolve, 500));
     setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
-    const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
     if (paperIndex !== -1) {
-      mockPapersDB[paperIndex].status = newStatus;
+      allMockPapers[paperIndex].status = newStatus;
     }
     toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
   };
@@ -188,10 +149,10 @@ function PaperDetailsContent() {
         plagiarismReport: { highlightedSections: result.highlightedSections }
       } : null);
       
-      const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
       if (paperIndex !== -1) {
-        mockPapersDB[paperIndex].plagiarismScore = result.plagiarismScore;
-        mockPapersDB[paperIndex].plagiarismReport = { highlightedSections: result.highlightedSections };
+        allMockPapers[paperIndex].plagiarismScore = result.plagiarismScore;
+        allMockPapers[paperIndex].plagiarismReport = { highlightedSections: result.highlightedSections };
       }
       toast({ title: "Plagiarism Check Complete" });
     } catch (error) {
@@ -216,10 +177,10 @@ function PaperDetailsContent() {
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
 
-      const paperIndex = mockPapersDB.findIndex(p => p.id === currentPaper.id);
+      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
       if (paperIndex !== -1) {
-        mockPapersDB[paperIndex].acceptanceProbability = result.probabilityScore;
-        mockPapersDB[paperIndex].acceptanceReport = { reasoning: result.reasoning };
+        allMockPapers[paperIndex].acceptanceProbability = result.probabilityScore;
+        allMockPapers[paperIndex].acceptanceReport = { reasoning: result.reasoning };
       }
       toast({ title: "Acceptance Probability Check Complete" });
     } catch (error) {
@@ -411,8 +372,8 @@ function PaperDetailsContent() {
                  <div className="flex items-center">
                   <FileText className="h-4 w-4 mr-2 text-primary" />
                   <strong>File:</strong>&nbsp;
-                  {/* In real app, this would be a download link */}
-                  <span className="text-muted-foreground hover:underline cursor-pointer">{currentPaper.fileName || 'View File'}</span>
+                  {/* In real app, this would be a download link to currentPaper.fileUrl */}
+                  <span className="text-muted-foreground hover:underline cursor-pointer" onClick={() => toast({title: "Download Mock", description: `Simulating download for ${currentPaper.fileName}`})}>{currentPaper.fileName || 'View File'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -436,4 +397,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-
