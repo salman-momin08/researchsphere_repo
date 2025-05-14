@@ -14,10 +14,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
-import type { Paper } from '@/types';
+import type { Paper, PaperStatus } from '@/types';
 import { UploadCloud, Loader2, AlertTriangle, DollarSign, Clock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addPaper } from '@/lib/paper-service'; // New service
+import { addPaper } from '@/lib/paper-service';
+import PaymentModal from '@/components/payment/PaymentModal'; // Import PaymentModal
 
 const paperSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
@@ -40,6 +41,9 @@ export default function PaperUploadForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
+  const [showPayNowModal, setShowPayNowModal] = useState(false);
+  const [formDataForSubmission, setFormDataForSubmission] = useState<PaperFormValues | null>(null);
+
   const form = useForm<PaperFormValues>({
     resolver: zodResolver(paperSchema),
     defaultValues: {
@@ -48,7 +52,7 @@ export default function PaperUploadForm() {
       authors: [],
       keywords: [],
       file: undefined,
-      paymentOption: "payLater", // Default to payLater
+      paymentOption: "payLater",
     },
   });
 
@@ -60,28 +64,27 @@ export default function PaperUploadForm() {
       setFileName(null);
     }
   }, [watchedFile]);
-  
-  const onFormSubmit = async (data: PaperFormValues) => {
+
+  const proceedWithSubmission = async (data: PaperFormValues, initialStatus: PaperStatus, paidAt?: string) => {
     if (!user) {
       toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to submit a paper." });
+      setIsSubmitting(false);
       return;
     }
-    
-    setIsSubmitting(true);
+    // isSubmitting state will be managed by the caller for "Pay Now" flow
+    // For "Pay Later", it's set here
+    if (initialStatus === "Payment Pending") {
+        setIsSubmitting(true);
+    }
     setFormError(null);
 
     try {
       const fileToUpload = (data.file as FileList)[0];
-      if (!fileToUpload) { 
-        throw new Error("File not available for submission.");
-      }
-
       // In a real app, upload fileToUpload to Firebase Storage here and get fileUrl
-      // For now, we'll just use fileName.
-      const mockFileUrl = `/uploads/mock/${fileToUpload.name}`; // Placeholder
+      const mockFileUrl = `/uploads/mock/${fileToUpload.name}`;
 
       let paymentDueDate: string | null = null;
-      if (data.paymentOption === "payLater") {
+      if (initialStatus === "Payment Pending") {
         const dueDate = new Date();
         dueDate.setHours(dueDate.getHours() + 2);
         paymentDueDate = dueDate.toISOString();
@@ -94,27 +97,27 @@ export default function PaperUploadForm() {
         authors: data.authors,
         keywords: data.keywords,
         fileName: fileToUpload.name,
-        fileUrl: mockFileUrl, // Replace with actual URL from Firebase Storage
-        status: data.paymentOption === "payLater" ? "Payment Pending" : "Submitted", // Or "Payment Pending" if payNow needs immediate payment step
+        fileUrl: mockFileUrl,
+        status: initialStatus,
         paymentOption: data.paymentOption,
         paymentDueDate: paymentDueDate,
-        submissionDate: data.paymentOption === "payNow" ? new Date().toISOString() : null, // Set if "Pay Now" and payment is immediate
-        // AI fields initialized to null
+        submissionDate: paidAt ? new Date().toISOString() : null,
         plagiarismScore: null,
         plagiarismReport: null,
         acceptanceProbability: null,
         acceptanceReport: null,
-        paidAt: null,
+        paidAt: paidAt || null,
       };
       
       const newPaperId = await addPaper(newPaperData);
       
-      toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been uploaded.` });
+      toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been processed.` });
       form.reset();
+      setFileName(null); // Clear file name display
       
-      if (data.paymentOption === "payNow") {
-        router.push(`/papers/${newPaperId}?action=pay`);
-      } else {
+      if (paidAt) { // Successfully paid via "Pay Now"
+        router.push('/dashboard'); 
+      } else { // "Pay Later"
         router.push(`/papers/${newPaperId}`);
       }
 
@@ -124,9 +127,40 @@ export default function PaperUploadForm() {
       setFormError(errorMessage);
       toast({ variant: "destructive", title: "Submission Failed", description: errorMessage });
     } finally {
-      setIsSubmitting(false);
+      if (initialStatus === "Payment Pending" || paidAt) { // Reset for both cases after completion
+        setIsSubmitting(false);
+      }
     }
   };
+  
+  const onFormSubmit = async (data: PaperFormValues) => {
+    setIsSubmitting(true); // Set submitting true at the start of form submit action
+    if (data.paymentOption === "payNow") {
+      setFormDataForSubmission(data);
+      setShowPayNowModal(true);
+      // setIsSubmitting will be reset by handleSuccessfulPayNowPayment or modal close
+    } else {
+      // For "payLater", directly proceed to submission with "Payment Pending" status
+      await proceedWithSubmission(data, "Payment Pending");
+      // setIsSubmitting is handled within proceedWithSubmission for this path
+    }
+  };
+
+  const handleSuccessfulPayNowPayment = async () => {
+    if (formDataForSubmission) {
+      // isSubmitting is already true from onFormSubmit
+      await proceedWithSubmission(formDataForSubmission, "Submitted", new Date().toISOString());
+    }
+    setShowPayNowModal(false);
+    setFormDataForSubmission(null);
+    setIsSubmitting(false); // Reset submitting state after "Pay Now" flow is complete
+  };
+
+  const handlePayNowModalClose = () => {
+    setShowPayNowModal(false);
+    setIsSubmitting(false); // Reset submitting if modal is closed without payment
+    setFormDataForSubmission(null);
+  }
 
   return (
     <>
@@ -201,8 +235,8 @@ export default function PaperUploadForm() {
             <div>
               <Label>Payment Option</Label>
               <RadioGroup
-                defaultValue="payLater"
-                onValueChange={(value) => form.setValue("paymentOption", value as "payNow" | "payLater")}
+                value={form.watch("paymentOption")}
+                onValueChange={(value) => form.setValue("paymentOption", value as "payNow" | "payLater", {shouldValidate: true})}
                 className="mt-2 space-y-2"
                 disabled={isSubmitting}
               >
@@ -225,15 +259,28 @@ export default function PaperUploadForm() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting Paper...</>
+              {isSubmitting && form.getValues("paymentOption") === "payLater" ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+              ) : isSubmitting && form.getValues("paymentOption") === "payNow" ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
               ) : (
-                <><UploadCloud className="mr-2 h-4 w-4" /> Submit Paper</>
+                <><UploadCloud className="mr-2 h-4 w-4" /> 
+                 {form.getValues("paymentOption") === "payNow" ? "Proceed to Payment" : "Submit Paper & Pay Later"}
+                </>
               )}
             </Button>
           </CardFooter>
         </form>
       </Card>
+
+      <PaymentModal 
+        isOpen={showPayNowModal} 
+        onOpenChange={handlePayNowModalClose} // Use specific close handler
+        paper={null} 
+        onPaymentSuccess={handleSuccessfulPayNowPayment} 
+      />
     </>
   );
 }
+
+    

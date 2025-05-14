@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +23,8 @@ import LoadingSpinner from "@/components/shared/LoadingSpinner";
 interface PaymentModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  paper: Paper | null;
-  onPaymentSuccess: (paperId: string) => void;
+  paper: Paper | null; 
+  onPaymentSuccess: (paperId?: string) => void; 
 }
 
 const SUBMISSION_FEE = 50.00; 
@@ -40,38 +40,53 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
   const [upiId, setUpiId] = useState("");
   const [paymentStep, setPaymentStep] = useState<"form" | "success">("form");
 
-  // Reset form when modal is opened with new paper or form step
   useEffect(() => {
-    if (isOpen && paymentStep === "form") {
-      setCardNumber("");
-      setExpiryDate("");
-      setCvc("");
-      setUpiId("");
-      setPaymentMethod("card"); // Reset to default payment method
+    if (isOpen) { // Reset form fields when modal opens, but keep paymentStep if already 'success'
+        if(paymentStep === "form") {
+            setCardNumber("");
+            setExpiryDate("");
+            setCvc("");
+            setUpiId("");
+            setPaymentMethod("card");
+        }
+    } else { // Reset completely when modal is closed
+        setPaymentStep("form");
+        setIsProcessing(false);
+        setCardNumber("");
+        setExpiryDate("");
+        setCvc("");
+        setUpiId("");
+        setPaymentMethod("card");
     }
-  }, [isOpen, paymentStep, paper]); // Depend on paper too, in case modal reopens for different paper
+  }, [isOpen]); // Removed paymentStep and paper from deps to avoid premature reset on prop changes
 
-  const resetLocalStateAndClose = () => {
+  // Effect to reset to 'form' step if paper prop changes (modal reused for different paper)
+  useEffect(() => {
+    if(isOpen) {
+        setPaymentStep("form");
+    }
+  }, [paper, isOpen]);
+
+
+  const handleDialogClose = () => {
+    // This function is now called by onOpenChange(false) or the X button
+    setPaymentStep("form");
+    setIsProcessing(false);
     setCardNumber("");
     setExpiryDate("");
     setCvc("");
     setUpiId("");
     setPaymentMethod("card");
-    setPaymentStep("form");
-    setIsProcessing(false); 
-    onOpenChange(false); // Call the prop to close the dialog
+    onOpenChange(false); // Call the original onOpenChange to update parent state
   };
 
 
   const handlePayment = async () => {
-    if (!paper) return;
-
     if (paymentMethod === "card") {
-      if (!cardNumber.trim() || !expiryDate.trim() || !cvc.trim()) { // Added .trim()
+      if (!cardNumber.trim() || !expiryDate.trim() || !cvc.trim()) {
         toast({ variant: "destructive", title: "Payment Error", description: "Please fill in all card details." });
         return;
       }
-      // Basic card validation (very simple, not for production)
       if (!/^\d{13,19}$/.test(cardNumber.replace(/\s/g, ''))) {
          toast({ variant: "destructive", title: "Invalid Card", description: "Please enter a valid card number." });
         return;
@@ -85,8 +100,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         return;
       }
     } else if (paymentMethod === "upi") {
-      if (!upiId.trim() && !confirm("Proceed with mock UPI payment without entering UPI ID (simulating QR scan)?")) { // Added .trim() and confirmation
-         // If user cancels the confirmation after leaving UPI ID blank
+      if (!upiId.trim() && !confirm("Proceed with mock UPI payment without entering UPI ID (simulating QR scan)?")) {
         return;
       }
        if (upiId.trim() && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
@@ -97,40 +111,26 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
 
     setIsProcessing(true);
     try {
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000)); 
       
-      // Call the success handler passed from parent
-      onPaymentSuccess(paper.id); 
-      setPaymentStep("success"); // Move to success screen
-      // Toast is now handled by the parent component after status update
+      if (paper && paper.id) {
+        onPaymentSuccess(paper.id); 
+      } else {
+        onPaymentSuccess(); // For "Pay Now" from submission form where paper ID isn't known yet
+      }
+      setPaymentStep("success");
     } catch (error) {
       console.error("Payment processing error:", error);
       toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
-      // Do not call onOpenChange(false) here, let user see error and close manually or retry
     } finally {
-      setIsProcessing(false); // Ensure processing is set to false
+      setIsProcessing(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) { // If dialog is being closed
-            resetLocalStateAndClose();
-        } else { // If dialog is being opened
-            setPaymentStep("form"); // Ensure it always opens to the form
-            setIsProcessing(false); // Ensure processing is reset
-            // Other fields are reset by useEffect or if a new paper is passed
-        }
-        onOpenChange(open); // Propagate open state change
-    }}>
+    <Dialog open={isOpen} onOpenChange={handleDialogClose}>
       <DialogContent className="sm:max-w-md">
-        {!paper && isOpen ? ( // Check isOpen to avoid rendering if modal is closed but paper is briefly null
-           <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
-            <LoadingSpinner size={32} />
-            <p className="mt-3 text-muted-foreground">Loading paper details...</p>
-          </div>
-        ) : paymentStep === "form" && paper ? (
+        {paymentStep === "form" ? (
           <>
             <DialogHeader>
               <div className="mx-auto mb-4 h-12 w-12 text-primary">
@@ -138,7 +138,8 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </div>
               <DialogTitle className="text-2xl font-bold text-center">Complete Your Submission</DialogTitle>
               <DialogDescription className="text-center">
-                A submission fee of <strong>${SUBMISSION_FEE.toFixed(2)}</strong> is required for &quot;{paper.title}&quot;.
+                A submission fee of <strong>${SUBMISSION_FEE.toFixed(2)}</strong> is required for 
+                {paper ? ` "${paper.title}"` : " your paper"}.
               </DialogDescription>
             </DialogHeader>
 
@@ -194,14 +195,14 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                   <div className="text-center text-sm text-muted-foreground my-2">OR</div>
                   <div className="flex flex-col items-center space-y-2">
                     <Label className="font-medium">Scan QR Code</Label>
-                    <div className="p-2 border rounded-md bg-white inline-block"> {/* Changed bg-muted to bg-white for QR visibility */}
+                    <div className="p-2 border rounded-md bg-white inline-block">
                        <Image 
-                        src="https://placehold.co/120x120/000000/FFFFFF.png?text=SCAN+QR" // Placeholder QR
+                        src="https://placehold.co/120x120/FFFFFF/000000.png?text=Scan+QR"
                         alt="Scan QR Code for UPI Payment" 
                         width={120} 
                         height={120} 
                         className="rounded"
-                        data-ai-hint="qr code payment" // More specific hint
+                        data-ai-hint="qr code payment"
                       />
                     </div>
                      <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>
@@ -211,14 +212,14 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </div>
 
             <DialogFooter className="sm:justify-between gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>Cancel</Button>
+              <Button variant="outline" onClick={handleDialogClose} disabled={isProcessing}>Cancel</Button>
               <Button onClick={handlePayment} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentMethod === 'card' ? <CreditCard className="mr-2 h-4 w-4" /> : <AtSign className="mr-2 h-4 w-4" />)}
                 {isProcessing ? "Processing..." : `Pay $${SUBMISSION_FEE.toFixed(2)}`}
               </Button>
             </DialogFooter>
           </>
-        ) : paymentStep === "success" && paper ? (
+        ) : paymentStep === "success" ? ( // Removed paper check here, success screen should show regardless
           <>
             <DialogHeader>
               <div className="mx-auto mb-4 h-16 w-16 text-green-500 flex items-center justify-center">
@@ -226,15 +227,24 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </div>
               <DialogTitle className="text-2xl font-bold text-center">Payment Successful!</DialogTitle>
               <DialogDescription className="text-center px-4">
-                Your paper &quot;{paper.title}&quot; has been successfully processed. You can track its status on your dashboard.
+                Your payment has been successfully processed.
+                {paper ? ` Your paper "${paper.title}" status will be updated.` : " Your paper will now be submitted."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-2">
-              <Button onClick={() => onOpenChange(false)} className="w-full">Close</Button>
+              <Button onClick={handleDialogClose} className="w-full">Close</Button>
             </DialogFooter>
           </>
-        ) : null}
+        ) : (
+            // Fallback for loading or unexpected state, though `isOpen` should prevent this usually
+            <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
+                <LoadingSpinner size={32} />
+                <p className="mt-3 text-muted-foreground">Loading payment details...</p>
+            </div>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
+
+    
