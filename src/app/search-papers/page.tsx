@@ -15,6 +15,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useRouter } from 'next/navigation';
 
 function SearchPapersContent() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +23,9 @@ function SearchPapersContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
+
+  console.log("SearchPapersContent component mounted or re-rendered"); // Added console.log
 
   const handleSearch = () => {
     if (!searchTerm.trim()) {
@@ -192,3 +196,4 @@ export default function SearchPapersPage() {
     </ProtectedRoute>
   );
 }
+
