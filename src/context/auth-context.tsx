@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [isSocialLoginInProgress, setIsSocialLoginInProgress] = useState<null | 'google' | 'github'>(null);
+  const [activeSocialLoginProvider, setActiveSocialLoginProvider] = useState<null | 'google' | 'github'>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({
         variant: "destructive",
         title: "Firestore Service Error",
-        description: "Could not connect to Firestore database service.",
+        description: "Could not connect to Firestore database service. Please check your Firebase project setup and ensure Firestore is enabled and configured correctly.",
         duration: 10000,
       });
       setLoading(false);
@@ -88,13 +88,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userDocSnap.exists()) {
             const docData = userDocSnap.data();
-             console.log(`AuthContext: User doc found for ${firebaseUser.uid}. Raw Firestore data:`, JSON.stringify(docData, null, 2));
-             console.log(`AuthContext: isAdmin field from Firestore for ${firebaseUser.uid}:`, docData.isAdmin, `(type: ${typeof docData.isAdmin})`);
+            // --- DETAILED LOGGING FOR isAdmin ---
+            console.log(`[AuthContext] User doc found for UID: ${firebaseUser.uid}.`);
+            console.log(`[AuthContext] Raw Firestore docData for ${firebaseUser.uid}:`, JSON.stringify(docData, null, 2));
+            console.log(`[AuthContext] Value of 'isAdmin' field from Firestore for ${firebaseUser.uid}:`, docData.isAdmin);
+            console.log(`[AuthContext] Type of 'isAdmin' field from Firestore for ${firebaseUser.uid}:`, typeof docData.isAdmin);
+            // --- END DETAILED LOGGING ---
             
             appUser = {
               id: userDocSnap.id,
               ...docData,
-              isAdmin: docData.isAdmin || false,
+              isAdmin: docData.isAdmin === true, // CRITICAL: Explicitly check for boolean true
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || docData.displayName,
               photoURL: firebaseUser.photoURL || docData.photoURL,
@@ -125,17 +129,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 toast({variant: "destructive", title: "Profile Sync Error", description: userMessage, duration: 7000 });
               }
             }
-             console.log(`AuthContext: Hydrated appUser for ${appUser.id}:`, JSON.stringify(appUser, null, 2));
+             console.log(`[AuthContext] Hydrated appUser for ${appUser.id} (resulting isAdmin: ${appUser.isAdmin}):`, JSON.stringify(appUser, null, 2));
             handleSuccessfulLogin(appUser);
           } else {
              const isInitialAdmin = firebaseUser.email === ADMIN_CREATOR_EMAIL;
              appUser = {
               id: firebaseUser.uid,
-              userId: firebaseUser.uid, // ensure userId is populated for rules if needed
+              userId: firebaseUser.uid, 
               email: firebaseUser.email,
               displayName: firebaseUser.displayName,
               photoURL: firebaseUser.photoURL,
-              isAdmin: isInitialAdmin,
+              isAdmin: isInitialAdmin, // boolean
               username: null, 
               role: null, 
               phoneNumber: firebaseUser.phoneNumber || null,
@@ -150,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   createdAt: serverTimestamp(), 
                   updatedAt: serverTimestamp(),
                 });
-                console.log(`AuthContext: New user profile created in Firestore for ${appUser.id} with isAdmin: ${appUser.isAdmin}:`, JSON.stringify(appUser, null, 2));
+                console.log(`[AuthContext] New user profile CREATED in Firestore for ${appUser.id} with isAdmin: ${appUser.isAdmin}.`);
                 handleSuccessfulLogin(appUser);
             } catch (dbError: any) {
                 let userMessage = "Could not initialize your profile. Please try again or contact support.";
@@ -182,14 +186,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('profileIncomplete');
       }
       setLoading(false);
-      setIsSocialLoginInProgress(null);
+      setActiveSocialLoginProvider(null);
     });
     return () => unsubscribe();
-  }, [router, pathname]); 
+  }, []); 
 
 
   const handleSuccessfulLogin = (appUser: User) => {
-    const userWithDefaultAdmin = { ...appUser, isAdmin: appUser.isAdmin || false };
+    const userWithDefaultAdmin = { ...appUser, isAdmin: appUser.isAdmin === true }; // Ensure boolean
     setUser(userWithDefaultAdmin);
     setShowLoginModal(false);
 
@@ -340,7 +344,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       institution: data.institution || null,
       role: data.role,
       researcherId: data.researcherId || null,
-      isAdmin: isInitialAdmin,
+      isAdmin: isInitialAdmin, // This will be boolean true or false
       photoURL: firebaseUser.photoURL || null, 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -382,6 +386,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
         console.error("Logout error:", error);
         toast({variant: "destructive", title: "Logout Failed", description: "Could not log out. Please try again."});
+    } finally {
+        setLoading(false); 
     }
   };
 
@@ -398,7 +404,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           appUser = { 
             id: userDocSnap.id, 
             ...docData, 
-            isAdmin: docData.isAdmin || false,
+            isAdmin: docData.isAdmin === true, 
             email: firebaseUser.email, 
             displayName: firebaseUser.displayName || docData.displayName,
             photoURL: firebaseUser.photoURL || docData.photoURL,
@@ -436,7 +442,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            isAdmin: isInitialAdmin,
+            isAdmin: isInitialAdmin, 
             username: null, 
             role: null, 
             phoneNumber: firebaseUser.phoneNumber || null,
@@ -465,12 +471,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              console.error("Error signing out after social login db error:", signOutError);
           }
     } finally {
-        setIsSocialLoginInProgress(null);
+        setActiveSocialLoginProvider(null);
     }
   };
 
   const handleSocialLoginError = (error: any, providerName: string) => {
-    setIsSocialLoginInProgress(null);
+    setActiveSocialLoginProvider(null);
     setLoading(false);
 
     const firebaseError = error as { code?: string; message?: string };
@@ -482,7 +488,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
           toastTitle = `${providerName} Sign-In Cancelled`;
-          toastMessage = `The ${providerName} sign-in popup was closed before completing. This might be due to popup blockers or network issues.`;
+          toastMessage = `The ${providerName} sign-in popup was closed before completing.`;
            toast({
             title: toastTitle,
             description: (
@@ -493,16 +499,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     <AlertTitle>Troubleshooting Tips</AlertTitle>
                     <AlertDescription>
                       Please ensure popups are enabled for this site in your browser settings.
-                      Also, check your internet connection and try again. If the problem persists, some browser extensions (like ad blockers or privacy tools) might interfere.
+                      Some browser extensions (like ad blockers or privacy tools) might interfere.
                       Consider temporarily disabling them or using an incognito window.
-                      Alternatively, you can try the other social login option if available.
+                      If the problem persists, check your internet connection.
                     </AlertDescription>
                   </Alert>
               </div>
             ),
             duration: 15000, 
           });
-          return; // Prevent generic toast for this case
+          return; 
         case 'auth/account-exists-with-different-credential':
           toastMessage = "An account already exists with the same email address but different sign-in credentials. Try signing in with the original method.";
           break;
@@ -529,7 +535,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithProvider = async (providerInstance: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: 'google' | 'github') => {
     if (!firebaseAuth || !providerInstance || !db) {
       toast({variant: "destructive", title: "Login Error", description: `${providerName} Sign-In service not available.`, duration: 7000});
-      setIsSocialLoginInProgress(null); 
+      setActiveSocialLoginProvider(null); 
       setLoading(false); 
       return;
     }
@@ -540,12 +546,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         duration: 5000,
     });
 
-    setIsSocialLoginInProgress(providerName);
+    setActiveSocialLoginProvider(providerName);
     setLoading(true);
 
     try {
-      const credential = await signInWithPopup(firebaseAuth, providerInstance);
-      await processSocialLogin(credential); 
+      await signInWithPopup(firebaseAuth, providerInstance);
     } catch (error) {
       handleSocialLoginError(error, providerName);
     }
@@ -566,8 +571,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
         let errorMessage = "Could not send password reset email.";
         if (error.code === 'auth/user-not-found') {
-            // This error is often intentionally masked on client to prevent email enumeration
-            // The message "If an account with that email exists..." is good for UI.
             throw error; 
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
@@ -603,7 +606,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     });
     
-    // Check username uniqueness if it's being changed
     if (updatedData.username && updatedData.username !== user.username) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("username", "==", updatedData.username));
@@ -627,7 +629,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    // Check phone number uniqueness if it's being changed and is not empty
     if (updatedData.phoneNumber && updatedData.phoneNumber !== user.phoneNumber) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("phoneNumber", "==", updatedData.phoneNumber));
@@ -677,7 +678,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const updatedAppUser = { 
           id: updatedUserDoc.id, 
           ...docData, 
-          isAdmin: docData.isAdmin || false,
+          isAdmin: docData.isAdmin === true, 
           email: firebaseAuth.currentUser.email || docData.email, 
           displayName: firebaseAuth.currentUser.displayName || docData.displayName,
           photoURL: firebaseAuth.currentUser.photoURL || docData.photoURL,
@@ -705,10 +706,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const isAdmin = user?.isAdmin || false;
+  const isAdmin = user?.isAdmin === true; 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, updateUserProfile, showLoginModal, setShowLoginModal, isAdmin, isSocialLoginInProgress: isSocialLoginInProgress !== null }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle, loginWithGitHub, sendPasswordResetEmail, updateUserProfile, showLoginModal, setShowLoginModal, isAdmin, isSocialLoginInProgress: activeSocialLoginProvider !== null }}>
       {children}
     </AuthContext.Provider>
   );

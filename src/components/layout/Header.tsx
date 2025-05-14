@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import React, { useState, useEffect } from 'react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users, FileText as FileTextIcon, Phone, Info as InfoIcon, MessageSquare } from 'lucide-react'; // Added more icons
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users, FileText as FileTextIcon, Phone, Info as InfoIcon, MessageSquare } from 'lucide-react'; 
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -39,10 +39,10 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false); // To avoid hydration mismatch for isAdmin checks
+  const [isClient, setIsClient] = useState(false); 
 
   useEffect(() => {
-    setIsClient(true); // Component has mounted, safe to use isAdmin
+    setIsClient(true); 
   }, []);
 
 
@@ -71,39 +71,37 @@ export default function Header() {
     }
   };
 
-  // Define base links available to everyone or non-logged-in users
   const baseNavLinks = [
-    { href: "/", label: "Home", icon: null },
-    { href: "/registration", label: "Registration", icon: null },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
+    { href: "/", label: "Home", icon: null, adminOnly: false, userOnly: false },
+    { href: "/registration", label: "Registration", icon: null, adminOnly: false, userOnly: false },
+    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
   ];
 
-  // Define links for authenticated non-admin users
-  const userNavLinks = [
-    { href: "/", label: "Home", icon: null },
-    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-1 h-4 w-4" /> },
-    { href: "/submit", label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-1 h-4 w-4" /> },
-    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
+  const userSpecificNavLinks = [
+    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
+    { href: "/submit", label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
   ];
 
-  // Define links for admin users
-  const adminNavLinks = [
-    { href: "/", label: "Home", icon: null },
-    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-1 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    // Admins generally don't need registration, submit, templates, or AI pre-check in their primary nav
+  const adminSpecificNavLinks = [
+    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-1 h-4 w-4" />, adminOnly: true, userOnly: false },
+    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-1 h-4 w-4" />, adminOnly: true, userOnly: false }, // Admins can also search
   ];
   
-  let currentNavLinks = baseNavLinks; // Default for non-logged-in users
-  if (isClient && user) { // Ensure user state is resolved on client
-    currentNavLinks = isAdmin ? adminNavLinks : userNavLinks;
+  let currentNavLinks = [];
+  if (isClient) {
+    if (user && isAdmin) {
+      currentNavLinks = [...baseNavLinks.filter(link => !link.userOnly), ...adminSpecificNavLinks];
+      // Filter out links not relevant for admins from baseNavLinks
+      currentNavLinks = currentNavLinks.filter(link => !["/registration", "/submit", "/ai-pre-check", "/sample-templates", "/contact-us"].includes(link.href));
+    } else if (user && !isAdmin) {
+      currentNavLinks = [...baseNavLinks.filter(link => !link.adminOnly), ...userSpecificNavLinks];
+    } else {
+      currentNavLinks = baseNavLinks.filter(link => !link.adminOnly && !link.userOnly);
+    }
   }
 
 
@@ -115,12 +113,11 @@ export default function Header() {
           <span className="text-xl font-bold">ResearchSphere</span>
         </Link>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {currentNavLinks.map(link => (
             link.action ? (
               <Button
-                key={link.href} // Use href as key even for actions
+                key={link.href} 
                 variant="ghost"
                 onClick={link.action}
                 className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
@@ -134,7 +131,7 @@ export default function Header() {
                 className={cn(
                   "px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center",
                   pathname === link.href && "text-primary font-semibold",
-                  link.href === '/admin/dashboard' && pathname.startsWith('/admin') && "text-primary font-bold underline" 
+                  (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "text-primary font-bold underline" 
                 )}
               >
                 {link.icon}{link.label}
@@ -143,9 +140,8 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Auth buttons / User Menu for Desktop */}
         <div className="hidden md:flex items-center space-x-2 ml-auto">
-          {isClient && user ? ( // Ensure user state is resolved on client
+          {isClient && user ? ( 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
@@ -201,15 +197,14 @@ export default function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : isClient ? ( // Ensure user state is resolved before showing login/signup
+          ) : isClient ? ( 
             <>
               <Button variant="ghost" onClick={handleLoginClick} className="text-foreground">Log In</Button>
               <Button onClick={handleSignupClick}>Sign Up</Button>
             </>
-          ) : null /* Render nothing server-side or before client hydration for auth buttons */ }
+          ) : null }
         </div>
 
-        {/* Mobile Navigation Trigger */}
         <div className="flex items-center md:hidden"> 
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -242,7 +237,7 @@ export default function Header() {
                       onClick={() => setIsMobileMenuOpen(false)} 
                       className={cn("text-foreground", 
                                    pathname === link.href && "text-primary bg-secondary",
-                                   link.href === '/admin/dashboard' && pathname.startsWith('/admin') && "font-bold"
+                                   (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "font-bold"
                                   )}
                     >
                        {link.icon}{link.label}

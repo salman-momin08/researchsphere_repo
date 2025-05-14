@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; // Firestore service
+import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; 
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
@@ -82,14 +82,12 @@ function AdminDashboardContent() {
   };
 
   const handleManualRejectOverdue = async (paperId: string) => {
-    const paperToNotify = papers.find(p => p.id === paperId); // Get paper details BEFORE updating state
+    const paperToNotify = papers.find(p => p.id === paperId); 
     try {
       await updatePaperStatus(paperId, 'Rejected');
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
 
       if (paperToNotify) {
-        // In a real app, you would fetch the user's email using paperToNotify.userId
-        // and then call a backend service to send an email.
         console.log(`SIMULATING EMAIL: An email would be sent to the user (owner of paper ID: ${paperToNotify.userId}) for paper "${paperToNotify.title}" regarding its rejection due to non-payment.`);
         toast({
           title: "Email Notification (Simulated)",
@@ -98,7 +96,7 @@ function AdminDashboardContent() {
           duration: 7000,
         });
       }
-      fetchAndSetPapers(); // Refresh list
+      fetchAndSetPapers(); 
     } catch (error) {
       console.error("Failed to reject paper:", error);
       toast({variant: "destructive", title: "Error Rejecting Paper", description: "Could not update paper status."});
@@ -109,20 +107,22 @@ function AdminDashboardContent() {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
 
+  // This check is important. If ProtectedRoute somehow lets a non-admin through,
+  // or if isAdmin status changes dynamically, this provides a clear message.
   if (user && !isAdmin) {
     return (
       <div className="container py-8 md:py-12 px-4 text-center">
-        <Alert variant="destructive" className="max-w-md mx-auto">
+        <Alert variant="destructive" className="max-w-lg mx-auto">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
-            Your account is not recognized as an administrator by the application.
-            This could be due to:
-            <ul className="list-disc list-inside text-left mt-2 text-xs">
-              <li>The 'isAdmin' field is missing or set to 'false' (boolean) in your user profile in the Firestore database.</li>
-              <li>A delay in user data propagation after login.</li>
+            Your account is not recognized as an administrator.
+            <ul className="list-disc list-inside text-left mt-2 text-sm">
+              <li>**Crucial Check:** Ensure the `isAdmin` field in your user document (in the Firestore `users` collection) is set to `true` (boolean type).</li>
+              <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
+              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted.</li>
             </ul>
-            Please verify your Firestore user document or contact support if you believe this is an error.
+            If the issue persists, please verify your Firestore data or contact support.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -149,6 +149,7 @@ function AdminDashboardContent() {
      );
   }
 
+  // If we reach here, user is logged in AND isAdmin is true (or authLoading is true, handled above)
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
@@ -204,7 +205,7 @@ function AdminDashboardContent() {
         </Card>
       </div>
 
-      <Card className="shadow-lg w-full"> {/* Ensure card takes full width of its new wider parent */}
+      <Card className="shadow-lg w-full"> 
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><BarChartHorizontalBig className="mr-2 h-5 w-5 text-primary" />All Submissions</CardTitle>
           <CardDescription>Review and manage all papers submitted to the platform.</CardDescription>
@@ -237,7 +238,7 @@ function AdminDashboardContent() {
                           {(paper as any).displayStatus || paper.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{new Date(paper.uploadDate).toLocaleDateString()}</TableCell>
+                      <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>
                         {paper.status === 'Payment Pending' && paper.paymentDueDate ? (
                            (paper as any).displayStatus === 'Payment Overdue' ? (
@@ -254,7 +255,7 @@ function AdminDashboardContent() {
                           <Button variant="outline" size="sm">Review</Button>
                         </Link>
                         {(paper as any).displayStatus === 'Payment Overdue' && (
-                           <Button variant="destructive" size="sm" onClick={() => handleManualRejectOverdue(paper.id)}>Reject</Button>
+                           <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)}>Reject</Button>
                         )}
                       </TableCell>
                     </TableRow>
