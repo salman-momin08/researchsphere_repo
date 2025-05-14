@@ -45,7 +45,7 @@ function SearchPapersContent() {
       // console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
 
       // Client-side filtering for author name (case-insensitive, partial match)
-      // This correctly handles multiple authors.
+      // This correctly handles multiple authors if an author's name is part of the search term.
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
@@ -75,11 +75,38 @@ function SearchPapersContent() {
         });
     }
   };
+
+  const handleDownloadMetadata = (paper: Paper) => {
+    const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+    const filename = `${safeTitle}_Details.txt`;
+    let content = `Title: ${paper.title}\n`;
+    content += `Authors: ${paper.authors.join(', ')}\n`;
+    content += `Keywords: ${paper.keywords.join(', ')}\n`;
+    content += `Status: ${paper.status}\n`;
+    content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
+    content += `Abstract:\n${paper.abstract}\n\n`;
+    if (paper.fileUrl) {
+      content += `Original File URL: ${paper.fileUrl}\n`;
+    } else {
+      content += `Original File URL: Not available\n`;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+  };
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
-      case 'Rejected': return 'destructive';
+      case 'Rejected': case 'Payment Overdue': return 'destructive';
       case 'Under Review': case 'Submitted': return 'secondary';
       case 'Payment Pending': case 'Action Required': return 'outline';
       default: return 'secondary';
@@ -154,12 +181,15 @@ function SearchPapersContent() {
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(paper.status)}>{paper.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="text-right space-x-1">
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File">
+                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File">
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Metadata" className="text-muted-foreground hover:text-primary">
+                          <FileText className="h-3 w-3 mr-1" /> Details
                         </Button>
                       </TableCell>
                     </TableRow>

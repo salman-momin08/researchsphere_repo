@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, FileText, Users, DollarSign, MessageSquare, Settings, Search as SearchIcon } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -58,39 +58,35 @@ export default function Header() {
   
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false); 
-    if (user && !isAdmin) {
+    if (user && !isAdmin) { // Only non-admins can submit papers
       router.push('/submit');
     } else if (!user) {
       localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
-    // If user is admin, this button action does nothing from here, which is intended.
   };
 
   const mainNavLinks = [
-    { href: "/", label: "Home", icon: null, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
-    { href: "/dashboard", label: "Dashboard", icon: null, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
-    { href: "/submit", label: "Submit Paper", icon: null, action: handleSubmitPaperClick, requiresAuthDynamic: true, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: true },
-    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
-    { href: "/registration", label: "Registration", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
-    { href: "/key-committee", label: "Committee", icon: null, adminOnlyPage: false, hideInAdminView: false, hideIfAdmin: false },
-    { href: "/sample-templates", label: "Templates", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
-    { href: "/contact-us", label: "Contact", icon: null, adminOnlyPage: false, hideInAdminView: true, hideIfAdmin: false, hideInAdminMainNavbar: true },
-    { href: "/admin/dashboard", label: "Admin", icon: null, requiresAuth: true, adminOnlyPage: true, hideInAdminView: false, hideIfAdmin: false },
+    { href: "/", label: "Home", icon: null, requiresAuth: false, adminOnlyPage: false, hideIfAdminVisible: false },
+    { href: "/dashboard", label: "Dashboard", icon: null, requiresAuth: true, adminOnlyPage: false, hideIfAdminVisible: false },
+    { href: "/submit", label: "Submit Paper", icon: null, action: handleSubmitPaperClick, requiresAuthDynamic: true, adminOnlyPage: false, hideIfAdmin: true },
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideIfAdmin: true, hideFromAdminDropdown: true },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, requiresAuth: true, adminOnlyPage: false, hideIfAdminVisible: false },
+    { href: "/registration", label: "Registration", icon: null, requiresAuth: false, adminOnlyPage: false, hideIfAdmin: true },
+    { href: "/key-committee", label: "Committee", icon: null, requiresAuth: false, adminOnlyPage: false, hideIfAdminVisible: false },
+    { href: "/sample-templates", label: "Templates", icon: null, requiresAuth: false, adminOnlyPage: false, hideIfAdmin: true },
+    { href: "/contact-us", label: "Contact", icon: null, requiresAuth: false, adminOnlyPage: false, hideIfAdmin: true },
+    { href: "/admin/dashboard", label: "Admin", icon: null, requiresAuth: true, adminOnlyPage: true, hideIfAdminVisible: false },
   ];
 
-  const getFilteredNavLinks = (isMobile: boolean) => {
-    const isViewingAdminSection = isAdmin && pathname.startsWith('/admin');
+ const getFilteredNavLinks = (isMobile: boolean) => {
     return mainNavLinks.filter(link => {
-      if (link.adminOnlyPage && !isAdmin) return false;
-      if (link.hideIfAdmin && isAdmin) return false; // Completely hide if admin (e.g., Submit Paper)
+      if (link.adminOnlyPage && !isAdmin) return false; // Hide admin-only pages from non-admins
+      if (link.hideIfAdmin && isAdmin && !isMobile) return false; // Hide certain links from admin's main horizontal nav
+      if (link.requiresAuth && !user && !isMobile && !link.action) return false; // Hide auth-required links if not logged in (for non-action links in desktop)
       
-      if (!isMobile && isAdmin && link.hideInAdminMainNavbar) return false; // Hide certain links from admin's main horizontal nav
-
-      if (isViewingAdminSection && link.hideInAdminView && !isMobile) return false; // Further hide links if admin is in admin section (main nav)
-      
-      if (link.requiresAuth && !user && !isMobile) return false;
+      // For mobile, we might show more links and handle auth via actions/modals
+      if (isMobile && link.hideIfAdmin && isAdmin) return false; 
       return true;
     });
   };
@@ -108,14 +104,16 @@ export default function Header() {
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {getFilteredNavLinks(false).map(link => (
             link.action ? (
-              <Button
-                key={link.href}
-                variant="ghost"
-                onClick={link.action}
-                className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
-              >
-                {link.icon}{link.label}
-              </Button>
+              (link.hideIfAdmin && isAdmin) ? null : ( // Hide action links if admin and hideIfAdmin is true
+                <Button
+                  key={link.href}
+                  variant="ghost"
+                  onClick={link.action}
+                  className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
+                >
+                  {link.icon}{link.label}
+                </Button>
+              )
             ) : (
               <Link 
                 key={link.href} 
@@ -166,10 +164,12 @@ export default function Header() {
                         <span>Submit Paper</span>
                     </DropdownMenuItem>
                 )}
-                 <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  <span>AI Pre-Check</span>
-                </DropdownMenuItem>
+                {!isAdmin && (
+                   <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span>AI Pre-Check</span>
+                  </DropdownMenuItem>
+                )}
                  <DropdownMenuItem onClick={() => router.push('/search-papers')}>
                   <SearchIcon className="mr-2 h-4 w-4" />
                   <span>Search Papers</span>
@@ -211,16 +211,18 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1">
-                {getFilteredNavLinks(true).map(link => ( // Pass true for isMobile
+                {getFilteredNavLinks(true).map(link => ( 
                    link.action ? (
-                    <Button 
-                      key={link.href} 
-                      variant="ghost" 
-                      onClick={() => { link.action!(); setIsMobileMenuOpen(false); }} 
-                      className={cn("w-full justify-start hover:text-primary text-foreground", pathname === link.href && "text-primary bg-secondary")}
-                    >
-                      {link.icon && React.cloneElement(link.icon, {className: "mr-2 h-4 w-4"})} {link.label}
-                    </Button>
+                     (link.hideIfAdmin && isAdmin) ? null : (
+                        <Button 
+                          key={link.href} 
+                          variant="ghost" 
+                          onClick={() => { link.action!(); setIsMobileMenuOpen(false); }} 
+                          className={cn("w-full justify-start hover:text-primary text-foreground", pathname === link.href && "text-primary bg-secondary")}
+                        >
+                          {link.icon && React.cloneElement(link.icon, {className: "mr-2 h-4 w-4"})} {link.label}
+                        </Button>
+                     )
                   ) : (
                     <NavLink 
                       key={link.href} 
@@ -245,6 +247,11 @@ export default function Header() {
                      <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className={cn("text-foreground", pathname === "/profile/settings" && "text-primary bg-secondary")}>
                         <Settings className="mr-2 h-4 w-4" /> Profile Settings
                      </NavLink>
+                    {!isAdmin && (
+                       <NavLink href="/ai-pre-check" onClick={() => { router.push('/ai-pre-check'); setIsMobileMenuOpen(false); }} className={cn("text-foreground", pathname === "/ai-pre-check" && "text-primary bg-secondary")}>
+                          <Sparkles className="mr-2 h-4 w-4" /> AI Pre-Check
+                       </NavLink>
+                    )}
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
                     </Button>

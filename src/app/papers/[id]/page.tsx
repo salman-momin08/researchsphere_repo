@@ -105,9 +105,19 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin || !adminFeedbackText.trim()) return;
     setIsSubmittingFeedback(true);
     try {
-      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText, status: "Action Required" });
-      setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText, status: "Action Required" } : null);
-      toast({title: "Feedback Submitted", description: "Author will be notified."});
+      // Status is no longer automatically changed to "Action Required" here.
+      // Admin should change status manually if needed.
+      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
+      setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
+      
+      // Simulate email notification
+      toast({
+        title: "Feedback Submitted", 
+        description: `Author will be notified (Simulated email to user for paper: ${currentPaper.title}).`,
+        duration: 7000
+      });
+      console.log(`SIMULATING EMAIL: Feedback provided for paper "${currentPaper.title}" (ID: ${currentPaper.id}) by admin. Email would be sent to user ID: ${currentPaper.userId}.`);
+
     } catch (error) {
       toast({variant: "destructive", title: "Feedback Submission Failed"});
     } finally {
@@ -199,6 +209,38 @@ function PaperDetailsContent() {
     }
   };
 
+  const handleDownloadMetadata = () => {
+    if (!currentPaper) return;
+    const safeTitle = currentPaper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+    const filename = `${safeTitle}_Details.txt`;
+    let content = `Title: ${currentPaper.title}\n`;
+    content += `Authors: ${currentPaper.authors.join(', ')}\n`;
+    content += `Keywords: ${currentPaper.keywords.join(', ')}\n`;
+    content += `Status: ${currentPaper.status}\n`;
+    content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
+    content += `Abstract:\n${currentPaper.abstract}\n\n`;
+    if (currentPaper.fileUrl) {
+      content += `Original File URL: ${currentPaper.fileUrl}\n`;
+    } else {
+      content += `Original File URL: Not available\n`;
+    }
+     if (isAdmin) {
+      if (currentPaper.plagiarismScore !== null) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
+      if (currentPaper.acceptanceProbability !== null) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+  };
+
 
   if (loadingPaper) {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
@@ -258,6 +300,9 @@ function PaperDetailsContent() {
                  <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full md:w-auto">
                     <Download className="mr-2 h-5 w-5" /> Download Original File
                 </Button>
+                 <Button onClick={handleDownloadMetadata} size="lg" variant="ghost" className="w-full md:w-auto text-muted-foreground hover:text-primary">
+                    <FileText className="mr-2 h-4 w-4" /> Download Details
+                </Button>
                 {effectiveStatus === 'Payment Pending' && user && user.id === currentPaper.userId && !isAdmin && !isPaperOverdue && (
                 <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
@@ -302,7 +347,7 @@ function PaperDetailsContent() {
                 {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
                     <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
                 )}
-                {(!currentPaper.plagiarismScore && !currentPaper.acceptanceProbability && !isCheckingPlagiarism && !isCheckingAcceptance) && (
+                {(currentPaper.plagiarismScore === null && currentPaper.acceptanceProbability === null && !isCheckingPlagiarism && !isCheckingAcceptance) && (
                     <Alert variant="default" className="mt-4">
                       <Sparkles className="h-4 w-4" />
                       <AlertTitle>AI Validation Available</AlertTitle>
@@ -318,10 +363,12 @@ function PaperDetailsContent() {
             
             {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdmin) && (
               <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Admin/Reviewer Feedback</h3>
+                <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />
+                  {isAdmin? "Current Feedback Sent to Author" : "Admin/Reviewer Feedback"}
+                </h3>
                 <Alert variant={currentPaper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
                   {currentPaper.status === "Action Required" ? <AlertTriangle className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
-                  <AlertTitle>Feedback Received</AlertTitle>
+                  <AlertTitle>Feedback</AlertTitle>
                   <AlertDescription className="whitespace-pre-wrap">{currentPaper.adminFeedback}</AlertDescription>
                 </Alert>
               </div>
@@ -331,7 +378,7 @@ function PaperDetailsContent() {
             {isAdmin && effectiveStatus !== "Payment Overdue" && (
               <div className="mt-6 p-4 border rounded-md">
                 <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
-                <Label htmlFor="adminFeedback">Feedback / Comments</Label>
+                <Label htmlFor="adminFeedback">Feedback / Comments (this will be visible to the author)</Label>
                 <Textarea 
                   id="adminFeedback" 
                   value={adminFeedbackText} 
@@ -343,7 +390,7 @@ function PaperDetailsContent() {
                 />
                 <Button onClick={handleAdminFeedbackSubmit} disabled={isSubmittingFeedback || !adminFeedbackText.trim()}>
                   {isSubmittingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                  Submit Feedback & Mark as 'Action Required'
+                  Submit Feedback
                 </Button>
               </div>
             )}

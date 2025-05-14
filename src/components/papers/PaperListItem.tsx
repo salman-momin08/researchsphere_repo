@@ -15,10 +15,9 @@ import { useAuth } from '@/hooks/use-auth';
 
 interface PaperListItemProps {
   paper: Paper;
-  onDelete?: (paperId: string) => void;
 }
 
-const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
+const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth(); 
@@ -77,20 +76,46 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
     }
   }
 
-  const handleDownloadOriginal = () => {
+  const handleDownloadOriginalFile = () => {
     if (paper.fileUrl) {
-      // For Firebase Storage URLs, this will open/download the file.
-      // For old mock URLs, it would try to open them (likely fail or show text).
       window.open(paper.fileUrl, '_blank');
       toast({ title: "Opening File", description: `Attempting to open ${paper.fileName || 'the paper'}. Check your browser for download or new tab.` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing or the file was not processed.",
+            description: "The URL for this paper file is missing.",
         });
     }
   };
+
+  const handleDownloadMetadata = () => {
+    const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+    const filename = `${safeTitle}_Details.txt`;
+    let content = `Title: ${paper.title}\n`;
+    content += `Authors: ${paper.authors.join(', ')}\n`;
+    content += `Keywords: ${paper.keywords.join(', ')}\n`;
+    content += `Status: ${paper.status}\n`;
+    content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
+    content += `Abstract:\n${paper.abstract}\n\n`;
+    if (paper.fileUrl) {
+      content += `Original File URL: ${paper.fileUrl}\n`;
+    } else {
+      content += `Original File URL: Not available\n`;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+  };
+
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg flex flex-col h-full">
@@ -133,8 +158,11 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
           <Eye className="mr-2 h-4 w-4" /> View Details
         </Button>
-        <Button variant="outline" size="sm" onClick={handleDownloadOriginal} className="w-full sm:w-auto">
+        <Button variant="outline" size="sm" onClick={handleDownloadOriginalFile} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" /> Download Original File
+        </Button>
+         <Button variant="ghost" size="sm" onClick={handleDownloadMetadata} className="w-full sm:w-auto text-xs text-muted-foreground hover:text-primary">
+            <FileText className="mr-1 h-3 w-3" /> Download Details
         </Button>
       </CardFooter>
     </Card>
