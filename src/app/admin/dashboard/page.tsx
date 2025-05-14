@@ -3,8 +3,8 @@
 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/use-auth";
-import type { Paper } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText } from "lucide-react";
+import type { Paper, PaperStatus } from "@/types";
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,63 +12,94 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { allMockPapers } from "@/lib/mock-data"; 
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-
+import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; // Firestore service
+import CountdownTimer from "@/components/shared/CountdownTimer";
+import { toast } from "@/hooks/use-toast";
 
 function AdminDashboardContent() {
   const { user, isAdmin, loading: authLoading } = useAuth(); 
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState(true);
+  
+  const [stats, setStats] = useState({
+    totalSubmissions: 0,
+    pendingReview: 0,
+    issuesFound: 0,
+    paymentPending: 0,
+  });
 
-  // Stats - simple counts for now
-  const totalSubmissions = papers.length;
-  const pendingReview = papers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
-  const issuesFound = papers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
-
-
-  useEffect(() => {
-    // Only fetch papers if the user is loaded and confirmed to be an admin
+  const fetchAndSetPapers = async () => {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
-      // Simulate fetching all papers
-      console.log("AdminDashboard: User is admin, fetching all mock papers.");
-      setTimeout(() => {
-        setPapers(allMockPapers); 
+      try {
+        const fetchedPapers = await getAllPapers();
+        console.log("AdminDashboard: Fetched papers from Firestore:", fetchedPapers.length);
+        
+        // Client-side check for overdue payments
+        const now = new Date();
+        const processedPapers = fetchedPapers.map(p => {
+          if (p.status === 'Payment Pending' && p.paymentDueDate && new Date(p.paymentDueDate) < now) {
+            // This is a display change, actual status update needs admin action or backend job
+            return { ...p, displayStatus: 'Payment Overdue' as PaperStatus }; 
+          }
+          return { ...p, displayStatus: p.status };
+        });
+        setPapers(processedPapers);
+
+        // Calculate stats
+        const totalSubmissions = processedPapers.length;
+        const pendingReview = processedPapers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
+        const issuesFound = processedPapers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
+        const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length;
+
+        setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
+
+      } catch (error) {
+        console.error("AdminDashboard: Error fetching papers:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load papers." });
+      } finally {
         setIsLoadingPapers(false);
-      }, 1000);
+      }
     } else if (!authLoading && user && !isAdmin) {
-      // User is loaded but not an admin, clear papers and stop loading.
-      // The main access denial message handles the UI.
-      console.warn("AdminDashboard: User is not admin, access denied by component logic.");
       setPapers([]);
       setIsLoadingPapers(false);
     } else if (!authLoading && !user) {
-      // User is not logged in, clear papers. ProtectedRoute should handle redirect.
-      console.log("AdminDashboard: No user logged in.");
       setPapers([]);
       setIsLoadingPapers(false);
     }
-    // If authLoading is true, we wait.
+  };
+
+  useEffect(() => {
+    fetchAndSetPapers();
   }, [user, isAdmin, authLoading]);
   
-  const getStatusBadgeVariant = (status: Paper['status']) => {
+  const getStatusBadgeVariant = (status: PaperStatus | undefined) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
-      case 'Rejected': return 'destructive';
+      case 'Rejected': case 'Payment Overdue': return 'destructive';
       case 'Under Review': case 'Submitted': return 'secondary';
       case 'Payment Pending': case 'Action Required': return 'outline';
       default: return 'secondary';
     }
   };
 
-  // This check is important. If auth is still loading, show a spinner.
+  const handleManualRejectOverdue = async (paperId: string) => {
+    try {
+      await updatePaperStatus(paperId, 'Rejected');
+      toast({title: "Paper Rejected", description: "Paper marked as rejected due to overdue payment."});
+      fetchAndSetPapers(); // Refresh list
+    } catch (error) {
+      toast({variant: "destructive", title: "Error", description: "Failed to reject paper."});
+    }
+  };
+
   if (authLoading) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
 
-  // If user is loaded, but not an admin (according to client-side context)
   if (user && !isAdmin) {
+     // console.log from AuthContext will show if isAdmin is false from Firestore
     return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-md mx-auto">
@@ -91,7 +122,6 @@ function AdminDashboardContent() {
     );
   }
   
-  // If user is null, ProtectedRoute should have handled it, but as a fallback:
   if (!user) {
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
@@ -103,18 +133,15 @@ function AdminDashboardContent() {
                 </AlertDescription>
             </Alert>
              <Link href="/login">
-                <Button className="mt-6">Log In</Button>
+                <Button className="mt-6" onClick={() => localStorage.setItem('redirectAfterLogin', '/admin/dashboard')}>Log In</Button>
             </Link>
         </div>
      );
   }
 
-
-  // If papers are still loading (and user is confirmed admin)
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
-
 
   return (
     <div className="container py-8 md:py-12 px-4">
@@ -124,26 +151,35 @@ function AdminDashboardContent() {
         </h1>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalSubmissions}</div>
+            <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
             <p className="text-xs text-muted-foreground">papers submitted to the platform</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+            <CardTitle className="text-sm font-medium">Awaiting Review</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingReview}</div>
+            <div className="text-2xl font-bold">{stats.pendingReview}</div>
             <p className="text-xs text-muted-foreground">papers awaiting admin/reviewer action</p>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Payment Pending</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.paymentPending}</div>
+            <p className="text-xs text-muted-foreground">papers awaiting payment</p>
           </CardContent>
         </Card>
         <Card>
@@ -152,7 +188,7 @@ function AdminDashboardContent() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{issuesFound}</div>
+            <div className="text-2xl font-bold">{stats.issuesFound}</div>
             <p className="text-xs text-muted-foreground">papers flagged or needing attention</p>
           </CardContent>
         </Card>
@@ -175,6 +211,7 @@ function AdminDashboardContent() {
                     <TableHead>Author(s)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Uploaded</TableHead>
+                    <TableHead>Payment Due</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -186,13 +223,29 @@ function AdminDashboardContent() {
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{paper.authors.join(', ')}</TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(paper.status)}>{paper.status}</Badge>
+                        <Badge variant={getStatusBadgeVariant((paper as any).displayStatus || paper.status)}>
+                          {(paper as any).displayStatus || paper.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>{new Date(paper.uploadDate).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
+                        {paper.status === 'Payment Pending' && paper.paymentDueDate ? (
+                           (paper as any).displayStatus === 'Payment Overdue' ? (
+                             <span className="text-destructive font-semibold">Overdue</span>
+                           ) : (
+                            <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" className="text-xs text-orange-600"/>
+                           )
+                        ) : (
+                          <span className="text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
                         <Link href={`/papers/${paper.id}`}>
                           <Button variant="outline" size="sm">Review</Button>
                         </Link>
+                        {(paper as any).displayStatus === 'Payment Overdue' && (
+                           <Button variant="destructive" size="sm" onClick={() => handleManualRejectOverdue(paper.id)}>Reject</Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -213,4 +266,3 @@ export default function AdminDashboardPage() {
     </ProtectedRoute>
   );
 }
-

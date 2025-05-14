@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,18 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
   const [upiId, setUpiId] = useState("");
   const [paymentStep, setPaymentStep] = useState<"form" | "success">("form");
 
-  const resetLocalState = () => {
+  // Reset form when modal is opened with new paper or form step
+  useEffect(() => {
+    if (isOpen && paymentStep === "form") {
+      setCardNumber("");
+      setExpiryDate("");
+      setCvc("");
+      setUpiId("");
+      setPaymentMethod("card"); // Reset to default payment method
+    }
+  }, [isOpen, paymentStep, paper]); // Depend on paper too, in case modal reopens for different paper
+
+  const resetLocalStateAndClose = () => {
     setCardNumber("");
     setExpiryDate("");
     setCvc("");
@@ -48,52 +59,73 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     setPaymentMethod("card");
     setPaymentStep("form");
     setIsProcessing(false); 
+    onOpenChange(false); // Call the prop to close the dialog
   };
 
-  const handleModalVisibilityChange = (newOpenState: boolean) => {
-    if (!newOpenState) {
-      resetLocalState(); 
-    }
-    onOpenChange(newOpenState); 
-  };
 
   const handlePayment = async () => {
     if (!paper) return;
 
     if (paymentMethod === "card") {
-      if (!cardNumber || !expiryDate || !cvc) {
+      if (!cardNumber.trim() || !expiryDate.trim() || !cvc.trim()) { // Added .trim()
         toast({ variant: "destructive", title: "Payment Error", description: "Please fill in all card details." });
         return;
       }
+      // Basic card validation (very simple, not for production)
+      if (!/^\d{13,19}$/.test(cardNumber.replace(/\s/g, ''))) {
+         toast({ variant: "destructive", title: "Invalid Card", description: "Please enter a valid card number." });
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate)) {
+         toast({ variant: "destructive", title: "Invalid Expiry", description: "Expiry date must be MM/YY." });
+        return;
+      }
+       if (!/^\d{3,4}$/.test(cvc)) {
+         toast({ variant: "destructive", title: "Invalid CVC", description: "CVC must be 3 or 4 digits." });
+        return;
+      }
     } else if (paymentMethod === "upi") {
-      if (!upiId) {
-          // For mock purposes, we'll allow proceeding if QR is shown, as scanning is simulated.
-          // In a real app, you might require UPI ID or confirm payment through other means.
-          console.log("UPI ID not entered, assuming QR scan for mock payment.");
-        }
+      if (!upiId.trim() && !confirm("Proceed with mock UPI payment without entering UPI ID (simulating QR scan)?")) { // Added .trim() and confirmation
+         // If user cancels the confirmation after leaving UPI ID blank
+        return;
+      }
+       if (upiId.trim() && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
+         toast({ variant: "destructive", title: "Invalid UPI ID", description: "Please enter a valid UPI ID (e.g., yourname@bank)." });
+        return;
+      }
     }
 
     setIsProcessing(true);
     try {
+      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000)); 
-      onPaymentSuccess(paper.id);
-      setPaymentStep("success");
-      toast({ 
-        title: "Payment Successful!", 
-        description: `Your payment of $${SUBMISSION_FEE.toFixed(2)} for "${paper.title}" via ${paymentMethod === 'card' ? 'Card' : 'UPI'} has been processed.` 
-      });
+      
+      // Call the success handler passed from parent
+      onPaymentSuccess(paper.id); 
+      setPaymentStep("success"); // Move to success screen
+      // Toast is now handled by the parent component after status update
     } catch (error) {
       console.error("Payment processing error:", error);
       toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
+      // Do not call onOpenChange(false) here, let user see error and close manually or retry
     } finally {
-      setIsProcessing(false); 
+      setIsProcessing(false); // Ensure processing is set to false
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalVisibilityChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        if (!open) { // If dialog is being closed
+            resetLocalStateAndClose();
+        } else { // If dialog is being opened
+            setPaymentStep("form"); // Ensure it always opens to the form
+            setIsProcessing(false); // Ensure processing is reset
+            // Other fields are reset by useEffect or if a new paper is passed
+        }
+        onOpenChange(open); // Propagate open state change
+    }}>
       <DialogContent className="sm:max-w-md">
-        {!paper && isOpen ? (
+        {!paper && isOpen ? ( // Check isOpen to avoid rendering if modal is closed but paper is briefly null
            <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
             <LoadingSpinner size={32} />
             <p className="mt-3 text-muted-foreground">Loading paper details...</p>
@@ -162,14 +194,14 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                   <div className="text-center text-sm text-muted-foreground my-2">OR</div>
                   <div className="flex flex-col items-center space-y-2">
                     <Label className="font-medium">Scan QR Code</Label>
-                    <div className="p-2 border rounded-md bg-muted inline-block">
+                    <div className="p-2 border rounded-md bg-white inline-block"> {/* Changed bg-muted to bg-white for QR visibility */}
                        <Image 
-                        src="https://picsum.photos/seed/upi-qr-code/120/120" 
+                        src="https://placehold.co/120x120/000000/FFFFFF.png?text=SCAN+QR" // Placeholder QR
                         alt="Scan QR Code for UPI Payment" 
                         width={120} 
                         height={120} 
                         className="rounded"
-                        data-ai-hint="qr code" 
+                        data-ai-hint="qr code payment" // More specific hint
                       />
                     </div>
                      <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>
@@ -179,7 +211,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </div>
 
             <DialogFooter className="sm:justify-between gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => handleModalVisibilityChange(false)} disabled={isProcessing}>Cancel</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>Cancel</Button>
               <Button onClick={handlePayment} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentMethod === 'card' ? <CreditCard className="mr-2 h-4 w-4" /> : <AtSign className="mr-2 h-4 w-4" />)}
                 {isProcessing ? "Processing..." : `Pay $${SUBMISSION_FEE.toFixed(2)}`}
@@ -194,11 +226,11 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </div>
               <DialogTitle className="text-2xl font-bold text-center">Payment Successful!</DialogTitle>
               <DialogDescription className="text-center px-4">
-                Your paper &quot;{paper.title}&quot; has been officially submitted. You can track its status on your dashboard.
+                Your paper &quot;{paper.title}&quot; has been successfully processed. You can track its status on your dashboard.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-2">
-              <Button onClick={() => handleModalVisibilityChange(false)} className="w-full">Close</Button>
+              <Button onClick={() => onOpenChange(false)} className="w-full">Close</Button>
             </DialogFooter>
           </>
         ) : null}
@@ -206,4 +238,3 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     </Dialog>
   );
 }
-

@@ -10,33 +10,25 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 import type { Paper } from '@/types';
-import { UploadCloud, Loader2, AlertTriangle } from 'lucide-react';
+import { UploadCloud, Loader2, AlertTriangle, DollarSign, Clock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { addPaper } from '@/lib/paper-service'; // New service
 
 const paperSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
   abstract: z.string().min(50, "Abstract must be at least 50 characters.").max(2000, "Abstract must be less than 2000 characters."),
   authors: z.string().min(1, "At least one author is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
-  file: z.any() // Use z.any() and refine on client
-    .refine(files => {
-      // This validation runs on the client.
-      // Ensure 'files' is a FileList and has at least one file.
-      if (typeof window === 'undefined') return true; // Allow server-side to pass
-      return files instanceof FileList && files.length > 0;
-    }, "A paper file is required.")
-    .refine(files => {
-      if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
-      return files[0].size <= 5 * 1024 * 1024; // 5MB
-    }, "File size must be less than 5MB.")
-    .refine(files => {
-      if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
-      return ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type);
-    }, "Only PDF or DOCX files are allowed."),
+  file: z.any()
+    .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0), "A paper file is required.")
+    .refine(files => typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0 || files[0].size <= 5 * 1024 * 1024, "File size must be less than 5MB.")
+    .refine(files => typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0 || ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type), "Only PDF or DOCX files are allowed."),
+  paymentOption: z.enum(["payNow", "payLater"], { required_error: "Please select a payment option." }),
 });
 
 type PaperFormValues = z.infer<typeof paperSchema>;
@@ -56,6 +48,7 @@ export default function PaperUploadForm() {
       authors: [],
       keywords: [],
       file: undefined,
+      paymentOption: "payLater", // Default to payLater
     },
   });
 
@@ -78,42 +71,52 @@ export default function PaperUploadForm() {
     setFormError(null);
 
     try {
-      // data.file is a FileList here due to Zod validation and RHF handling on the client
       const fileToUpload = (data.file as FileList)[0];
-
       if (!fileToUpload) { 
         throw new Error("File not available for submission.");
       }
 
-      const newPaperId = Date.now().toString(); 
+      // In a real app, upload fileToUpload to Firebase Storage here and get fileUrl
+      // For now, we'll just use fileName.
+      const mockFileUrl = `/uploads/mock/${fileToUpload.name}`; // Placeholder
 
-      const newPaper: Paper = {
-        id: newPaperId,
+      let paymentDueDate: string | null = null;
+      if (data.paymentOption === "payLater") {
+        const dueDate = new Date();
+        dueDate.setHours(dueDate.getHours() + 2);
+        paymentDueDate = dueDate.toISOString();
+      }
+
+      const newPaperData: Omit<Paper, 'id' | 'uploadDate'> = {
         userId: user.id,
         title: data.title,
         abstract: data.abstract,
         authors: data.authors,
         keywords: data.keywords,
         fileName: fileToUpload.name,
-        uploadDate: new Date().toISOString(),
-        status: "Submitted", 
-        plagiarismScore: null, 
+        fileUrl: mockFileUrl, // Replace with actual URL from Firebase Storage
+        status: data.paymentOption === "payLater" ? "Payment Pending" : "Submitted", // Or "Payment Pending" if payNow needs immediate payment step
+        paymentOption: data.paymentOption,
+        paymentDueDate: paymentDueDate,
+        submissionDate: data.paymentOption === "payNow" ? new Date().toISOString() : null, // Set if "Pay Now" and payment is immediate
+        // AI fields initialized to null
+        plagiarismScore: null,
         plagiarismReport: null,
         acceptanceProbability: null,
         acceptanceReport: null,
+        paidAt: null,
       };
       
-      localStorage.setItem(`newPaperTitle-${newPaperId}`, newPaper.title);
-      localStorage.setItem(`newPaperAbstract-${newPaperId}`, newPaper.abstract);
-      localStorage.setItem(`newPaperFileName-${newPaperId}`, newPaper.fileName || 'unknown.pdf');
-
-      // console.log("Submitting paper:", newPaper); // Removed mock message
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      const newPaperId = await addPaper(newPaperData);
       
       toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been uploaded.` });
       form.reset();
       
-      router.push(`/papers/${newPaperId}`);
+      if (data.paymentOption === "payNow") {
+        router.push(`/papers/${newPaperId}?action=pay`);
+      } else {
+        router.push(`/papers/${newPaperId}`);
+      }
 
     } catch (error) {
       console.error("Submission error:", error);
@@ -130,7 +133,7 @@ export default function PaperUploadForm() {
       <Card className="w-full max-w-2xl mx-auto shadow-xl my-8">
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl">Submit Your Research Paper</CardTitle>
-          <CardDescription>Fill in the details below and upload your paper (PDF or DOCX, max 5MB).</CardDescription>
+          <CardDescription>Fill in the details below, upload your paper, and choose a payment option.</CardDescription>
         </CardHeader>
         <form onSubmit={form.handleSubmit(onFormSubmit)}>
           <CardContent className="space-y-6">
@@ -194,6 +197,31 @@ export default function PaperUploadForm() {
               </div>
               {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{form.formState.errors.file.message as string}</p>}
             </div>
+
+            <div>
+              <Label>Payment Option</Label>
+              <RadioGroup
+                defaultValue="payLater"
+                onValueChange={(value) => form.setValue("paymentOption", value as "payNow" | "payLater")}
+                className="mt-2 space-y-2"
+                disabled={isSubmitting}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="payNow" id="payNow" />
+                  <Label htmlFor="payNow" className="font-normal flex items-center">
+                    <DollarSign className="mr-2 h-4 w-4 text-green-600" /> Pay Now ($50.00 Submission Fee)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="payLater" id="payLater" />
+                  <Label htmlFor="payLater" className="font-normal flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-orange-500" /> Pay Later (Within 2 hours)
+                  </Label>
+                </div>
+              </RadioGroup>
+              {form.formState.errors.paymentOption && <p className="text-sm text-destructive mt-1">{form.formState.errors.paymentOption.message}</p>}
+            </div>
+
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={isSubmitting}>

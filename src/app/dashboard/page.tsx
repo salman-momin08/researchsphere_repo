@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { getMockPapersByUserId, allMockPapers } from "@/lib/mock-data"; // Import new function and all papers
+import { getUserPapers, getAllPapers } from "@/lib/paper-service"; // Import Firestore service
 
 function DashboardContent() {
   const { user } = useAuth();
@@ -19,19 +19,30 @@ function DashboardContent() {
   const [isLoadingPapers, setIsLoadingPapers] = useState(true);
 
   useEffect(() => {
-    // Simulate fetching user's papers
     if (user) {
       setIsLoadingPapers(true);
-      setTimeout(() => {
-        const userPapers = user.isAdmin ? allMockPapers : getMockPapersByUserId(user.id);
-        setPapers(userPapers);
-        setIsLoadingPapers(false);
-      }, 1000);
+      const fetchPapers = async () => {
+        try {
+          let fetchedPapers: Paper[];
+          if (user.isAdmin) {
+            fetchedPapers = await getAllPapers();
+          } else {
+            fetchedPapers = await getUserPapers(user.id);
+          }
+          setPapers(fetchedPapers);
+        } catch (error) {
+          console.error("Failed to fetch papers:", error);
+          // Optionally, set an error state here to show in UI
+        } finally {
+          setIsLoadingPapers(false);
+        }
+      };
+      fetchPapers();
     }
   }, [user]);
 
   if (isLoadingPapers) {
-    return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/></div>;
+    return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading papers...</p></div>;
   }
 
   return (
@@ -45,7 +56,7 @@ function DashboardContent() {
         </Link>
       </div>
 
-      {papers.length === 0 && !user?.isAdmin ? ( // Only show "No papers submitted" if not admin or admin has no papers
+      {papers.length === 0 && !user?.isAdmin ? (
         <Alert className="bg-secondary">
           <FileText className="h-4 w-4" />
           <AlertTitle>No Papers Submitted Yet</AlertTitle>

@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   email: string | null;
@@ -22,6 +23,7 @@ export type PaperStatus =
   | "Accepted"
   | "Rejected"
   | "Payment Pending"
+  | "Payment Overdue" // New status for client-side display
   | "Published";
 
 export interface Paper {
@@ -44,6 +46,8 @@ export interface Paper {
     reasoning: string;
   } | null;
   adminFeedback?: string | null;
-  submissionDate?: string | null; // ISO date string, after payment
+  submissionDate?: string | null; // ISO date string, after payment or if "Pay Now"
+  paymentDueDate?: string | null; // ISO date string, for "Pay Later"
+  paymentOption?: "payNow" | "payLater" | null;
+  paidAt?: string | null; // ISO date string, when payment was made
 }
-

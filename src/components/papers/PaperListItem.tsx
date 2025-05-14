@@ -1,28 +1,45 @@
+
 "use client";
 
-import type { Paper } from '@/types';
+import type { Paper, PaperStatus } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Eye, Edit3, Trash2, DollarSign, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React from 'react'; // Import React for React.memo
+import React, { useEffect, useState } from 'react'; // Import React for React.memo
+import CountdownTimer from '../shared/CountdownTimer';
 
 interface PaperListItemProps {
   paper: Paper;
-  onDelete?: (paperId: string) => void; // Optional: if delete functionality is added
+  onDelete?: (paperId: string) => void;
 }
 
 const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
   const router = useRouter();
+  const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
 
-  const getStatusBadgeVariant = (status: Paper['status']) => {
+  useEffect(() => {
+    if (paper.status === "Payment Pending" && paper.paymentDueDate) {
+      if (new Date() > new Date(paper.paymentDueDate)) {
+        setDisplayStatus("Payment Overdue");
+      } else {
+        setDisplayStatus(paper.status); // Reset if not overdue (e.g. date changed)
+      }
+    } else {
+      setDisplayStatus(paper.status);
+    }
+  }, [paper.status, paper.paymentDueDate]);
+
+
+  const getStatusBadgeVariant = (status: PaperStatus) => {
     switch (status) {
       case 'Accepted':
       case 'Published':
         return 'default'; 
       case 'Rejected':
+      case 'Payment Overdue':
         return 'destructive';
       case 'Under Review':
       case 'Submitted':
@@ -35,17 +52,18 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
     }
   };
 
-  const getStatusIcon = (status: Paper['status']) => {
+  const getStatusIcon = (status: PaperStatus) => {
     switch (status) {
       case 'Accepted':
       case 'Published':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'Rejected':
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      case 'Payment Overdue':
+        return <AlertCircle className="h-4 w-4 text-destructive" />;
       case 'Payment Pending':
-        return <DollarSign className="h-4 w-4 text-yellow-600" />;
+        return <DollarSign className="h-4 w-4 text-orange-500" />;
       case 'Action Required':
-        return <AlertCircle className="h-4 w-4 text-orange-500" />;
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />; // Changed from orange for variety
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
@@ -71,9 +89,16 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
           {paper.abstract}
         </p>
         <div className="flex items-center space-x-2">
-          {getStatusIcon(paper.status)}
-          <Badge variant={getStatusBadgeVariant(paper.status)}>{paper.status}</Badge>
+          {getStatusIcon(displayStatus)}
+          <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
         </div>
+        
+        {displayStatus === 'Payment Pending' && paper.paymentDueDate && (
+          <div className="text-xs text-orange-600 flex items-center">
+            <Clock className="h-3 w-3 mr-1" />
+            <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" />
+          </div>
+        )}
         
         {(paper.plagiarismScore !== null && paper.plagiarismScore !== undefined) && (
           <p className="text-xs text-muted-foreground">Plagiarism: {(paper.plagiarismScore * 100).toFixed(1)}%</p>
@@ -84,19 +109,19 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
 
       </CardContent>
       <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row justify-end gap-2">
-        {paper.status === 'Payment Pending' && (
+        {displayStatus === 'Payment Pending' && (
           <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto">
-            <DollarSign className="mr-2 h-4 w-4" /> Pay
+            <DollarSign className="mr-2 h-4 w-4" /> Pay Now
           </Button>
         )}
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
-          <Eye className="mr-2 h-4 w-4" /> View
+          <Eye className="mr-2 h-4 w-4" /> View Details
         </Button>
       </CardFooter>
     </Card>
   );
 });
 
-PaperListItem.displayName = 'PaperListItem'; // Adding display name for the memoized component
+PaperListItem.displayName = 'PaperListItem';
 
 export default PaperListItem;
