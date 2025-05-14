@@ -21,7 +21,7 @@ const profileUpdateSchema = z.object({
   username: z.string()
     .min(4, { message: "Username must be 4-20 characters." })
     .max(20, { message: "Username must be 4-20 characters." })
-    .regex(/^[a-zA-Z0-9]+$/, { message: "Username must be alphanumeric." }),
+    .regex(/^[a-zA-Z0-9_]+$/, { message: "Username can only contain letters, numbers, and underscores." }),
   role: z.enum(["Author", "Reviewer"], { required_error: "Please select a role." }),
   phoneNumber: z.string().optional().or(z.literal("")).refine(val => !val || /^\+?\d[\d-]{7,14}$/.test(val), {
     message: "Invalid phone number format (e.g., +1-1234567890).",
@@ -77,14 +77,12 @@ export default function ProfileUpdateForm() {
     setSuccessMessage(null);
 
     try {
-      await updateUserProfile(data); // Pass all form data
+      await updateUserProfile(data); 
       setSuccessMessage("Profile updated successfully!");
       toast({ title: "Success", description: "Your profile has been updated." });
       
-      // If was completing profile and now it's complete (username and role are set), redirect.
       if (isCompletingProfile && data.username && data.role) {
-        localStorage.removeItem('profileIncomplete'); // Ensure flag is cleared
-        // Short delay to allow toast to be seen before redirect
+        localStorage.removeItem('profileIncomplete');
         setTimeout(() => router.push('/dashboard'), 1000); 
       }
 
@@ -97,7 +95,7 @@ export default function ProfileUpdateForm() {
     }
   };
 
-  if (authLoading && !user) { // Show loading only if user data isn't available yet
+  if (authLoading && !user) {
     return <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
@@ -130,7 +128,7 @@ export default function ProfileUpdateForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {successMessage && !isCompletingProfile && ( // Don't show generic success if completing, completion has its own flow
+      {successMessage && !isCompletingProfile && (
         <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
             <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
             <AlertTitle>Success!</AlertTitle>
@@ -164,7 +162,7 @@ export default function ProfileUpdateForm() {
       </div>
       
       <div>
-        <Label htmlFor="username">Username *</Label>
+        <Label htmlFor="username">Username * (letters, numbers, and underscores only)</Label>
         <Input 
             id="username" 
             {...form.register("username")} 

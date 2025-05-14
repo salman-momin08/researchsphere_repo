@@ -3,52 +3,78 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the requesting user is an admin
     function isAdmin() {
       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
+    function isUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isPaperOwner(paper) {
+      return request.auth != null && paper.userId == request.auth.uid;
+    }
+
     // Users Collection
     match /users/{userId} {
-      // Authenticated users can read their own profile
-      allow get: if request.auth != null && request.auth.uid == userId;
-      // Authenticated users can create their own profile (on signup)
-      // Ensure userId in the document matches the authenticated user
-      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.userId == request.auth.uid;
-      // Authenticated users can update their own profile (specific fields, cannot make themselves admin)
-      allow update: if request.auth != null && request.auth.uid == userId && !(request.resource.data.isAdmin is bool);
+      // 1. Authenticated users can read their own profile.
+      allow get: if isUser(userId);
 
-      // Admins can read any user profile (for admin panel, etc.)
-      allow list: if isAdmin(); // Admins can list all users
+      // 2. Authenticated users can create their own profile (on signup).
+      //    Ensure they are setting their own userId and not trying to set isAdmin.
+      allow create: if isUser(userId) &&
+                       request.resource.data.userId == request.auth.uid &&
+                       !(request.resource.data.isAdmin is bool); // Prevent setting isAdmin on create
+
+      // 3. Authenticated users can update their own profile.
+      //    Prevent users from updating their own isAdmin status or userId.
+      allow update: if isUser(userId) &&
+                       !(request.resource.data.isAdmin is bool) &&
+                       request.resource.data.userId == resource.data.userId && // Cannot change userId
+                       request.resource.data.email == resource.data.email; // Email shouldn't be changed here
+
+      // 4. Admins can read any user profile.
+      allow get, list: if isAdmin(); // Changed from just get to get, list for admin view
+
+      // 5. Authenticated users can list users for uniqueness checks (e.g. username, phone)
+      // This is a broad permission for query, but client queries should be specific.
+      allow list: if request.auth != null;
     }
 
     // Papers Collection
     match /papers/{paperId} {
-
-      // Helper function to check if the requesting user is the owner of the paper
-      function isPaperOwner() {
-        return request.auth != null && request.auth.uid == resource.data.userId;
-      }
-
-      // 1. Owner-based access for their own papers (any status)
-      // This rule allows owners to read (get, list), update, and delete their own papers.
-      // For 'list', this works because the client-side query for a user's papers will be
-      // filtered by 'userId', so every document considered by this rule during a list operation
-      // will satisfy 'resource.data.userId == request.auth.uid'.
-      allow get, list, update, delete: if isPaperOwner();
-
-      // Owners can create papers for themselves.
+      // 1. Authenticated users can create papers for themselves.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
-      // 2. Admin access to any paper
-      // Admins can perform any operation (read, write) on any paper.
-      allow read, write: if isAdmin(); // 'read' covers get, list. 'write' covers create, update, delete.
+      // 2. Owner or Admin can read a paper.
+      allow get: if request.auth != null && (isPaperOwner(resource.data) || isAdmin());
 
-      // 3. Authenticated users can read (get, list) PUBLISHED papers (for search functionality)
-      // This rule allows any authenticated user to read papers whose status is 'Published'.
-      // For 'list', this means that if this rule is the one granting permission,
-      // all documents returned by the query must have status == 'Published'.
-      // This is suitable for the search page which explicitly queries for published papers.
+      // 3. Authenticated users can list their own papers.
+      //    The client query must include `where('userId', '==', request.auth.uid)`.
+      allow list: if request.auth != null && request.query.resource.data.userId == request.auth.uid;
+
+      // 4. Owner or Admin can update a paper.
+      allow update: if request.auth != null && (isPaperOwner(resource.data) || isAdmin());
+
+      // 5. Owner or Admin can delete a paper (if you implement delete functionality).
+      // allow delete: if request.auth != null && (isPaperOwner(resource.data) || isAdmin());
+
+      // 6. Admins can list all papers.
+      //    The client query for admins does not need to filter by userId.
+      allow list: if isAdmin();
+
+      // 7. Any authenticated user can read (list or get) papers that are 'Published'.
+      //    This allows the public search functionality for published papers.
+      //    This rule needs to be more specific if it conflicts with owner/admin list rules.
+      //    Combining with other list rules:
+      //    For listing:
+      //    - if user is admin, allow.
+      //    - if query filters by user's own id, allow.
+      //    - if query filters by status == 'Published', allow.
+      //    This can be complex to write in a single list rule.
+      //    The current structure prioritizes admin listing all, then user listing their own.
+      //    The search functionality will rely on client-side filtering after fetching published papers by an admin or a more permissive read.
+      //    To simplify, this specific rule below might be better if search fetches based on status.
       allow get, list: if request.auth != null && resource.data.status == 'Published';
     }
   }
