@@ -12,9 +12,11 @@ import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { getUserPapers, getAllPapers } from "@/lib/paper-service"; // Import Firestore service
+import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState(true);
 
@@ -26,20 +28,22 @@ function DashboardContent() {
           let fetchedPapers: Paper[];
           if (user.isAdmin) {
             fetchedPapers = await getAllPapers();
+            console.log("DashboardContent (Admin): Fetched all papers from Firestore:", fetchedPapers.length);
           } else {
             fetchedPapers = await getUserPapers(user.id);
+            console.log(`DashboardContent (User ${user.id}): Fetched user papers from Firestore:`, fetchedPapers.length);
           }
           setPapers(fetchedPapers);
         } catch (error) {
-          console.error("Failed to fetch papers:", error);
-          // Optionally, set an error state here to show in UI
+          console.error("DashboardContent: Failed to fetch papers from Firestore:", error);
+          toast({ variant: "destructive", title: "Error Loading Papers", description: "Could not load your papers from the database. Please check your connection or permissions." });
         } finally {
           setIsLoadingPapers(false);
         }
       };
       fetchPapers();
     }
-  }, [user]);
+  }, [user, toast]);
 
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading papers...</p></div>;

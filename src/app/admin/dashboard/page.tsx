@@ -34,7 +34,7 @@ function AdminDashboardContent() {
       setIsLoadingPapers(true);
       try {
         const fetchedPapers = await getAllPapers();
-        console.log("AdminDashboard: Fetched papers from Firestore:", fetchedPapers.length);
+        console.log("AdminDashboard: Fetched all papers from Firestore:", fetchedPapers.length);
         
         // Client-side check for overdue payments
         const now = new Date();
@@ -56,8 +56,8 @@ function AdminDashboardContent() {
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
 
       } catch (error) {
-        console.error("AdminDashboard: Error fetching papers:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load papers." });
+        console.error("AdminDashboard: Error fetching papers from Firestore:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load papers from the database." });
       } finally {
         setIsLoadingPapers(false);
       }
@@ -99,7 +99,6 @@ function AdminDashboardContent() {
   }
 
   if (user && !isAdmin) {
-     // console.log from AuthContext will show if isAdmin is false from Firestore
     return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-md mx-auto">
