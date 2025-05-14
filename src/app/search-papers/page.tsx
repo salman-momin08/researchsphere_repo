@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react'; // Changed ExternalLink to Eye
+import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper } from '@/types';
 import { getPublishedPapers } from '@/lib/paper-service'; 
@@ -42,11 +42,10 @@ function SearchPapersContent() {
 
     try {
       const publishedPapers = await getPublishedPapers();
-      // This console.log is helpful for verifying data fetching during development
       // console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
 
       // Client-side filtering for author name (case-insensitive, partial match)
-      // This logic already handles multiple authors correctly.
+      // This correctly handles multiple authors.
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
@@ -64,35 +63,17 @@ function SearchPapersContent() {
     }
   };
 
-  const triggerTextFileDownload = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadOriginalMock = (paper: Paper) => {
-    const fileContent = `
-Paper Title: ${paper.title}
-Authors: ${paper.authors.join(', ')}
-Abstract: ${paper.abstract}
-Keywords: ${paper.keywords.join(', ')}
-Status: ${paper.status}
-Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
-File Name: ${paper.fileName || 'N/A'}
-Mock File URL: ${paper.fileUrl || 'N/A'}
-
-This is a downloaded text file representing the paper from ResearchSphere.
-In a real application, this button would initiate a download of the actual paper document (${paper.fileName}).
-    `;
-    const safeTitle = paper.title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_');
-    triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Paper_Details.txt`);
-    toast({ title: "Mock Download Started", description: `A text summary for "${paper.title}" is being downloaded.` });
+  const handleDownloadOriginal = (paper: Paper) => {
+    if (paper.fileUrl) {
+      window.open(paper.fileUrl, '_blank');
+      toast({ title: "Opening File", description: `Attempting to open ${paper.fileName || 'the paper'}. Check your browser for download or new tab.` });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "File Not Available",
+            description: "The URL for this paper file is missing or the file was not processed.",
+        });
+    }
   };
   
   const getStatusBadgeVariant = (status: Paper['status']) => {
@@ -177,7 +158,7 @@ In a real application, this button would initiate a download of the actual paper
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalMock(paper)} title="Download Original (Mock)">
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File">
                           <Download className="h-4 w-4" />
                         </Button>
                       </TableCell>

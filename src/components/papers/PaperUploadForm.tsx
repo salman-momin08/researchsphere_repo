@@ -18,7 +18,7 @@ import type { Paper, PaperStatus } from '@/types';
 import { UploadCloud, Loader2, AlertTriangle, DollarSign, Clock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addPaper } from '@/lib/paper-service';
-import PaymentModal from '@/components/payment/PaymentModal'; // Import PaymentModal
+import PaymentModal from '@/components/payment/PaymentModal';
 
 const paperSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
@@ -49,8 +49,8 @@ export default function PaperUploadForm() {
     defaultValues: {
       title: "",
       abstract: "",
-      authors: [],
-      keywords: [],
+      authors: [], // Will be a string from input, transformed by Zod
+      keywords: [], // Will be a string from input, transformed by Zod
       file: undefined,
       paymentOption: "payLater",
     },
@@ -71,8 +71,7 @@ export default function PaperUploadForm() {
       setIsSubmitting(false);
       return;
     }
-    // isSubmitting state will be managed by the caller for "Pay Now" flow
-    // For "Pay Later", it's set here
+    
     if (initialStatus === "Payment Pending") {
         setIsSubmitting(true);
     }
@@ -80,9 +79,7 @@ export default function PaperUploadForm() {
 
     try {
       const fileToUpload = (data.file as FileList)[0];
-      // In a real app, upload fileToUpload to Firebase Storage here and get fileUrl
-      const mockFileUrl = `/uploads/mock/${fileToUpload.name}`;
-
+      
       let paymentDueDate: string | null = null;
       if (initialStatus === "Payment Pending") {
         const dueDate = new Date();
@@ -90,14 +87,14 @@ export default function PaperUploadForm() {
         paymentDueDate = dueDate.toISOString();
       }
 
-      const newPaperData: Omit<Paper, 'id' | 'uploadDate'> = {
-        userId: user.id,
+      // Prepare paper data for Firestore, excluding id, uploadDate, fileUrl, fileName
+      // These will be handled by the addPaper service function or Firestore itself.
+      const newPaperFirestoreData: Omit<Paper, 'id' | 'uploadDate' | 'fileUrl' | 'fileName'> = {
+        userId: user.id, // This is crucial and should come from the authenticated user
         title: data.title,
         abstract: data.abstract,
-        authors: data.authors,
-        keywords: data.keywords,
-        fileName: fileToUpload.name,
-        fileUrl: mockFileUrl,
+        authors: data.authors, // Zod already transformed this to string[]
+        keywords: data.keywords, // Zod already transformed this to string[]
         status: initialStatus,
         paymentOption: data.paymentOption,
         paymentDueDate: paymentDueDate,
@@ -109,15 +106,16 @@ export default function PaperUploadForm() {
         paidAt: paidAt || null,
       };
       
-      const newPaperId = await addPaper(newPaperData);
+      // Call addPaper with the paper data and the file object
+      const newPaperId = await addPaper(newPaperFirestoreData, fileToUpload, user.id);
       
       toast({ title: "Paper Submitted Successfully!", description: `${data.title} has been processed.` });
       form.reset();
-      setFileName(null); // Clear file name display
+      setFileName(null);
       
-      if (paidAt) { // Successfully paid via "Pay Now"
+      if (paidAt) { 
         router.push('/dashboard'); 
-      } else { // "Pay Later"
+      } else { 
         router.push(`/papers/${newPaperId}`);
       }
 
@@ -127,38 +125,34 @@ export default function PaperUploadForm() {
       setFormError(errorMessage);
       toast({ variant: "destructive", title: "Submission Failed", description: errorMessage });
     } finally {
-      if (initialStatus === "Payment Pending" || paidAt) { // Reset for both cases after completion
+      if (initialStatus === "Payment Pending" || paidAt) {
         setIsSubmitting(false);
       }
     }
   };
   
   const onFormSubmit = async (data: PaperFormValues) => {
-    setIsSubmitting(true); // Set submitting true at the start of form submit action
+    setIsSubmitting(true); 
     if (data.paymentOption === "payNow") {
       setFormDataForSubmission(data);
       setShowPayNowModal(true);
-      // setIsSubmitting will be reset by handleSuccessfulPayNowPayment or modal close
     } else {
-      // For "payLater", directly proceed to submission with "Payment Pending" status
       await proceedWithSubmission(data, "Payment Pending");
-      // setIsSubmitting is handled within proceedWithSubmission for this path
     }
   };
 
   const handleSuccessfulPayNowPayment = async () => {
     if (formDataForSubmission) {
-      // isSubmitting is already true from onFormSubmit
       await proceedWithSubmission(formDataForSubmission, "Submitted", new Date().toISOString());
     }
     setShowPayNowModal(false);
     setFormDataForSubmission(null);
-    setIsSubmitting(false); // Reset submitting state after "Pay Now" flow is complete
+    setIsSubmitting(false); 
   };
 
   const handlePayNowModalClose = () => {
     setShowPayNowModal(false);
-    setIsSubmitting(false); // Reset submitting if modal is closed without payment
+    setIsSubmitting(false); 
     setFormDataForSubmission(null);
   }
 
@@ -265,7 +259,7 @@ export default function PaperUploadForm() {
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
               ) : (
                 <><UploadCloud className="mr-2 h-4 w-4" /> 
-                 {form.getValues("paymentOption") === "payNow" ? "Proceed to Payment" : "Submit Paper & Pay Later"}
+                 {form.getValues("paymentOption") === "payNow" ? "Proceed to Payment & Submit" : "Submit Paper & Pay Later"}
                 </>
               )}
             </Button>
@@ -273,14 +267,16 @@ export default function PaperUploadForm() {
         </form>
       </Card>
 
-      <PaymentModal 
-        isOpen={showPayNowModal} 
-        onOpenChange={handlePayNowModalClose} // Use specific close handler
-        paper={null} 
-        onPaymentSuccess={handleSuccessfulPayNowPayment} 
-      />
+      {user && formDataForSubmission && ( // Ensure user and formDataForSubmission are available for the modal
+        <PaymentModal 
+            isOpen={showPayNowModal} 
+            onOpenChange={handlePayNowModalClose}
+            // Pass a minimal paper object or null. The modal might not need full paper details for "Pay Now" from form.
+            // Or, pass only relevant info like title if the modal displays it.
+            paper={ { title: formDataForSubmission.title } as Paper /* Cast if needed, or adjust modal */ }
+            onPaymentSuccess={handleSuccessfulPayNowPayment} 
+        />
+      )}
     </>
   );
 }
-
-    

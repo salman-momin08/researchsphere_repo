@@ -77,36 +77,12 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
     }
   }
 
-  const triggerTextFileDownload = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadOriginalMock = () => {
+  const handleDownloadOriginal = () => {
     if (paper.fileUrl) {
-        const fileContent = `
-Paper Title: ${paper.title}
-Authors: ${paper.authors.join(', ')}
-Abstract: ${paper.abstract}
-Keywords: ${paper.keywords.join(', ')}
-Status: ${paper.status}
-Upload Date: ${new Date(paper.uploadDate).toLocaleDateString()}
-File Name: ${paper.fileName || 'N/A'}
-Original File URL (for reference): ${paper.fileUrl}
-
-This is a mock text file representing the paper "${paper.title}".
-In a real application, this button would initiate a download of the actual paper document (${paper.fileName}).
-        `;
-        const safeTitle = paper.title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_');
-        triggerTextFileDownload(fileContent.trim(), `${safeTitle}_Paper_Details.txt`);
-        toast({ title: "Mock Download Started", description: `A text summary for "${paper.title}" is being downloaded.` });
+      // For Firebase Storage URLs, this will open/download the file.
+      // For old mock URLs, it would try to open them (likely fail or show text).
+      window.open(paper.fileUrl, '_blank');
+      toast({ title: "Opening File", description: `Attempting to open ${paper.fileName || 'the paper'}. Check your browser for download or new tab.` });
     } else {
         toast({
             variant: "destructive",
@@ -157,8 +133,8 @@ In a real application, this button would initiate a download of the actual paper
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
           <Eye className="mr-2 h-4 w-4" /> View Details
         </Button>
-        <Button variant="outline" size="sm" onClick={handleDownloadOriginalMock} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> Download Original (Mock)
+        <Button variant="outline" size="sm" onClick={handleDownloadOriginal} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> Download Original File
         </Button>
       </CardFooter>
     </Card>
