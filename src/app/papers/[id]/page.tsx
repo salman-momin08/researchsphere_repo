@@ -69,7 +69,7 @@ function PaperDetailsContent() {
                 };
                 // Add to the main mock data store if not already present
                 if (!allMockPapers.find(p => p.id === foundPaper!.id)) {
-                    allMockPapers.push(foundPaper!); // This mutates the imported array, careful in real apps
+                    allMockPapers.push(foundPaper!); // This mutates the imported array
                 }
                 localStorage.removeItem(`newPaperTitle-${params.id}`);
                 localStorage.removeItem(`newPaperAbstract-${params.id}`);
@@ -101,7 +101,7 @@ function PaperDetailsContent() {
 
   const handlePaymentSuccess = (paperId: string) => {
     setCurrentPaper(prev => prev ? { ...prev, status: 'Submitted', submissionDate: new Date().toISOString() } : null);
-    const paperIndex = allMockPapers.findIndex(p => p.id === paperId); // Use allMockPapers
+    const paperIndex = allMockPapers.findIndex(p => p.id === paperId); 
     if (paperIndex !== -1) {
       allMockPapers[paperIndex].status = 'Submitted';
       allMockPapers[paperIndex].submissionDate = new Date().toISOString();
@@ -115,7 +115,7 @@ function PaperDetailsContent() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText, status: "Action Required" } : null);
-    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
+    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); 
     if (paperIndex !== -1) {
       allMockPapers[paperIndex].adminFeedback = adminFeedbackText;
       allMockPapers[paperIndex].status = "Action Required";
@@ -128,7 +128,7 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin) return;
     await new Promise(resolve => setTimeout(resolve, 500));
     setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
-    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
+    const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); 
     if (paperIndex !== -1) {
       allMockPapers[paperIndex].status = newStatus;
     }
@@ -149,7 +149,7 @@ function PaperDetailsContent() {
         plagiarismReport: { highlightedSections: result.highlightedSections }
       } : null);
       
-      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
+      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); 
       if (paperIndex !== -1) {
         allMockPapers[paperIndex].plagiarismScore = result.plagiarismScore;
         allMockPapers[paperIndex].plagiarismReport = { highlightedSections: result.highlightedSections };
@@ -177,7 +177,7 @@ function PaperDetailsContent() {
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
 
-      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); // Use allMockPapers
+      const paperIndex = allMockPapers.findIndex(p => p.id === currentPaper.id); 
       if (paperIndex !== -1) {
         allMockPapers[paperIndex].acceptanceProbability = result.probabilityScore;
         allMockPapers[paperIndex].acceptanceReport = { reasoning: result.reasoning };
