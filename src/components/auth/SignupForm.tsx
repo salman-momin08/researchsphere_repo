@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -29,12 +30,12 @@ const signupSchema = z.object({
   username: z.string()
     .min(4, { message: "Username must be 4-20 characters." })
     .max(20, { message: "Username must be 4-20 characters." })
-    .regex(/^[a-zA-Z0-9]+$/, { message: "Username must be alphanumeric." }),
+    .regex(/^[a-zA-Z0-9_]+$/, { message: "Username must be alphanumeric or include underscores." }),
   email: z.string().email({ message: "Invalid email address." }),
   confirmEmail: z.string().email({ message: "Invalid email address." }),
   password: z.string()
     .min(8, { message: "Password must be at least 8 characters." })
-    .regex(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/, { message: "Password must include letters and numbers." }),
+    .regex(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/, { message: "Password must include at least one letter, one number, and can contain special characters." }),
   confirmPassword: z.string(),
   phoneNumber: z.string().optional().or(z.literal("")).refine(val => !val || /^\+?\d[\d-]{7,14}$/.test(val), {
     message: "Invalid phone number format (e.g., +1-1234567890).",
