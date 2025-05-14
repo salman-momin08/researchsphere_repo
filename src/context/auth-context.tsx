@@ -27,6 +27,9 @@ import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 
+// Define the special email for initial admin creation
+const ADMIN_CREATOR_EMAIL = 'admin-creator@researchsphere.com';
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -67,7 +70,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
-      console.log("onAuthStateChanged triggered. Firebase user:", firebaseUser ? firebaseUser.uid : 'null');
       if (firebaseUser) {
         try {
           const userDocRef = doc(db, "users", firebaseUser.uid);
@@ -76,21 +78,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userDocSnap.exists()) {
             const docData = userDocSnap.data();
-            console.log(`AuthContext: User doc found for ${firebaseUser.uid}. Raw Firestore data:`, JSON.parse(JSON.stringify(docData)));
-            console.log(`AuthContext: isAdmin field from Firestore for ${firebaseUser.uid}:`, docData.isAdmin, "(type: ", typeof docData.isAdmin, ")");
-
+            
             appUser = {
               id: userDocSnap.id,
               ...docData,
-              isAdmin: docData.isAdmin || false, // Explicitly default isAdmin
+              isAdmin: docData.isAdmin || false, 
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || docData.displayName,
               photoURL: firebaseUser.photoURL || docData.photoURL,
             } as User;
             
-            console.log(`AuthContext: Hydrated appUser for ${firebaseUser.uid}:`, JSON.parse(JSON.stringify(appUser)));
-
-
             let firestoreUpdates: Partial<User> = {};
             if (firebaseUser.displayName && firebaseUser.displayName !== docData.displayName) {
               firestoreUpdates.displayName = firebaseUser.displayName;
@@ -106,9 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               try {
                 await updateDoc(userDocRef, firestoreUpdates);
                 appUser = { ...appUser, ...firestoreUpdates };
-                 console.log(`AuthContext: Synced Firebase Auth profile to Firestore for ${firebaseUser.uid}. Updated appUser:`, JSON.parse(JSON.stringify(appUser)));
               } catch (updateError: any) {
-                console.error("Error syncing Firebase Auth profile to Firestore:", updateError);
                 let userMessage = "Could not sync your profile data. Some information might be outdated.";
                  if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied') || updateError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while syncing your profile. Some information might be outdated. Please check your internet connection or contact support.";
@@ -118,14 +113,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             
           } else {
-            console.log(`AuthContext: No user doc found for ${firebaseUser.uid}. Creating new one.`);
+             // This case should ideally not happen if signup/social login creates the doc.
+             // But if it does, create a basic profile.
+             const isInitialAdmin = firebaseUser.email === ADMIN_CREATOR_EMAIL;
              appUser = {
               id: firebaseUser.uid,
-              userId: firebaseUser.uid, // Make sure userId is set
+              userId: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName,
               photoURL: firebaseUser.photoURL,
-              isAdmin: false, // New users are not admins by default
+              isAdmin: isInitialAdmin, 
               username: null, 
               role: null, 
               phoneNumber: firebaseUser.phoneNumber || null,
@@ -134,9 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             };
             try {
                 await setDoc(userDocRef, appUser);
-                console.log(`AuthContext: Created new user document in Firestore for ${firebaseUser.uid}:`, JSON.parse(JSON.stringify(appUser)));
             } catch (dbError: any) {
-                console.error("Error creating user document in Firestore (onAuthStateChanged):", dbError);
                 let userMessage = "Could not initialize your profile. Please try again or contact support.";
                 if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while setting up your profile. Please check your internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
@@ -160,7 +155,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
 
         } catch (error: any) {
-            console.error("Error fetching/creating user document in Firestore onAuthStateChanged:", error);
             let userMessage = "Could not load your profile. Please try again or contact support.";
             if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
                 userMessage = "Permission denied while accessing your profile. Please check your internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
@@ -174,14 +168,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('profileIncomplete');
       }
       setLoading(false);
-      console.log("onAuthStateChanged finished. Loading set to false. Current app user:", user ? user.id : 'null', 'isAdmin:', user ? user.isAdmin : 'N/A');
     });
     return () => unsubscribe();
-  }, [router, pathname]); // user removed from dependency array to avoid re-running on setUser
+  }, [router, pathname]); 
 
 
   const handleSuccessfulLogin = (appUser: User) => {
-    console.log("handleSuccessfulLogin called for user:", appUser.id, "isAdmin:", appUser.isAdmin);
     const userWithDefaultAdmin = { ...appUser, isAdmin: appUser.isAdmin || false };
     setUser(userWithDefaultAdmin);
     setShowLoginModal(false);
@@ -207,9 +199,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(firebaseAuth, email, pass);
       // onAuthStateChanged will handle setting the user and further logic.
-      // Success is implicitly handled by onAuthStateChanged.
     } catch (error) {
-      console.error("Login error:", error);
       const firebaseError = error as { code?: string; message?: string };
       let errorMessage = "An unknown error occurred during login.";
       if (firebaseError.code) {
@@ -236,10 +226,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             errorMessage = firebaseError.message || errorMessage;
         }
       }
+      setLoading(false); // Ensure loading is reset on error
       throw new Error(errorMessage); 
-    } finally {
-        setLoading(false); 
-    }
+    } 
+    // setLoading(false) will be handled by onAuthStateChanged
   };
 
   const signup = async (data: SignupFormValues) => {
@@ -257,7 +247,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error("Username already exists. Please choose another one.");
         }
     } catch (queryError: any) {
-        console.error("Error checking username uniqueness:", queryError);
         let userMessage = "Could not verify username uniqueness. Please try again.";
         if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
             userMessage = "Permission denied while checking username. Please check your internet connection or contact support.";
@@ -271,7 +260,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
     } catch (authError: any) {
-      console.error("Firebase Auth Signup error:", authError);
       let errorMessage = "An unknown error occurred during signup with Firebase Auth.";
        if (authError.code) {
           switch (authError.code) {
@@ -307,12 +295,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         await updateFirebaseProfile(firebaseUser, { displayName: data.fullName });
     } catch (profileUpdateError) {
-        console.warn("Could not update Firebase Auth profile displayName during signup:", profileUpdateError);
+        // Non-critical, proceed with Firestore profile creation
     }
+
+    const isInitialAdmin = data.email === ADMIN_CREATOR_EMAIL;
 
     const newUserProfile: User = {
       id: firebaseUser.uid,
-      userId: firebaseUser.uid, // Ensure userId is set
+      userId: firebaseUser.uid,
       email: data.email,
       displayName: data.fullName, 
       username: data.username,
@@ -320,7 +310,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       institution: data.institution || null,
       role: data.role,
       researcherId: data.researcherId || null,
-      isAdmin: false, // New users are not admins
+      isAdmin: isInitialAdmin, // Set admin status based on the special email
       photoURL: firebaseUser.photoURL || null, 
     };
 
@@ -328,7 +318,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await setDoc(doc(db, "users", firebaseUser.uid), newUserProfile);
       // onAuthStateChanged will pick up the new user and call handleSuccessfulLogin
     } catch (firestoreError: any) {
-        console.error("Firestore profile creation error during signup:", firestoreError);
         let errorMessage = "An unknown error occurred while saving your profile.";
         if (firestoreError.code === 'permission-denied' || firestoreError.message?.includes('permission-denied') || firestoreError.message?.includes('Missing or insufficient permissions')) {
             errorMessage = "Could not save your profile due to a permission issue. Please ensure you are connected to the internet and try again. If the problem persists, please contact support.";
@@ -336,14 +325,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ variant: "destructive", title: "Profile Creation Error", description: errorMessage, duration: 9000 });
         try {
             if (firebaseUser) await firebaseUser.delete();
-            console.log("Firebase Auth user deleted due to Firestore profile creation failure.");
         } catch (deleteError) {
-            console.error("Failed to delete Firebase Auth user after Firestore error:", deleteError);
             errorMessage += " Additionally, an orphaned auth account might exist. Please contact support.";
         }
         setLoading(false);
         throw new Error(errorMessage);
     }
+    // setLoading(false) will be handled by onAuthStateChanged
   };
 
   const logout = async () => {
@@ -354,15 +342,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
         await signOut(firebaseAuth);
-        // onAuthStateChanged will set user to null and handle UI updates
         localStorage.removeItem('redirectAfterLogin');
         localStorage.removeItem('profileIncomplete');
         router.push('/');
     } catch (error) {
-        console.error("Error during logout:", error);
         toast({variant: "destructive", title: "Logout Failed", description: "Could not log out. Please try again."});
     } finally {
-        setLoading(false); 
+        // setLoading(false) will be handled by onAuthStateChanged
     }
   };
 
@@ -370,15 +356,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const firebaseUser = credential.user;
     const userDocRef = doc(db, "users", firebaseUser.uid);
     let appUser: User;
-    console.log(`processSocialLogin: Processing social login for ${firebaseUser.uid}`);
 
     try {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const docData = userDocSnap.data();
-          console.log(`processSocialLogin: User doc found for social login ${firebaseUser.uid}. Raw Firestore data:`, JSON.parse(JSON.stringify(docData)));
-          console.log(`processSocialLogin: isAdmin field from Firestore for social login ${firebaseUser.uid}:`, docData.isAdmin, "(type: ", typeof docData.isAdmin, ")");
-
+          
           appUser = { 
             id: userDocSnap.id, 
             ...docData, 
@@ -387,8 +370,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             displayName: firebaseUser.displayName || docData.displayName,
             photoURL: firebaseUser.photoURL || docData.photoURL,
           } as User;
-           console.log(`processSocialLogin: Hydrated existing appUser for social login ${firebaseUser.uid}:`, JSON.parse(JSON.stringify(appUser)));
-
+          
           let firestoreUpdates: Partial<User> = {};
           if (firebaseUser.displayName && firebaseUser.displayName !== docData.displayName) {
               firestoreUpdates.displayName = firebaseUser.displayName;
@@ -403,9 +385,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               try {
                   await updateDoc(userDocRef, firestoreUpdates);
                   appUser = { ...appUser, ...firestoreUpdates };
-                   console.log(`processSocialLogin: Synced social login profile to Firestore for ${firebaseUser.uid}. Updated appUser:`, JSON.parse(JSON.stringify(appUser)));
               } catch (updateError: any) {
-                  console.error("Error syncing social login profile to Firestore:", updateError);
                   let userMessage = "Could not sync your profile from social login. Some information might be outdated.";
                   if (updateError.code === 'permission-denied' || updateError.message?.includes('permission-denied') || updateError.message?.includes('Missing or insufficient permissions')) {
                     userMessage = "Permission denied while syncing your profile. Some information might be outdated. Please check your internet connection or contact support.";
@@ -414,14 +394,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
           }
         } else {
-          console.log(`processSocialLogin: No user doc found for social login ${firebaseUser.uid}. Creating new one.`);
+          const isInitialAdmin = firebaseUser.email === ADMIN_CREATOR_EMAIL;
           appUser = {
             id: firebaseUser.uid,
-            userId: firebaseUser.uid, // Ensure userId is set
+            userId: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            isAdmin: false, // New users are not admins
+            isAdmin: isInitialAdmin, // Set admin for social login with special email too
             username: null, 
             role: null, 
             phoneNumber: firebaseUser.phoneNumber || null,
@@ -429,12 +409,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             researcherId: null,
           };
           await setDoc(userDocRef, appUser);
-          console.log(`processSocialLogin: Created new user document for social login ${firebaseUser.uid}:`, JSON.parse(JSON.stringify(appUser)));
         }
         // onAuthStateChanged will pick up the new user state and call handleSuccessfulLogin via its own setUser call.
-        // Direct call to handleSuccessfulLogin here might be redundant if onAuthStateChanged is robust.
     } catch (dbError: any) {
-         console.error("Error creating/updating user document for social login:", dbError);
          let userMessage = "Failed to set up user profile. Please try again.";
          if (dbError.code === 'permission-denied' || dbError.message?.includes('permission-denied') || dbError.message?.includes('Missing or insufficient permissions')) {
             userMessage = "Could not save your profile due to a permission issue after social login. Please try again or contact support if the problem persists.";
@@ -443,16 +420,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           try {
             if (firebaseAuth) await signOut(firebaseAuth);
           } catch (signOutError) {
-            console.error("Error signing out user after profile creation failure:", signOutError);
+            // silent error
           }
     } finally {
         setIsSocialLoginInProgress(false);
-        setLoading(false);
+        // setLoading(false) will be handled by onAuthStateChanged
     }
   };
 
   const handleSocialLoginError = (error: any, providerName: string) => {
-    console.error(`${providerName} login error:`, error); 
     const firebaseError = error as { code?: string; message?: string };
     let toastMessage = `${providerName} Sign-In failed. Please try again.`;
     let toastTitle = `${providerName} Login Error`;
@@ -462,7 +438,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
           toastTitle = `${providerName} Sign-In Cancelled`;
-          toastMessage = `The ${providerName} sign-in popup was closed before completing. This might be due to popup blockers or network issues. Please ensure popups are allowed and try again. If the problem persists, check your browser extensions or network connection.`;
+          toastMessage = `The ${providerName} sign-in popup was closed before completing. This might be due to popup blockers or network issues. Please ensure popups are enabled and try again. If the problem persists, check your browser extensions or network connection.`;
            toast({
             title: toastTitle,
             description: (
@@ -507,8 +483,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithProvider = async (providerInstance: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: string) => {
     if (!firebaseAuth || !providerInstance) {
       toast({variant: "destructive", title: "Login Error", description: `${providerName} Sign-In service not available.`, duration: 7000});
-      setIsSocialLoginInProgress(false); // Ensure reset
-      setLoading(false); // Ensure reset
+      setIsSocialLoginInProgress(false); 
+      setLoading(false); 
       return;
     }
     
@@ -542,9 +518,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         await firebaseSendPasswordResetEmail(firebaseAuth, emailAddress);
     } catch (error: any) {
-        console.error("Password reset error:", error);
         let errorMessage = "Could not send password reset email.";
         if (error.code === 'auth/user-not-found') {
+            // For security, we might not want to reveal if an email exists.
+            // The toast in ForgotPasswordPage handles this generic message.
             throw error; 
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "The email address is not valid.";
@@ -553,9 +530,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (error.code === 'auth/network-request-failed') {
             errorMessage = "Password reset request failed due to a network error. Please check your internet connection.";
         }
+        setLoading(false); // Ensure loading is reset on error
         throw new Error(errorMessage);
     } finally {
-        setLoading(false);
+        setLoading(false); // Ensure loading is always reset
     }
   };
 
@@ -569,11 +547,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if ('isAdmin' in updatedData) {
       delete (updatedData as any).isAdmin; 
-      console.warn("AuthContext: Attempt to update 'isAdmin' field via updateUserProfile was blocked.");
     }
     if ('userId' in updatedData) {
       delete (updatedData as any).userId;
-      console.warn("AuthContext: Attempt to update 'userId' field via updateUserProfile was blocked.");
     }
 
 
@@ -588,7 +564,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 throw new Error("Username already taken. Please choose another one.");
             }
         } catch (queryError: any) {
-            console.error("Error checking username uniqueness during profile update:", queryError);
             let userMessage = "Could not verify username uniqueness for update. Please try again.";
             if (queryError.code === 'permission-denied' || queryError.message?.includes('permission-denied') || queryError.message?.includes('Missing or insufficient permissions')) {
                  userMessage = "Permission denied while checking username for update. Please check your internet connection or contact support.";
@@ -604,7 +579,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ['displayName', 'username', 'role', 'phoneNumber', 'institution', 'researcherId'];
 
     allowedFields.forEach(field => {
-      if ((updatedData as any)[field] !== undefined) { // Check if the field exists in updatedData
+      if ((updatedData as any)[field] !== undefined) { 
         dataToUpdateInFirestore[field] = (updatedData as any)[field] === "" ? null : (updatedData as any)[field];
       }
     });
@@ -613,7 +588,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             if (firebaseAuth.currentUser) await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
         } catch (authProfileError) {
-            console.warn("AuthContext: Could not update Firebase Auth profile displayName:", authProfileError);
+            // Non-critical warning
         }
     }
 
@@ -622,7 +597,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    console.log("AuthContext: Updating Firestore user profile with data:", dataToUpdateInFirestore);
 
     try {
       await updateDoc(userDocRef, dataToUpdateInFirestore);
@@ -641,23 +615,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } as User;
       
       setUser(updatedAppUser); 
-      console.log("AuthContext: Profile updated successfully. New user state:", JSON.parse(JSON.stringify(updatedAppUser)));
-
-
+      
       if (localStorage.getItem('profileIncomplete') === 'true') {
           if (updatedAppUser.username && updatedAppUser.role) { 
               localStorage.removeItem('profileIncomplete');
-              console.log("AuthContext: Profile completion flag removed.");
           }
       }
     } catch(error: any) {
-      console.error("Error updating user profile in Firestore:", error);
       let userMessage = "Failed to update profile in the database.";
       if (error.code === 'permission-denied' || error.message?.includes('permission-denied') || error.message?.includes('Missing or insufficient permissions')) {
         userMessage = "Could not update your profile due to a permission issue. Please check your internet connection or ensure you have the necessary permissions. If the problem persists, contact support.";
       }
       toast({ variant: "destructive", title: "Profile Update Error", description: userMessage, duration: 9000 });
-      setLoading(false); // Ensure loading is false on error
+      setLoading(false); 
       throw new Error(userMessage);
     } finally {
       setLoading(false);
