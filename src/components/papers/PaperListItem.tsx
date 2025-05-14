@@ -5,11 +5,12 @@ import type { Paper, PaperStatus } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock, Download } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react'; // Import React for React.memo
+import React, { useEffect, useState } from 'react'; 
 import CountdownTimer from '../shared/CountdownTimer';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaperListItemProps {
   paper: Paper;
@@ -18,6 +19,7 @@ interface PaperListItemProps {
 
 const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
   const router = useRouter();
+  const { toast } = useToast();
   const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
 
   useEffect(() => {
@@ -25,7 +27,7 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
       if (new Date() > new Date(paper.paymentDueDate)) {
         setDisplayStatus("Payment Overdue");
       } else {
-        setDisplayStatus(paper.status); // Reset if not overdue (e.g. date changed)
+        setDisplayStatus(paper.status); 
       }
     } else {
       setDisplayStatus(paper.status);
@@ -63,11 +65,27 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
       case 'Payment Pending':
         return <DollarSign className="h-4 w-4 text-orange-500" />;
       case 'Action Required':
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />; // Changed from orange for variety
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />; 
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   }
+
+  const handleViewDownload = () => {
+    if (paper.fileUrl) {
+        // In a real app, this would open the URL: window.open(paper.fileUrl, '_blank');
+        toast({
+            title: "Simulating File Action",
+            description: `Displaying/downloading: ${paper.fileName || 'paper'}. URL: ${paper.fileUrl}`,
+        });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "File Not Available",
+            description: "The URL for this paper file is missing.",
+        });
+    }
+  };
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg flex flex-col h-full">
@@ -78,7 +96,7 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
               <Link href={`/papers/${paper.id}`}>{paper.title}</Link>
             </CardTitle>
             <CardDescription className="mt-1 text-xs sm:text-sm">
-              Uploaded: {new Date(paper.uploadDate).toLocaleDateString()}
+              Uploaded: {paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}
             </CardDescription>
           </div>
           <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground flex-shrink-0" />
@@ -100,22 +118,20 @@ const PaperListItem = React.memo(({ paper, onDelete }: PaperListItemProps) => {
           </div>
         )}
         
-        {(paper.plagiarismScore !== null && paper.plagiarismScore !== undefined) && (
-          <p className="text-xs text-muted-foreground">Plagiarism: {(paper.plagiarismScore * 100).toFixed(1)}%</p>
-        )}
-        {(paper.acceptanceProbability !== null && paper.acceptanceProbability !== undefined) && (
-          <p className="text-xs text-muted-foreground">Acceptance Chance: {(paper.acceptanceProbability * 100).toFixed(1)}%</p>
-        )}
+        {/* Plagiarism and Acceptance info REMOVED from user-facing list item */}
 
       </CardContent>
-      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row justify-end gap-2">
+      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row items-stretch md:items-center justify-end gap-2">
         {displayStatus === 'Payment Pending' && (
           <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto">
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
           </Button>
         )}
+        <Button variant="outline" size="sm" onClick={handleViewDownload} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> View/Download
+        </Button>
         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
-          <Eye className="mr-2 h-4 w-4" /> View Details
+          <Eye className="mr-2 h-4 w-4" /> Details
         </Button>
       </CardFooter>
     </Card>

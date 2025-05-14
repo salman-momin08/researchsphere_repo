@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, User, Users, Tag, CalendarDays, ShieldCheck, BarChart3, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock } from 'lucide-react';
+import { FileText, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -52,8 +52,6 @@ function PaperDetailsContent() {
             if (paper.status === "Payment Pending" && paper.paymentDueDate) {
               if (new Date() > new Date(paper.paymentDueDate)) {
                 setIsPaperOverdue(true);
-                // Optionally update status to "Payment Overdue" in Firestore here if an admin is viewing
-                // or rely on a backend process. For now, client-side display change.
               }
             }
           } else {
@@ -169,6 +167,22 @@ function PaperDetailsContent() {
     }
   };
 
+  const handleViewDownloadPaper = () => {
+    if (currentPaper?.fileUrl) {
+        // In a real app, this would open the URL: window.open(currentPaper.fileUrl, '_blank');
+        toast({
+            title: "Simulating File Action",
+            description: `Displaying/downloading: ${currentPaper.fileName || 'paper'}. URL: ${currentPaper.fileUrl}`,
+        });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "File Not Available",
+            description: "The URL for this paper file is missing.",
+        });
+    }
+  };
+
 
   if (loadingPaper) {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
@@ -224,16 +238,21 @@ function PaperDetailsContent() {
                   </Alert>
               )}
             </div>
-            {effectiveStatus === 'Payment Pending' && !isAdmin && !isPaperOverdue && (
-              <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
-                <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
-              </Button>
-            )}
-            {isAdmin && (
-                 <Button onClick={() => router.push(`/admin/dashboard?edit=${currentPaper.id}`)} variant="outline" className="w-full md:w-auto">
-                    <Edit className="mr-2 h-4 w-4" /> Manage Paper
-                  </Button>
-            )}
+            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-stretch md:items-center">
+                 <Button onClick={handleViewDownloadPaper} size="lg" variant="outline" className="w-full md:w-auto">
+                    <Download className="mr-2 h-5 w-5" /> View/Download Paper
+                </Button>
+                {effectiveStatus === 'Payment Pending' && !isAdmin && !isPaperOverdue && (
+                <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
+                    <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
+                </Button>
+                )}
+                {isAdmin && (
+                    <Button onClick={() => router.push(`/admin/dashboard?edit=${currentPaper.id}`)} variant="outline" className="w-full md:w-auto">
+                        <Edit className="mr-2 h-4 w-4" /> Manage Paper
+                    </Button>
+                )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6 grid md:grid-cols-3 gap-8">
@@ -244,46 +263,48 @@ function PaperDetailsContent() {
             </div>
             
             <Separator />
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools (Title & Abstract)
-              </h3>
-              <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                <Button onClick={handleRunPlagiarismCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
-                  {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                  {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Check' : 'Run Plagiarism Check'}
-                </Button>
-                <Button onClick={handleRunAcceptanceCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
-                  {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BarChart3 className="mr-2 h-4 w-4" />}
-                   {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Check' : 'Run Acceptance Check'}
-                </Button>
-              </div>
-
-              {currentPaper.plagiarismScore !== null && currentPaper.plagiarismReport && (
-                  <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
-              )}
-              {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
-                  <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
-              )}
-               {(!currentPaper.plagiarismScore && !currentPaper.acceptanceProbability && !isCheckingPlagiarism && !isCheckingAcceptance) && (
-                  <Alert variant="default" className="mt-4">
-                    <Sparkles className="h-4 w-4" />
-                    <AlertTitle>AI Analysis Available</AlertTitle>
-                    <AlertDescription>
-                      Run plagiarism and acceptance probability checks based on the paper's title and abstract using the buttons above.
-                    </AlertDescription>
-                  </Alert>
-               )}
-            </div>
             
-            <Separator />
+            {/* AI Analysis Tools - Only for Admins */}
+            {isAdmin && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Analysis Tools (Title & Abstract)
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                  <Button onClick={handleRunPlagiarismCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                    {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />} {/* Changed Icon */}
+                    {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Check' : 'Run Plagiarism Check'}
+                  </Button>
+                  <Button onClick={handleRunAcceptanceCheck} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                    {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />} {/* Changed Icon */}
+                    {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Check' : 'Run Acceptance Check'}
+                  </Button>
+                </div>
 
+                {currentPaper.plagiarismScore !== null && currentPaper.plagiarismReport && (
+                    <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
+                )}
+                {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
+                    <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
+                )}
+                {(!currentPaper.plagiarismScore && !currentPaper.acceptanceProbability && !isCheckingPlagiarism && !isCheckingAcceptance) && (
+                    <Alert variant="default" className="mt-4">
+                      <Sparkles className="h-4 w-4" />
+                      <AlertTitle>AI Analysis Available</AlertTitle>
+                      <AlertDescription>
+                        Run plagiarism and acceptance probability checks based on the paper's title and abstract using the buttons above.
+                      </AlertDescription>
+                    </Alert>
+                )}
+                 <Separator className="my-6"/>
+              </div>
+            )}
+            
             {currentPaper.adminFeedback && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Admin/Reviewer Feedback</h3>
                 <Alert variant={currentPaper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
-                  <AlertTriangle className="h-4 w-4" />
+                  {currentPaper.status === "Action Required" ? <AlertTriangle className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
                   <AlertTitle>Feedback Received</AlertTitle>
                   <AlertDescription className="whitespace-pre-wrap">{currentPaper.adminFeedback}</AlertDescription>
                 </Alert>
@@ -305,7 +326,7 @@ function PaperDetailsContent() {
                 />
                 <Button onClick={handleAdminFeedbackSubmit} disabled={isSubmittingFeedback || !adminFeedbackText.trim()}>
                   {isSubmittingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                  Submit Feedback
+                  Submit Feedback & Mark as 'Action Required'
                 </Button>
               </div>
             )}
@@ -361,7 +382,7 @@ function PaperDetailsContent() {
                 <div className="flex items-center">
                   <CalendarDays className="h-4 w-4 mr-2 text-primary" />
                   <strong>Uploaded:</strong>&nbsp;
-                  <span className="text-muted-foreground">{new Date(currentPaper.uploadDate).toLocaleDateString()}</span>
+                  <span className="text-muted-foreground">{currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}</span>
                 </div>
                 {currentPaper.submissionDate && (
                   <div className="flex items-center">
@@ -370,23 +391,6 @@ function PaperDetailsContent() {
                     <span className="text-muted-foreground">{new Date(currentPaper.submissionDate).toLocaleDateString()}</span>
                   </div>
                 )}
-                 <div className="flex items-center">
-                  <FileText className="h-4 w-4 mr-2 text-primary" />
-                  <strong>File:</strong>&nbsp;
-                  <span 
-                    className="text-muted-foreground hover:underline cursor-pointer" 
-                    onClick={() => {
-                        if (currentPaper.fileUrl) {
-                            // In a real app, window.open(currentPaper.fileUrl, '_blank');
-                            toast({title: "Download Mock", description: `Simulating download for ${currentPaper.fileName}. URL: ${currentPaper.fileUrl}`});
-                        } else {
-                            toast({variant: "destructive", title: "File Not Available", description: "File URL is missing."});
-                        }
-                    }}
-                  >
-                    {currentPaper.fileName || 'View File'}
-                  </span>
-                </div>
                 {currentPaper.paidAt && (
                    <div className="flex items-center">
                     <DollarSign className="h-4 w-4 mr-2 text-green-600" />
@@ -416,3 +420,4 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
+
