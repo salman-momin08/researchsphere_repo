@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Search as SearchIcon, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper } from '@/types';
-import { allMockPapers } from '@/lib/mock-data';
+// import { allMockPapers } from '@/lib/mock-data'; // No longer using mock data directly
+import { getPublishedPapers } from '@/lib/paper-service'; // Import Firestore service
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -25,9 +26,9 @@ function SearchPapersContent() {
   const { toast } = useToast();
   const router = useRouter();
 
-  console.log("SearchPapersContent: Component initialized.");
+  console.log("SearchPapersContent: Component initialized. Will use Firestore for search.");
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast({
         variant: "destructive",
@@ -40,19 +41,29 @@ function SearchPapersContent() {
     }
     setIsLoading(true);
     setHasSearched(true);
-    // Simulate API call delay
-    setTimeout(() => {
+    setSearchResults([]); // Clear previous results
+
+    try {
+      // Fetch all "Published" papers from Firestore
+      const publishedPapers = await getPublishedPapers();
+      console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
+
+      // Client-side filtering for author name (case-insensitive, partial match)
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      // The following filter logic ensures that:
-      // 1. The search is case-insensitive.
-      // 2. It performs a partial match (e.g., "Doe" matches "Dr. Jane Doe").
-      // 3. If a paper has multiple authors, it will be found if the search term matches *any* of those authors.
-      const results = allMockPapers.filter(paper =>
+      const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
       setSearchResults(results);
+    } catch (error) {
+      console.error("SearchPapersContent: Error fetching or filtering papers:", error);
+      toast({
+        variant: "destructive",
+        title: "Search Error",
+        description: "Could not retrieve or filter papers. Please try again.",
+      });
+    } finally {
       setIsLoading(false);
-    }, 700);
+    }
   };
 
   const handleDownload = (paper: Paper) => {
@@ -104,7 +115,7 @@ In a real application, this would be the actual paper document.
           <SearchIcon className="mx-auto h-12 w-12 text-primary mb-2" />
           <CardTitle className="text-2xl md:text-3xl">Advanced Paper Search</CardTitle>
           <CardDescription>
-            Find papers by author name. Results include links to view details and mock download options.
+            Find published papers by author name. Results are fetched from the live database.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -127,7 +138,7 @@ In a real application, this would be the actual paper document.
           {isLoading && (
             <div className="text-center py-10">
               <LoadingSpinner size={32} />
-              <p className="mt-2 text-muted-foreground">Searching for papers...</p>
+              <p className="mt-2 text-muted-foreground">Searching published papers...</p>
             </div>
           )}
 
@@ -136,7 +147,7 @@ In a real application, this would be the actual paper document.
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>No Results Found</AlertTitle>
               <AlertDescription>
-                No papers found matching the author name &quot;{searchTerm}&quot;. Please try a different name or check your spelling.
+                No published papers found matching the author name &quot;{searchTerm}&quot;. Please try a different name or check your spelling.
               </AlertDescription>
             </Alert>
           )}
@@ -181,9 +192,9 @@ In a real application, this would be the actual paper document.
            {!isLoading && !hasSearched && (
             <Alert>
                 <SearchIcon className="h-4 w-4" />
-                <AlertTitle>Search for Papers</AlertTitle>
+                <AlertTitle>Search Published Papers</AlertTitle>
                 <AlertDescription>
-                    Enter an author's name in the search bar above to find relevant research papers.
+                    Enter an author's name in the search bar above to find relevant published research papers from the database.
                 </AlertDescription>
             </Alert>
            )}
@@ -200,4 +211,3 @@ export default function SearchPapersPage() {
     </ProtectedRoute>
   );
 }
-

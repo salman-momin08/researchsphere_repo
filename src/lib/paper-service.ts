@@ -44,7 +44,10 @@ export const addPaper = async (paperData: Omit<Paper, 'id' | 'uploadDate'> & { u
   try {
     const docRef = await addDoc(collection(db, "papers"), {
       ...paperData,
-      uploadDate: paperData.uploadDate || serverTimestamp(), // Use server timestamp if not provided
+      uploadDate: paperData.uploadDate ? Timestamp.fromDate(new Date(paperData.uploadDate)) : serverTimestamp(), // Store as Timestamp
+      submissionDate: paperData.submissionDate ? Timestamp.fromDate(new Date(paperData.submissionDate)) : null, // Store as Timestamp
+      paymentDueDate: paperData.paymentDueDate ? Timestamp.fromDate(new Date(paperData.paymentDueDate)) : null, // Store as Timestamp
+      paidAt: paperData.paidAt ? Timestamp.fromDate(new Date(paperData.paidAt)) : null, // Store as Timestamp
       lastUpdatedAt: serverTimestamp(),
     });
     return docRef.id;
@@ -61,7 +64,7 @@ export const getPaper = async (paperId: string): Promise<Paper | null> => {
     if (docSnap.exists()) {
       return convertPaperTimestamps({ id: docSnap.id, ...docSnap.data() } as any);
     } else {
-      console.log("No such document!");
+      console.log("No such document for paper ID:", paperId);
       return null;
     }
   } catch (error) {
@@ -97,14 +100,14 @@ export const getAllPapers = async (): Promise<Paper[]> => {
 export const updatePaperStatus = async (paperId: string, status: PaperStatus, paymentDetails?: { paidAt: string }): Promise<void> => {
   try {
     const paperRef = doc(db, "papers", paperId);
-    const updateData: Partial<Paper> & { lastUpdatedAt: any } = { status, lastUpdatedAt: serverTimestamp() };
+    const updateData: Partial<Paper> & { lastUpdatedAt: any, paidAt?: any, submissionDate?: any } = { status, lastUpdatedAt: serverTimestamp() };
     if (paymentDetails?.paidAt) {
-      updateData.paidAt = paymentDetails.paidAt;
+      updateData.paidAt = Timestamp.fromDate(new Date(paymentDetails.paidAt)); // Store as Timestamp
       if (status === "Submitted") { // Assuming "Submitted" is the status after payment
-         updateData.submissionDate = paymentDetails.paidAt; // Set submissionDate to payment time
+         updateData.submissionDate = Timestamp.fromDate(new Date(paymentDetails.paidAt)); // Set submissionDate to payment time, as Timestamp
       }
     }
-    await updateDoc(paperRef, updateData);
+    await updateDoc(paperRef, updateData as any); // Use 'as any' if type issues with serverTimestamp
   } catch (error) {
     console.error("Error updating paper status in Firestore: ", error);
     throw error;
@@ -123,6 +126,19 @@ export const updatePaperData = async (paperId: string, data: Partial<Omit<Paper,
     throw error;
   }
 };
+
+export const getPublishedPapers = async (): Promise<Paper[]> => {
+  try {
+    const papersRef = collection(db, "papers");
+    const q = query(papersRef, where("status", "==", "Published"), orderBy("uploadDate", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => convertPaperTimestamps({ id: doc.id, ...doc.data() } as any));
+  } catch (error) {
+    console.error("Error getting published papers from Firestore: ", error);
+    throw error;
+  }
+};
+
 
 // Example: Function to seed mock data (run once or as needed)
 // This is illustrative. A proper seed script would be separate.
