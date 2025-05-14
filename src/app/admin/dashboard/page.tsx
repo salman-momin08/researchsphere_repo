@@ -36,18 +36,15 @@ function AdminDashboardContent() {
         const fetchedPapers = await getAllPapers();
         console.log("AdminDashboard: Fetched all papers from Firestore:", fetchedPapers.length);
         
-        // Client-side check for overdue payments
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           if (p.status === 'Payment Pending' && p.paymentDueDate && new Date(p.paymentDueDate) < now) {
-            // This is a display change, actual status update needs admin action or backend job
             return { ...p, displayStatus: 'Payment Overdue' as PaperStatus }; 
           }
           return { ...p, displayStatus: p.status };
         });
         setPapers(processedPapers);
 
-        // Calculate stats
         const totalSubmissions = processedPapers.length;
         const pendingReview = processedPapers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
         const issuesFound = processedPapers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
@@ -85,12 +82,26 @@ function AdminDashboardContent() {
   };
 
   const handleManualRejectOverdue = async (paperId: string) => {
+    const paperToNotify = papers.find(p => p.id === paperId); // Get paper details BEFORE updating state
     try {
       await updatePaperStatus(paperId, 'Rejected');
-      toast({title: "Paper Rejected", description: "Paper marked as rejected due to overdue payment."});
+      toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
+
+      if (paperToNotify) {
+        // In a real app, you would fetch the user's email using paperToNotify.userId
+        // and then call a backend service to send an email.
+        console.log(`SIMULATING EMAIL: An email would be sent to the user (owner of paper ID: ${paperToNotify.userId}) for paper "${paperToNotify.title}" regarding its rejection due to non-payment.`);
+        toast({
+          title: "Email Notification (Simulated)",
+          description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
+          variant: "default",
+          duration: 7000,
+        });
+      }
       fetchAndSetPapers(); // Refresh list
     } catch (error) {
-      toast({variant: "destructive", title: "Error", description: "Failed to reject paper."});
+      console.error("Failed to reject paper:", error);
+      toast({variant: "destructive", title: "Error Rejecting Paper", description: "Could not update paper status."});
     }
   };
 
@@ -143,7 +154,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="container py-8 md:py-12 px-4">
+    <div className="w-full max-w-screen-2xl mx-auto py-8 md:py-12 px-4 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center">
           <Shield className="mr-3 h-8 w-8 text-primary" /> Admin Panel
@@ -193,7 +204,7 @@ function AdminDashboardContent() {
         </Card>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg w-full"> {/* Ensure card takes full width of its new wider parent */}
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><BarChartHorizontalBig className="mr-2 h-5 w-5 text-primary" />All Submissions</CardTitle>
           <CardDescription>Review and manage all papers submitted to the platform.</CardDescription>
@@ -265,3 +276,4 @@ export default function AdminDashboardPage() {
     </ProtectedRoute>
   );
 }
+
