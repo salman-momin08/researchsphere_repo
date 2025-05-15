@@ -25,7 +25,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div className="flex min-h-screen bg-secondary/30"> {/* This div controls the overall flex container for admin section */}
+      {/* Changed min-h-screen to flex-1 to allow it to grow within RootLayout's main.flex-grow */}
+      <div className="flex flex-1 bg-secondary/30"> 
         <aside className="w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-16"> {/* Sidebar, fixed, pt-16 to be below header */}
           <div className="flex items-center gap-2 mb-6 px-2 mt-4"> {/* Added mt-4 to push content below header area within sidebar */}
             <Shield className="h-7 w-7 text-primary" />
