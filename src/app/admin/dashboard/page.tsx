@@ -33,12 +33,14 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers();
-        console.log("AdminDashboard: Fetched all papers from Firestore:", fetchedPapers.length);
+        const fetchedPapers = await getAllPapers(); // Fetches from MongoDB via API
+        console.log("AdminDashboard: Fetched all papers from API:", fetchedPapers.length);
         
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
-          if (p.status === 'Payment Pending' && p.paymentDueDate && new Date(p.paymentDueDate) < now) {
+          // Ensure paymentDueDate is a valid date string before creating a Date object
+          const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
+          if (p.status === 'Payment Pending' && paymentDueDateValid && new Date(p.paymentDueDate!) < now) {
             return { ...p, displayStatus: 'Payment Overdue' as PaperStatus }; 
           }
           return { ...p, displayStatus: p.status };
@@ -52,9 +54,9 @@ function AdminDashboardContent() {
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
 
-      } catch (error) {
-        console.error("AdminDashboard: Error fetching papers from Firestore:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load papers from the database." });
+      } catch (error: any) {
+        console.error("AdminDashboard: Error fetching papers from API:", error);
+        toast({ variant: "destructive", title: "Error", description: error.message || "Could not load papers from the database." });
       } finally {
         setIsLoadingPapers(false);
       }
@@ -69,7 +71,8 @@ function AdminDashboardContent() {
 
   useEffect(() => {
     fetchAndSetPapers();
-  }, [user, isAdmin, authLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isAdmin, authLoading]); // Dependencies remain the same
   
   const getStatusBadgeVariant = (status: PaperStatus | undefined) => {
     switch (status) {
@@ -84,7 +87,7 @@ function AdminDashboardContent() {
   const handleManualRejectOverdue = async (paperId: string) => {
     const paperToNotify = papers.find(p => p.id === paperId); 
     try {
-      await updatePaperStatus(paperId, 'Rejected');
+      await updatePaperStatus(paperId, 'Rejected'); // Calls API
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
 
       if (paperToNotify) {
@@ -97,9 +100,9 @@ function AdminDashboardContent() {
         });
       }
       fetchAndSetPapers(); 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to reject paper:", error);
-      toast({variant: "destructive", title: "Error Rejecting Paper", description: "Could not update paper status."});
+      toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
     }
   };
 
@@ -107,9 +110,8 @@ function AdminDashboardContent() {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
 
-  // This check is important. If ProtectedRoute somehow lets a non-admin through,
-  // or if isAdmin status changes dynamically, this provides a clear message.
   if (user && !isAdmin) {
+     // This Alert has been updated in a previous step to be more informative
     return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
@@ -118,11 +120,11 @@ function AdminDashboardContent() {
           <AlertDescription>
             Your account is not recognized as an administrator.
             <ul className="list-disc list-inside text-left mt-2 text-sm">
-              <li>**Crucial Check:** Ensure the `isAdmin` field in your user document (in the Firestore `users` collection) is set to `true` (boolean type).</li>
+              <li>**Crucial Check:** Ensure the `isAdmin` field in your user document (in the MongoDB `users` collection, accessed via Firebase Admin or your User API) is set to `true` (boolean type).</li>
               <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
-              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted.</li>
+              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted after fetching from the API.</li>
             </ul>
-            If the issue persists, please verify your Firestore data or contact support.
+            If the issue persists, please verify your MongoDB data or contact support.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -149,7 +151,6 @@ function AdminDashboardContent() {
      );
   }
 
-  // If we reach here, user is logged in AND isAdmin is true (or authLoading is true, handled above)
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
@@ -277,4 +278,3 @@ export default function AdminDashboardPage() {
     </ProtectedRoute>
   );
 }
-

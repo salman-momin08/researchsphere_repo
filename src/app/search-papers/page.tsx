@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper } from '@/types';
-import { getPublishedPapers } from '@/lib/paper-service'; 
+import { getPublishedPapers } from '@/lib/paper-service'; // Fetches from MongoDB API
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -41,22 +41,22 @@ function SearchPapersContent() {
     setSearchResults([]); 
 
     try {
-      const publishedPapers = await getPublishedPapers();
-      // console.log("SearchPapersContent: Fetched published papers from Firestore:", publishedPapers.length);
+      // Fetch all published papers first
+      const publishedPapers = await getPublishedPapers(); // Calls API
+      console.log("SearchPapersContent: Fetched published papers from API:", publishedPapers.length);
 
       // Client-side filtering for author name (case-insensitive, partial match)
-      // This correctly handles multiple authors if an author's name is part of the search term.
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
       setSearchResults(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("SearchPapersContent: Error fetching or filtering papers:", error);
       toast({
         variant: "destructive",
         title: "Search Error",
-        description: "Could not retrieve or filter papers. Please try again.",
+        description: error.message || "Could not retrieve or filter papers. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -64,14 +64,15 @@ function SearchPapersContent() {
   };
 
   const handleDownloadOriginal = (paper: Paper) => {
-    if (paper.fileUrl) {
-      window.open(paper.fileUrl, '_blank');
-      toast({ title: "Opening File", description: `Attempting to open ${paper.fileName || 'the paper'}. Check your browser for download or new tab.` });
+    if (paper.id) {
+        const downloadUrl = `/api/papers/download/${paper.id}`;
+        window.open(downloadUrl, '_blank');
+        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. Check your browser.` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing or the file was not processed.",
+            description: "The paper ID is missing or file data is not available for download.",
         });
     }
   };
@@ -85,11 +86,8 @@ function SearchPapersContent() {
     content += `Status: ${paper.status}\n`;
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
-    if (paper.fileUrl) {
-      content += `Original File URL: ${paper.fileUrl}\n`;
-    } else {
-      content += `Original File URL: Not available\n`;
-    }
+    content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
+
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -103,7 +101,7 @@ function SearchPapersContent() {
     toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
   };
   
-  const getStatusBadgeVariant = (status: Paper['status']) => {
+  const getStatusBadgeVariant = (status: Paper['status'] | undefined) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
       case 'Rejected': case 'Payment Overdue': return 'destructive';

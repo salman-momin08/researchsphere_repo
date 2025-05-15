@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { getUserPapers, getAllPapers } from "@/lib/paper-service"; // Import Firestore service
+import { getUserPapers, getAllPapers } from "@/lib/paper-service"; 
 import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
@@ -27,16 +27,16 @@ function DashboardContent() {
         try {
           let fetchedPapers: Paper[];
           if (user.isAdmin) {
-            fetchedPapers = await getAllPapers();
-            console.log("DashboardContent (Admin): Fetched all papers from Firestore:", fetchedPapers.length);
+            fetchedPapers = await getAllPapers(); // Fetches from MongoDB via API
+            console.log("DashboardContent (Admin): Fetched all papers from API:", fetchedPapers.length);
           } else {
-            fetchedPapers = await getUserPapers(user.id);
-            console.log(`DashboardContent (User ${user.id}): Fetched user papers from Firestore:`, fetchedPapers.length);
+            fetchedPapers = await getUserPapers(user.id); // Fetches from MongoDB via API
+            console.log(`DashboardContent (User ${user.id}): Fetched user papers from API:`, fetchedPapers.length);
           }
           setPapers(fetchedPapers);
-        } catch (error) {
-          console.error("DashboardContent: Failed to fetch papers from Firestore:", error);
-          toast({ variant: "destructive", title: "Error Loading Papers", description: "Could not load your papers from the database. Please check your connection or permissions." });
+        } catch (error: any) {
+          console.error("DashboardContent: Failed to fetch papers from API:", error);
+          toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load your papers from the database." });
         } finally {
           setIsLoadingPapers(false);
         }
@@ -53,11 +53,13 @@ function DashboardContent() {
     <div className="container py-8 md:py-12 px-4">
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Your Dashboard</h1>
-        <Link href="/submit">
-          <Button size="lg" className="w-full md:w-auto">
-            <PlusCircle className="mr-2 h-5 w-5" /> Submit New Paper
-          </Button>
-        </Link>
+        {!user?.isAdmin && (
+          <Link href="/submit">
+            <Button size="lg" className="w-full md:w-auto">
+              <PlusCircle className="mr-2 h-5 w-5" /> Submit New Paper
+            </Button>
+          </Link>
+        )}
       </div>
 
       {papers.length === 0 && !user?.isAdmin ? (

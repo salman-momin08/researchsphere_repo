@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { getPaper, updatePaperStatus, updatePaperData } from '@/lib/paper-service';
+import { getPaper, updatePaperStatus, updatePaperData } from '@/lib/paper-service'; // Calls API now
 import CountdownTimer from '@/components/shared/CountdownTimer';
 
 function PaperDetailsContent() {
@@ -44,50 +44,52 @@ function PaperDetailsContent() {
     const paperId = params.id as string;
     if (paperId && user) { 
       setLoadingPaper(true);
-      getPaper(paperId)
+      getPaper(paperId) // Fetches from MongoDB via API
         .then(paper => {
-          if (paper && (paper.userId === user?.id || isAdmin)) {
+          if (paper) { // API should handle auth, but client can double check if needed
             setCurrentPaper(paper);
             if(paper.adminFeedback) setAdminFeedbackText(paper.adminFeedback);
-            if (paper.status === "Payment Pending" && paper.paymentDueDate) {
-              if (new Date() > new Date(paper.paymentDueDate)) {
+            const paymentDueDateValid = paper.paymentDueDate && !isNaN(new Date(paper.paymentDueDate).getTime());
+            if (paper.status === "Payment Pending" && paymentDueDateValid) {
+              if (new Date() > new Date(paper.paymentDueDate!)) {
                 setIsPaperOverdue(true);
               }
             }
           } else {
             setCurrentPaper(null); 
-            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper or it does not exist." });
+            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper does not exist or you do not have permission to view it." });
             router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
           }
         })
-        .catch(err => {
-          console.error("Error fetching paper:", err);
+        .catch((err: any) => {
+          console.error("Error fetching paper from API:", err);
           setCurrentPaper(null);
-          toast({ variant: "destructive", title: "Error", description: "Could not load paper details." });
+          toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
           router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
         })
         .finally(() => setLoadingPaper(false));
     } else if (!user && loadingPaper) { 
-        // If user is null and we are still in initial loadingPaper state, wait for user.
+        // Wait for user
     } else if (!user && !loadingPaper) {
-        // If user becomes null after initial loading attempt (e.g., session expired during fetch)
         setCurrentPaper(null); 
         setLoadingPaper(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, user, isAdmin, router]); 
 
   useEffect(() => {
-    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
+    const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
+    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && paymentDueDateValid && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
       setIsPaymentModalOpen(true);
     }
   }, [searchParams, currentPaper, isPaperOverdue, user, isAdmin]);
 
-  const handlePaymentSuccess = async (paperId?: string) => { 
-    const targetPaperId = paperId || currentPaper?.id;
+  const handlePaymentSuccess = async (paperIdToUpdate?: string) => { 
+    const targetPaperId = paperIdToUpdate || currentPaper?.id;
     if (!targetPaperId) return;
 
     try {
-      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
+      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() }); // Calls API
       setCurrentPaper(prev => {
         if (prev && prev.id === targetPaperId) {
           return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString() };
@@ -96,8 +98,8 @@ function PaperDetailsContent() {
       });
       setIsPaymentModalOpen(false);
       toast({title: "Payment Successful", description: "Paper status updated to Submitted."});
-    } catch (error) {
-      toast({variant: "destructive", title: "Payment Update Failed", description: "Could not update paper status after payment."});
+    } catch (error: any) {
+      toast({variant: "destructive", title: "Payment Update Failed", description: error.message || "Could not update paper status after payment."});
     }
   };
   
@@ -105,12 +107,9 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin || !adminFeedbackText.trim()) return;
     setIsSubmittingFeedback(true);
     try {
-      // Status is no longer automatically changed to "Action Required" here.
-      // Admin should change status manually if needed.
-      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
+      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText }); // Calls API
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       
-      // Simulate email notification
       toast({
         title: "Feedback Submitted", 
         description: `Author will be notified (Simulated email to user for paper: ${currentPaper.title}).`,
@@ -118,8 +117,8 @@ function PaperDetailsContent() {
       });
       console.log(`SIMULATING EMAIL: Feedback provided for paper "${currentPaper.title}" (ID: ${currentPaper.id}) by admin. Email would be sent to user ID: ${currentPaper.userId}.`);
 
-    } catch (error) {
-      toast({variant: "destructive", title: "Feedback Submission Failed"});
+    } catch (error: any) {
+      toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -128,7 +127,7 @@ function PaperDetailsContent() {
   const handleStatusChange = async (newStatus: Paper['status']) => {
     if (!currentPaper || !isAdmin) return;
     try {
-      await updatePaperStatus(currentPaper.id, newStatus);
+      await updatePaperStatus(currentPaper.id, newStatus); // Calls API
       setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
@@ -139,8 +138,8 @@ function PaperDetailsContent() {
       if (newStatus !== "Payment Pending") {
         setIsPaperOverdue(false);
       }
-    } catch (error) {
-      toast({variant: "destructive", title: "Status Update Failed"});
+    } catch (error: any) {
+      toast({variant: "destructive", title: "Status Update Failed", description: error.message || "Could not update status."});
     }
   };
 
@@ -152,7 +151,7 @@ function PaperDetailsContent() {
     setIsCheckingPlagiarism(true);
     try {
       const result = await plagiarismCheck({ documentText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, {
+      await updatePaperData(currentPaper.id, { // Calls API
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
       });
@@ -162,9 +161,9 @@ function PaperDetailsContent() {
         plagiarismReport: { highlightedSections: result.highlightedSections }
       } : null);
       toast({ title: "Plagiarism Validation Complete" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Plagiarism validation error:", error);
-      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error instanceof Error ? error.message : "Unknown error" });
+      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error.message || "Unknown error" });
     } finally {
       setIsCheckingPlagiarism(false);
     }
@@ -178,7 +177,7 @@ function PaperDetailsContent() {
     setIsCheckingAcceptance(true);
     try {
       const result = await acceptanceProbability({ paperText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, {
+      await updatePaperData(currentPaper.id, { // Calls API
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       });
@@ -188,23 +187,26 @@ function PaperDetailsContent() {
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
       toast({ title: "Acceptance Probability Validation Complete" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Acceptance validation error:", error);
-      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error instanceof Error ? error.message : "Unknown error" });
+      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error.message || "Unknown error" });
     } finally {
       setIsCheckingAcceptance(false);
     }
   };
 
-  const handleDownloadOriginalPaper = () => {
-    if (currentPaper?.fileUrl) {
-      window.open(currentPaper.fileUrl, '_blank');
-      toast({ title: "Opening File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}. Check your browser for download or new tab.` });
+  const handleDownloadOriginalPaper = async () => {
+    if (currentPaper?.id) {
+        // Construct the API endpoint URL for downloading the file
+        const downloadUrl = `/api/papers/download/${currentPaper.id}`;
+        // Open the URL in a new tab/window. The browser will handle the download.
+        window.open(downloadUrl, '_blank');
+        toast({ title: "Initiating Download", description: `Attempting to download ${currentPaper.fileName || 'the paper'}. Check your browser.` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing or the file was not processed.",
+            description: "The paper ID is missing or file data is not available.",
         });
     }
   };
@@ -219,14 +221,11 @@ function PaperDetailsContent() {
     content += `Status: ${currentPaper.status}\n`;
     content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${currentPaper.abstract}\n\n`;
-    if (currentPaper.fileUrl) {
-      content += `Original File URL: ${currentPaper.fileUrl}\n`;
-    } else {
-      content += `Original File URL: Not available\n`;
-    }
+    // File URL is not stored directly now; download is via API.
+    content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
      if (isAdmin) {
-      if (currentPaper.plagiarismScore !== null) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
-      if (currentPaper.acceptanceProbability !== null) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
+      if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
+      if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
     }
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -240,7 +239,6 @@ function PaperDetailsContent() {
     URL.revokeObjectURL(url);
     toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
   };
-
 
   if (loadingPaper) {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
@@ -303,7 +301,7 @@ function PaperDetailsContent() {
                  <Button onClick={handleDownloadMetadata} size="lg" variant="ghost" className="w-full md:w-auto text-muted-foreground hover:text-primary">
                     <FileText className="mr-2 h-4 w-4" /> Download Details
                 </Button>
-                {effectiveStatus === 'Payment Pending' && user && user.id === currentPaper.userId && !isAdmin && !isPaperOverdue && (
+                {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdmin && !isPaperOverdue && (
                 <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
@@ -341,13 +339,13 @@ function PaperDetailsContent() {
                   </Button>
                 </div>
 
-                {currentPaper.plagiarismScore !== null && currentPaper.plagiarismReport && (
+                {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined && currentPaper.plagiarismReport && (
                     <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
                 )}
-                {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceReport && (
+                {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined && currentPaper.acceptanceReport && (
                     <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
                 )}
-                {(currentPaper.plagiarismScore === null && currentPaper.acceptanceProbability === null && !isCheckingPlagiarism && !isCheckingAcceptance) && (
+                {((currentPaper.plagiarismScore === null || currentPaper.plagiarismScore === undefined) && (currentPaper.acceptanceProbability === null || currentPaper.acceptanceProbability === undefined) && !isCheckingPlagiarism && !isCheckingAcceptance) && (
                     <Alert variant="default" className="mt-4">
                       <Sparkles className="h-4 w-4" />
                       <AlertTitle>AI Validation Available</AlertTitle>

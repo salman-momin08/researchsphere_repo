@@ -2,17 +2,15 @@
 export interface User {
   id: string;
   email: string | null;
-  displayName: string | null; // This will store Full Name
+  displayName: string | null; 
   photoURL?: string | null;
-  isAdmin?: boolean; // For admin panel access
+  isAdmin?: boolean; 
 
-  // New fields from registration
-  username?: string | null; // Now can be null
+  username?: string | null; 
   phoneNumber?: string | null;
   institution?: string | null;
-  role?: "Author" | "Reviewer" | "Admin" | null; // Now can be null
-  researcherId?: string | null; // ORCID ID or other researcher ID
-  // termsAccepted is usually for validation and not stored, but can be if needed for audit
+  role?: "Author" | "Reviewer" | "Admin" | null; 
+  researcherId?: string | null; 
 }
 
 export type PaperStatus = 
@@ -23,31 +21,38 @@ export type PaperStatus =
   | "Accepted"
   | "Rejected"
   | "Payment Pending"
-  | "Payment Overdue" // New status for client-side display
+  | "Payment Overdue" 
   | "Published";
 
 export interface Paper {
-  id: string;
+  id: string; // In MongoDB, this will be _id from the document
   userId: string;
   title: string;
   abstract: string;
-  authors: string[]; // Array of author names
+  authors: string[]; 
   keywords: string[];
-  fileUrl?: string; // URL to the stored PDF/DOCX file
-  fileName?: string;
+  
+  // For MongoDB embedded file storage (small files)
+  fileName?: string; // Original filename
+  fileMimeType?: string; // e.g. 'application/pdf'
+  // fileData: Buffer; // This is stored in MongoDB but NOT typically sent to client unless downloading
+
+  // fileUrl is no longer used if embedding files. Download will be via API endpoint.
+  // fileUrl?: string; 
+
   uploadDate: string; // ISO date string
   status: PaperStatus;
-  plagiarismScore?: number | null; // 0 to 1
+  plagiarismScore?: number | null; 
   plagiarismReport?: {
     highlightedSections: string[];
   } | null;
-  acceptanceProbability?: number | null; // 0 to 1
+  acceptanceProbability?: number | null; 
   acceptanceReport?: {
     reasoning: string;
   } | null;
   adminFeedback?: string | null;
-  submissionDate?: string | null; // ISO date string, after payment or if "Pay Now"
-  paymentDueDate?: string | null; // ISO date string, for "Pay Later"
+  submissionDate?: string | null; 
+  paymentDueDate?: string | null; 
   paymentOption?: "payNow" | "payLater" | null;
-  paidAt?: string | null; // ISO date string, when payment was made
+  paidAt?: string | null; 
 }

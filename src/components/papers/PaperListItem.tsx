@@ -26,12 +26,13 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
 
   useEffect(() => {
     if (paper.status === "Payment Pending" && paper.paymentDueDate) {
-      if (new Date() > new Date(paper.paymentDueDate)) {
-        setDisplayStatus("Payment Overdue");
-        setIsOverdue(true);
-      } else {
-        setDisplayStatus(paper.status); 
-        setIsOverdue(false);
+        const paymentDueDateValid = !isNaN(new Date(paper.paymentDueDate).getTime());
+        if (paymentDueDateValid && new Date() > new Date(paper.paymentDueDate)) {
+            setDisplayStatus("Payment Overdue");
+            setIsOverdue(true);
+        } else {
+            setDisplayStatus(paper.status); 
+            setIsOverdue(false);
       }
     } else {
       setDisplayStatus(paper.status);
@@ -77,14 +78,15 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
   }
 
   const handleDownloadOriginalFile = () => {
-    if (paper.fileUrl) {
-      window.open(paper.fileUrl, '_blank');
-      toast({ title: "Opening File", description: `Attempting to open ${paper.fileName || 'the paper'}. Check your browser for download or new tab.` });
+    if (paper.id) {
+        const downloadUrl = `/api/papers/download/${paper.id}`;
+        window.open(downloadUrl, '_blank');
+        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. Check your browser.` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The URL for this paper file is missing.",
+            description: "The paper ID is missing or file data is not available.",
         });
     }
   };
@@ -98,11 +100,8 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     content += `Status: ${paper.status}\n`;
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
-    if (paper.fileUrl) {
-      content += `Original File URL: ${paper.fileUrl}\n`;
-    } else {
-      content += `Original File URL: Not available\n`;
-    }
+    content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
+
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
