@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { Shield, Users, LayoutDashboard, FileText as FileTextIcon, UserCheck, Eye } from 'lucide-react'; // Added Eye for Reviewers
+import { Shield, Users, LayoutDashboard, FileText as FileTextIcon, UserCheck, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -17,9 +17,7 @@ const adminNavLinks = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/admin/users', label: 'User Management', icon: <Users className="mr-2 h-5 w-5" /> },
   { href: '/admin/registered-admins', label: 'Registered Admins', icon: <UserCheck className="mr-2 h-5 w-5" /> },
-  { href: '/admin/reviewers', label: 'Reviewer Management', icon: <Eye className="mr-2 h-5 w-5" /> }, // New Link for Reviewers
-  // Add more admin modules here as they are built
-  // { href: '/admin/papers', label: 'Paper Management', icon: <FileTextIcon className="mr-2 h-5 w-5" /> },
+  { href: '/admin/reviewers', label: 'Reviewer Management', icon: <Eye className="mr-2 h-5 w-5" /> },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -27,9 +25,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div className="flex min-h-screen bg-secondary/30">
-        <aside className="w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-20"> {/* pt-20 to offset header */}
-          <div className="flex items-center gap-2 mb-6 px-2">
+      <div className="flex min-h-screen bg-secondary/30"> {/* This div controls the overall flex container for admin section */}
+        <aside className="w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-16"> {/* Sidebar, fixed, pt-16 to be below header */}
+          <div className="flex items-center gap-2 mb-6 px-2 mt-4"> {/* Added mt-4 to push content below header area within sidebar */}
             <Shield className="h-7 w-7 text-primary" />
             <h2 className="text-xl font-semibold tracking-tight">Admin Panel</h2>
           </div>
@@ -52,8 +50,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             ))}
           </nav>
         </aside>
-        <main className="flex-1 p-6 md:p-8 ml-64 mt-16"> {/* ml-64 for sidebar width, mt-16 for header height */}
-          {children}
+        {/* Main content area for admin pages */}
+        <main className="flex-1 flex flex-col ml-64 mt-16"> {/* ml-64 for sidebar, mt-16 for header, flex flex-col */}
+          <div className="flex-grow p-6 md:p-8"> {/* Inner div that grows */}
+            {children}
+          </div>
         </main>
       </div>
     </ProtectedRoute>

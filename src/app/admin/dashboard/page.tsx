@@ -33,7 +33,6 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        console.log("AdminDashboardContent: Fetching all papers from Firestore via paper-service.");
         const fetchedPapers = await getAllPapers(); // This should fetch from Firestore
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
@@ -48,11 +47,10 @@ function AdminDashboardContent() {
         const totalSubmissions = processedPapers.length;
         const pendingReview = processedPapers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
         const issuesFound = processedPapers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
-        const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length;
+        const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length; // Count only pending, not overdue
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
       } catch (error: any) {
-        console.error("AdminDashboard: Error fetching papers:", error);
         toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
@@ -90,7 +88,6 @@ function AdminDashboardContent() {
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
       if (paperToNotify) {
         // Simulate email notification
-        console.log(`SIMULATED EMAIL: User ${paperToNotify.userId} notified that paper "${paperToNotify.title}" was rejected due to non-payment.`);
         toast({
           title: "Email Notification (Simulated)",
           description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
@@ -100,18 +97,15 @@ function AdminDashboardContent() {
       }
       fetchAndSetPapers(); // Refresh paper list
     } catch (error: any) {
-      console.error("Failed to reject paper:", error);
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
     }
   };
 
-  // Auth loading and permission checks are largely handled by AdminLayout's ProtectedRoute
   if (authLoading) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
   
   if (!isAdmin && user) { 
-     // This case should ideally be caught by ProtectedRoute in AdminLayout
      return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
@@ -131,7 +125,6 @@ function AdminDashboardContent() {
   }
   
   if (!user) { 
-     // This case should also be caught by ProtectedRoute in AdminLayout
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
             <Alert variant="default" className="max-w-md mx-auto">
@@ -225,35 +218,41 @@ function AdminDashboardContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {papers.map((paper) => (
-                    <TableRow key={paper.id}>
-                      <TableCell className="font-medium max-w-xs truncate">
-                        <Link href={`/papers/${paper.id}`} className="hover:text-primary">{paper.title}</Link>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">{paper.authors.join(', ')}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant((paper as any).displayStatus || paper.status)}>
-                          {(paper as any).displayStatus || paper.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell>
-                        {paper.status === 'Payment Pending' || (paper as any).displayStatus === 'Payment Overdue' ? (
-                           <span className="text-destructive font-semibold">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Link href={`/papers/${paper.id}`}>
-                          <Button variant="outline" size="sm">Review</Button>
-                        </Link>
-                        {(paper as any).displayStatus === 'Payment Overdue' && (
-                           <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)}>Reject</Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {papers.map((paper) => {
+                    const effectiveStatus = (paper as any).displayStatus || paper.status;
+                    const isPaymentReallyDue = effectiveStatus === 'Payment Overdue';
+                    return (
+                      <TableRow key={paper.id}>
+                        <TableCell className="font-medium max-w-xs truncate">
+                          <Link href={`/papers/${paper.id}`} className="hover:text-primary">{paper.title}</Link>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{paper.authors.join(', ')}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(effectiveStatus)}>
+                            {effectiveStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>
+                          {isPaymentReallyDue ? (
+                             <span className="text-destructive font-semibold">Yes</span>
+                          ) : effectiveStatus === 'Payment Pending' ? (
+                             <span className="text-yellow-600 font-semibold">Pending</span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Link href={`/papers/${paper.id}`}>
+                            <Button variant="outline" size="sm">Review</Button>
+                          </Link>
+                          {effectiveStatus === 'Payment Overdue' && (
+                             <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)}>Reject</Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
