@@ -13,14 +13,21 @@ import {
   where,
   Timestamp,
   serverTimestamp,
+  orderBy, // Added orderBy import
 } from "firebase/firestore";
 import { db as firestoreDb } from "@/lib/firebase"; // Use db from firebase.ts
 import type { User } from '@/types';
 
 // Helper to convert Firestore Timestamps in user data
 const convertUserTimestamps = (userData: any): User => {
-  const convert = (timestamp: any) =>
-    timestamp instanceof Timestamp ? timestamp.toDate().toISOString() : (timestamp || null);
+  const convert = (timestamp: any) => {
+    if (!timestamp) return null;
+    if (timestamp instanceof Timestamp) return timestamp.toDate().toISOString();
+    // Handle cases where it might already be an ISO string or a Date object from client-side mock data
+    if (typeof timestamp === 'string') return timestamp;
+    if (timestamp instanceof Date) return timestamp.toISOString();
+    return null;
+  }
 
   return {
     ...userData,
@@ -37,8 +44,10 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
   }
   const userDocRef = doc(firestoreDb, "users", userId);
   try {
+    // console.log(`User Service (getUserProfile): Fetching user profile for UID ${userId}.`);
     const userSnap = await getDoc(userDocRef);
     if (userSnap.exists()) {
+      // console.log(`User Service (getUserProfile): User profile found for ${userId}. Data:`, userSnap.data());
       return convertUserTimestamps({ id: userSnap.id, ...userSnap.data() });
     } else {
       console.warn(`User Service (getUserProfile): No user document found for UID ${userId}.`);
@@ -51,57 +60,64 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 };
 
 // Creates or updates a user profile in Firestore
-export const createOrUpdateUserProfile = async (
-  userId: string,
-  profileData: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>> & { email?: string | null }
+// Note: `email` is typically managed by Firebase Auth and should be consistent.
+// `isAdmin` is managed server-side or manually for security.
+export const createOrUpdateUserProfileInFirestore = async (
+  uid: string,
+  data: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'isAdmin'>> & { email?: string | null, isAdmin?: boolean }
 ): Promise<User | null> => {
   if (!firestoreDb) {
-    console.error("User Service (createOrUpdateUserProfile): Firestore DB instance is not available.");
+    console.error("User Service (createOrUpdateUserProfileInFirestore): Firestore DB instance is not available.");
     return null;
   }
-  const userDocRef = doc(firestoreDb, "users", userId);
+  const userDocRef = doc(firestoreDb, "users", uid);
   try {
     const userSnap = await getDoc(userDocRef);
-    let finalProfileData: User;
+    const now = serverTimestamp();
+    let profileToSave: any;
 
     if (userSnap.exists()) {
       // Update existing document
-      const existingData = userSnap.data() as User;
-      const updatePayload: Partial<User> & { updatedAt: any } = {
-        ...profileData,
-        updatedAt: serverTimestamp(),
-      };
-      // Ensure email is not accidentally overwritten with null if not provided and already exists
-      if (profileData.email === undefined && existingData.email) {
-        updatePayload.email = existingData.email;
+      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Updating existing profile for ${uid}. Data:`, data);
+      profileToSave = { ...data, updatedAt: now };
+      // Preserve existing createdAt if not provided (shouldn't be in updates)
+      if (userSnap.data().createdAt && !profileToSave.createdAt) {
+        profileToSave.createdAt = userSnap.data().createdAt;
       }
-      await updateDoc(userDocRef, updatePayload);
-      finalProfileData = { ...existingData, ...updatePayload, id: userId, updatedAt: new Date().toISOString() } as User;
+      await updateDoc(userDocRef, profileToSave);
     } else {
       // Create new document
-      const newPayload: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { createdAt: any, updatedAt: any, id: string } = {
-        id: userId,
-        email: profileData.email || null,
-        displayName: profileData.displayName || "User",
-        photoURL: profileData.photoURL || null,
-        username: profileData.username || null,
-        role: profileData.role || "Author", // Default role
-        phoneNumber: profileData.phoneNumber || null,
-        institution: profileData.institution || null,
-        researcherId: profileData.researcherId || null,
-        isAdmin: profileData.isAdmin || false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Creating new profile for ${uid}. Data:`, data);
+      profileToSave = {
+        id: uid, // Ensure id is stored in the document
+        email: data.email || null,
+        displayName: data.displayName || "User",
+        photoURL: data.photoURL || null,
+        username: data.username || null,
+        role: data.role || "Author",
+        phoneNumber: data.phoneNumber || null,
+        institution: data.institution || null,
+        researcherId: data.researcherId || null,
+        isAdmin: data.isAdmin || false, // Default isAdmin to false for new profiles unless specified
+        createdAt: now,
+        updatedAt: now,
+        ...data, // Spread remaining data
       };
-      await setDoc(userDocRef, newPayload);
-      finalProfileData = { ...newPayload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as User;
+      await setDoc(userDocRef, profileToSave);
     }
-    return convertUserTimestamps(finalProfileData);
+    // Fetch the possibly merged/updated document to return consistent data
+    const updatedSnap = await getDoc(userDocRef);
+    if (updatedSnap.exists()) {
+      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Profile operation successful for ${uid}.`);
+      return convertUserTimestamps({ id: updatedSnap.id, ...updatedSnap.data() });
+    }
+    return null;
   } catch (error) {
-    console.error(`User Service (createOrUpdateUserProfile): Error for UID ${userId}:`, error);
+    console.error(`User Service (createOrUpdateUserProfileInFirestore): Error for UID ${uid}:`, error);
     return null;
   }
 };
+
 
 // Fetches all users from Firestore (for admin use)
 export const getAllUsers = async (): Promise<User[]> => {
@@ -121,34 +137,63 @@ export const getAllUsers = async (): Promise<User[]> => {
   }
 };
 
-// Check if a username is already taken
-export const isUsernameTaken = async (username: string, currentUserId?: string): Promise<boolean> => {
-  if (!firestoreDb) return false;
-  const usersRef = collection(firestoreDb, "users");
-  // Query for username, excluding the current user if provided (for profile updates)
-  let q = query(usersRef, where("username", "==", username));
-  if (currentUserId) {
-    // This query is more complex and might require a composite index on username and a way to exclude currentUserId
-    // For simplicity, we fetch all and filter, or rely on Firestore rules preventing duplicates + try/catch on write
-    // A simpler approach for updates is to allow the write and catch duplicate errors,
-    // or fetch the specific user by username and check if its ID is different than currentUserId.
-    const userSnap = await getDocs(q);
-    if (userSnap.empty) return false;
-    return userSnap.docs.some(doc => doc.id !== currentUserId);
+// Check if a username is already taken (excluding a specific user, for updates)
+export const isUsernameTaken = async (username: string, excludeUserId?: string): Promise<boolean> => {
+  if (!firestoreDb) {
+    console.error("User Service (isUsernameTaken): Firestore DB instance is not available.");
+    return false; // Or throw error, depending on desired handling
   }
-  const querySnapshot = await getDocs(q);
-  return !querySnapshot.empty;
+  const usersRef = collection(firestoreDb, "users");
+  let q = query(usersRef, where("username", "==", username));
+  try {
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      return false; // Username not taken
+    }
+    // If excludeUserId is provided, check if the found user is different
+    if (excludeUserId) {
+      return querySnapshot.docs.some(doc => doc.id !== excludeUserId);
+    }
+    return true; // Username taken and no exclusion
+  } catch (error) {
+    console.error("User Service (isUsernameTaken): Error checking username:", error);
+    return false; // Default to not taken on error to avoid blocking valid signups, or handle error differently
+  }
 };
 
-// Check if a phone number is already taken
-export const isPhoneNumberTaken = async (phoneNumber: string, currentUserId?: string): Promise<boolean> => {
-  if (!firestoreDb || !phoneNumber) return false;
+// Check if a phone number is already taken (excluding a specific user, for updates)
+export const isPhoneNumberTaken = async (phoneNumber: string, excludeUserId?: string): Promise<boolean> => {
+  if (!firestoreDb) {
+    console.error("User Service (isPhoneNumberTaken): Firestore DB instance is not available.");
+    return false;
+  }
+  if (!phoneNumber) return false; // Empty phone number is not "taken"
+
   const usersRef = collection(firestoreDb, "users");
   let q = query(usersRef, where("phoneNumber", "==", phoneNumber));
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) return false;
-  if (currentUserId) {
-    return querySnapshot.docs.some(doc => doc.id !== currentUserId);
+  try {
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      return false; // Phone number not taken
+    }
+    if (excludeUserId) {
+      return querySnapshot.docs.some(doc => doc.id !== excludeUserId);
+    }
+    return true; // Phone number taken
+  } catch (error) {
+    console.error("User Service (isPhoneNumberTaken): Error checking phone number:", error);
+    return false;
   }
-  return !querySnapshot.empty;
+};
+
+// Helper to convert client-side User data to Firestore-compatible data, especially for timestamps
+export const prepareUserDataForFirestore = (userData: Partial<User>): any => {
+  const data: any = { ...userData };
+  if (data.createdAt && typeof data.createdAt === 'string') {
+    data.createdAt = Timestamp.fromDate(new Date(data.createdAt));
+  }
+  if (data.updatedAt && typeof data.updatedAt === 'string') {
+    data.updatedAt = Timestamp.fromDate(new Date(data.updatedAt));
+  }
+  return data;
 };
