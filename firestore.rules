@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,56 +6,61 @@ service cloud.firestore {
 
     // Helper functions
     function isAdmin() {
-      // Check if the user is authenticated, their user document exists, and has isAdmin == true
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      // Check if the requesting user exists and has isAdmin == true in their user document
+      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+    function isPaperOwner() {
+      return request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Users Collection
     match /users/{userId} {
-      // Authenticated users can read their own profile.
-      // Admins can read any user profile.
-      allow get: if isOwner(userId) || isAdmin();
-
-      // Allow creating own user document during signup.
-      // - The userId in the path must match the authenticated user's UID.
-      // - The 'id' field in the document data must also match the UID.
-      // - Users cannot set 'isAdmin' to true during creation via this rule.
-      //   (Initial admin setup is typically manual or via a trusted backend process/special email).
-      allow create: if isOwner(userId) &&
-                       request.resource.data.id == request.auth.uid &&
-                       (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
-
-      // Allow authenticated users to update their own profile.
-      // - They cannot change their 'id' or 'email' if these fields are stored in the document.
-      // - They cannot change their 'isAdmin' status.
-      allow update: if isOwner(userId) &&
-                       (!('id'      in request.resource.data) || request.resource.data.id      == resource.data.id) &&
-                       (!('email'   in request.resource.data) || request.resource.data.email   == resource.data.email) &&
-                       (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin);
-
-      // Allow authenticated users to query the users collection.
-      // This is necessary for client-side uniqueness checks (e.g., username, phone number).
-      // Client-side queries should be specific (e.g., .where('username', '==', valueToCheck)).
+      // 1. Authenticated users can read their own profile.
+      // 2. Admins can read any user profile.
+      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      
+      // 3. Any authenticated user can list user data (needed for client-side uniqueness checks on username/phone).
+      // Consider if this needs to be more restrictive based on query.
       allow list: if request.auth != null;
+
+      // Authenticated users can create their own profile document during signup.
+      // The userId in the document must match their auth uid.
+      allow create: if request.auth != null && request.auth.uid == userId &&
+                       request.resource.data.userId == request.auth.uid;
+
+      // Authenticated users can update their own profile.
+      // They cannot change their isAdmin status through this rule.
+      // If isAdmin field is present in the update, its value must match existing or not be present.
+      allow update: if request.auth != null && request.auth.uid == userId &&
+                       (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin);
     }
 
-    // Papers collection is currently handled by mock data on the client-side.
-    // If papers were to be stored in Firestore, their rules would go here.
-    // Example (if papers were in Firestore):
-    // match /papers/{paperId} {
-    //   function isPaperOwner() {
-    //     return request.auth != null && resource.data.userId == request.auth.uid;
-    //   }
-    //   allow read: if isPaperOwner() || isAdmin() || resource.data.status == 'Published';
-    //   allow list: if isPaperOwner() || isAdmin() || request.query.filters.find(f => f[0] == 'status' && f[2] == 'Published') != null;
-    //   allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    //   allow update, delete: if isPaperOwner() || isAdmin();
-    // }
+    // Papers Collection
+    match /papers/{paperId} {
+      // Read operations (get)
+      allow get: if (isPaperOwner() || isAdmin() || (request.auth != null && resource.data.status == 'Published'));
+
+      // List operations
+      // Admins can list all papers.
+      // Authenticated users can list their own papers (client query must filter by userId).
+      // Authenticated users can list published papers (client query must filter by status == 'Published').
+      allow list: if request.auth != null &&
+                     (isAdmin() ||
+                      (resource.data.userId == request.auth.uid) || // Allows listing for owner if query is open, client should filter
+                      (resource.data.status == 'Published')       // Allows listing for anyone if query is open, client should filter
+                     );
+      // Note: For `list` rules, if you want to enforce that queries *must* include specific filters
+      // (e.g., user must query `where('userId', '==', request.auth.uid)`),
+      // you'd use `request.query.filters` or check `request.query.resource.data.userId == request.auth.uid`.
+      // The current rule is more permissive at the rule level, relying on client queries.
+
+      // Create operations
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Update and Delete operations
+      allow update, delete: if isPaperOwner() || isAdmin();
+    }
   }
 }

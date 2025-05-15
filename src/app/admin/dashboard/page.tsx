@@ -1,10 +1,10 @@
 
 "use client";
 
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import ProtectedRoute from "@/components/auth/ProtectedRoute"; // Already wraps AdminLayout
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText, Clock, Info } from "lucide-react";
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info } from "lucide-react"; // Renamed FileText to FileTextIcon
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; // Now fetches from Firestore via API
+import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
@@ -33,9 +33,7 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        // console.log("AdminDashboard: Fetching all papers from Firestore.");
-        const fetchedPapers = await getAllPapers();
-
+        const fetchedPapers = await getAllPapers(); // Fetches from Firestore
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -52,9 +50,8 @@ function AdminDashboardContent() {
         const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length;
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
-
       } catch (error: any) {
-        console.error("AdminDashboard: Error fetching papers from Firestore:", error);
+        console.error("AdminDashboard: Error fetching papers:", error);
         toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
@@ -62,9 +59,11 @@ function AdminDashboardContent() {
     } else if (!authLoading && user && !isAdmin) {
       setPapers([]);
       setIsLoadingPapers(false);
+      // Non-admin should not see this content due to ProtectedRoute in AdminLayout
     } else if (!authLoading && !user) {
       setPapers([]);
       setIsLoadingPapers(false);
+      // Logged-out user should not see this
     }
   };
 
@@ -88,9 +87,7 @@ function AdminDashboardContent() {
     try {
       await updatePaperStatus(paperId, 'Rejected');
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
-
       if (paperToNotify) {
-        // console.log(`SIMULATING EMAIL: An email would be sent to the user (owner of paper ID: ${paperToNotify.userId}) for paper "${paperToNotify.title}" regarding its rejection due to non-payment.`);
         toast({
           title: "Email Notification (Simulated)",
           description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
@@ -105,24 +102,19 @@ function AdminDashboardContent() {
     }
   };
 
+  // Auth loading and permission checks are largely handled by AdminLayout's ProtectedRoute
   if (authLoading) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
-
-  if (user && !isAdmin) {
-    return (
+  
+  if (!isAdmin && user) { // Should ideally not be reached if AdminLayout works.
+     return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
-            Your account is not recognized as an administrator.
-            Please ensure the `isAdmin` field is correctly set to `true` (boolean) in your user's Firestore document.
-            <ul className="list-disc list-inside text-left mt-2 text-sm">
-                <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
-                <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted for your user.</li>
-            </ul>
-            If the issue persists, please verify your Firestore data or contact support.
+            You do not have permission to view this page.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -131,7 +123,8 @@ function AdminDashboardContent() {
       </div>
     );
   }
-  if (!user) {
+  
+  if (!user) { // Should ideally not be reached
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
             <Alert variant="default" className="max-w-md mx-auto">
@@ -148,28 +141,27 @@ function AdminDashboardContent() {
      );
   }
 
-
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
 
   return (
-    <div className="w-full max-w-screen-2xl mx-auto py-8 md:py-12 px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="w-full space-y-8"> {/* Removed max-w-screen-2xl, controlled by layout */}
+      <div className="flex items-center justify-between">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center">
-          <Shield className="mr-3 h-8 w-8 text-primary" /> Admin Panel
+          <LayoutDashboard className="mr-3 h-8 w-8 text-primary" /> Dashboard Overview
         </h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileTextIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
-            <p className="text-xs text-muted-foreground">papers submitted to the platform</p>
+            <p className="text-xs text-muted-foreground">papers submitted</p>
           </CardContent>
         </Card>
         <Card>
@@ -179,7 +171,7 @@ function AdminDashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pendingReview}</div>
-            <p className="text-xs text-muted-foreground">papers awaiting admin/reviewer action</p>
+            <p className="text-xs text-muted-foreground">papers awaiting action</p>
           </CardContent>
         </Card>
          <Card>
@@ -199,7 +191,7 @@ function AdminDashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.issuesFound}</div>
-            <p className="text-xs text-muted-foreground">papers flagged or needing attention</p>
+            <p className="text-xs text-muted-foreground">papers flagged</p>
           </CardContent>
         </Card>
       </div>
@@ -211,7 +203,7 @@ function AdminDashboardContent() {
         </CardHeader>
         <CardContent>
           {papers.length === 0 ? (
-            <p className="text-muted-foreground">No papers have been submitted to the platform yet.</p>
+            <p className="text-muted-foreground text-center py-4">No papers have been submitted to the platform yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -270,9 +262,6 @@ function AdminDashboardContent() {
 }
 
 export default function AdminDashboardPage() {
-  return (
-    <ProtectedRoute adminOnly={true}>
-      <AdminDashboardContent />
-    </ProtectedRoute>
-  );
+  // The AdminLayout will handle the ProtectedRoute for adminOnly
+  return <AdminDashboardContent />;
 }

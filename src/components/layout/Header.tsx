@@ -21,18 +21,42 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users, FileText as FileTextIcon, Phone } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIcon, FileText as FileTextIconLucide, Phone } from 'lucide-react'; // Renamed Users to UsersIcon, FileText to FileTextIconLucide
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
+const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon }: { href?: string, children: React.ReactNode, onClick?: () => void, isActive?: boolean, isAction?: boolean, icon?: React.ReactNode }) => {
+  const commonClasses = "w-full justify-start hover:text-primary flex items-center text-foreground";
+  const activeClasses = isActive ? "text-primary bg-secondary font-semibold" : "";
 
-const NavLink = ({ href, children, onClick, className }: { href: string, children: React.ReactNode, onClick?: () => void, className?: string }) => (
-  <Link href={href} passHref>
-    <Button variant="ghost" className={cn("w-full justify-start hover:text-primary", className)} onClick={onClick}>
-      {children}
-    </Button>
-  </Link>
-);
+  if (isAction && onClick) {
+    return (
+      <Button
+        variant="ghost"
+        onClick={onClick}
+        className={cn(commonClasses, activeClasses, "px-3 py-2 text-sm font-medium")}
+      >
+        {icon}{children}
+      </Button>
+    );
+  }
+
+  if (href) {
+    return (
+      <Link href={href} passHref>
+        <Button
+          variant="ghost"
+          onClick={onClick}
+          className={cn(commonClasses, activeClasses, "px-3 py-2 text-sm font-medium")}
+        >
+         {icon}{children}
+        </Button>
+      </Link>
+    );
+  }
+  return null;
+};
+
 
 export default function Header() {
   const { user, logout, isAdmin, setShowLoginModal } = useAuth();
@@ -44,7 +68,6 @@ export default function Header() {
   useEffect(() => {
     setIsClient(true);
   }, []);
-
 
   const handleLoginClick = () => {
     setIsMobileMenuOpen(false);
@@ -59,7 +82,8 @@ export default function Header() {
   const handleLogout = async () => {
     setIsMobileMenuOpen(false);
     await logout();
-  }
+    router.push('/'); // Redirect to home after logout
+  };
 
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false);
@@ -69,48 +93,48 @@ export default function Header() {
       localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
-    // If user is admin, this button isn't shown based on currentNavLinks logic
   };
+  
+  const isViewingAdminSection = pathname.startsWith('/admin');
 
   const baseNavLinks = [
     { href: "/", label: "Home", icon: null },
     { href: "/registration", label: "Registration", icon: null },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
 
-  const userNavLinks = [ // Links for logged-in, non-admin users
+  const userNavLinks = [
     { href: "/", label: "Home", icon: null },
-    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-1 h-4 w-4" /> },
-    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-1 h-4 w-4" />, href: "/submit" }, // Added href
-    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
+    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-2 h-4 w-4" />, href:"/submit" },
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-2 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
 
-  const adminNavLinks = [ // Links for admin users
-    { href: "/", label: "Home", icon: null },
-    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-1 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
-    // Admins typically don't need Registration, Templates, Contact in their main nav bar
+  const adminNavLinks = [
+    { href: "/", label: "Home", icon: null }, // Admin still needs access to home
+    { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
+    { href: "/admin/users", label: "Users", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
+    // { href: "/admin/papers", label: "Papers", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> }, // Example for future
+    { href: "/search-papers", label: "Search All Papers", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee Info", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
   ];
-
 
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
-  if (isClient) {
+  if (isClient) { // Only determine links on client to avoid hydration mismatch
     if (user && isAdmin) {
       currentNavLinks = adminNavLinks;
     } else if (user && !isAdmin) {
       currentNavLinks = userNavLinks;
-    } else { // Guest users
+    } else {
       currentNavLinks = baseNavLinks;
     }
   }
-
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -122,28 +146,16 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {currentNavLinks.map(link => (
-            link.action ? (
-              <Button
-                key={link.href || link.label}
-                variant="ghost"
-                onClick={link.action}
-                className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium flex items-center"
-              >
-                {link.icon}{link.label}
-              </Button>
-            ) : (
-              <Link
-                key={link.href}
-                href={link.href!}
-                className={cn(
-                  "px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center",
-                  pathname === link.href && "text-primary font-semibold",
-                  (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "text-primary font-bold underline"
-                )}
-              >
-                {link.icon}{link.label}
-              </Link>
-            )
+            <NavLinkItem
+              key={link.href || link.label}
+              href={link.href}
+              onClick={link.action}
+              isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href))}
+              isAction={!!link.action}
+              icon={link.icon}
+            >
+              {link.label}
+            </NavLinkItem>
           ))}
         </nav>
 
@@ -168,7 +180,7 @@ export default function Header() {
                 <DropdownMenuSeparator />
                 {isAdmin ? (
                      <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
-                        <Shield className="mr-2 h-4 w-4" />
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
                         <span>Admin Panel</span>
                     </DropdownMenuItem>
                 ) : (
@@ -228,28 +240,19 @@ export default function Header() {
               </SheetHeader>
               <div className="flex flex-col space-y-1">
                 {currentNavLinks.map(link => (
-                   link.action ? (
-                        <Button
-                          key={link.href || link.label}
-                          variant="ghost"
-                          onClick={() => { link.action!(); setIsMobileMenuOpen(false); }}
-                          className={cn("w-full justify-start hover:text-primary text-foreground flex items-center", pathname === link.href && "text-primary bg-secondary")}
-                        >
-                          {link.icon}{link.label}
-                        </Button>
-                  ) : (
-                    <NavLink
-                      key={link.href}
-                      href={link.href!}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn("text-foreground flex items-center",
-                                   pathname === link.href && "text-primary bg-secondary",
-                                   (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "font-bold"
-                                  )}
+                   <NavLinkItem
+                      key={link.href || link.label}
+                      href={link.href}
+                      onClick={() => {
+                        if(link.action) link.action();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href))}
+                      isAction={!!link.action}
+                      icon={link.icon}
                     >
-                       {link.icon}{link.label}
-                    </NavLink>
-                  )
+                      {link.label}
+                    </NavLinkItem>
                 ))}
                 <DropdownMenuSeparator className="my-2"/>
                 {isClient && user ? (
@@ -258,24 +261,20 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className={cn("text-foreground flex items-center", pathname === "/profile/settings" && "text-primary bg-secondary")}>
-                        <Settings className="mr-2 h-4 w-4" /> Profile Settings
-                     </NavLink>
+                    <NavLinkItem href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/profile/settings"} icon={<Settings className="mr-2 h-4 w-4" />}>
+                         Profile Settings
+                    </NavLinkItem>
                     {!isAdmin && (
-                       <NavLink href="/ai-pre-check" onClick={() => { router.push('/ai-pre-check'); setIsMobileMenuOpen(false); }} className={cn("text-foreground flex items-center", pathname === "/ai-pre-check" && "text-primary bg-secondary")}>
-                          <Sparkles className="mr-2 h-4 w-4" /> AI Pre-Check
-                       </NavLink>
+                        <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname==="/submit"} isAction={true} icon={<UploadCloud className="mr-2 h-4 w-4" />}>
+                            Submit Paper
+                        </NavLinkItem>
                     )}
                      {!isAdmin && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }}
-                          className={cn("w-full justify-start hover:text-primary text-foreground flex items-center", pathname === "/submit" && "text-primary bg-secondary")}
-                        >
-                          <UploadCloud className="mr-2 h-4 w-4" /> Submit Paper
-                        </Button>
+                       <NavLinkItem href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/ai-pre-check"} icon={<Sparkles className="mr-2 h-4 w-4" />}>
+                          AI Pre-Check
+                       </NavLinkItem>
                     )}
-                    <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive">
+                    <Button variant="ghost" onClick={() => {handleLogout(); setIsMobileMenuOpen(false);}} className="w-full justify-start text-destructive hover:text-destructive flex items-center">
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
                     </Button>
                   </>
