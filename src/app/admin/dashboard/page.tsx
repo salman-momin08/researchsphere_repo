@@ -1,10 +1,10 @@
 
 "use client";
 
-import ProtectedRoute from "@/components/auth/ProtectedRoute"; // Already wraps AdminLayout
+// import ProtectedRoute from "@/components/auth/ProtectedRoute"; // Already wraps AdminLayout
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info, LayoutDashboard } from "lucide-react"; // Renamed FileText to FileTextIcon, Added LayoutDashboard
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info, LayoutDashboard } from "lucide-react";
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +33,8 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers(); // Fetches from Firestore
+        console.log("AdminDashboardContent: Fetching all papers from Firestore via paper-service.");
+        const fetchedPapers = await getAllPapers();
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -107,14 +108,16 @@ function AdminDashboardContent() {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
   
-  if (!isAdmin && user) { // Should ideally not be reached if AdminLayout works.
+  if (!isAdmin && user) { 
      return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
-          <AlertTriangle className="h-4 w-4" />
+          <Shield className="h-5 w-5" /> {/* Changed Icon to Shield for thematic consistency */}
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
             You do not have permission to view this page.
+            Your `isAdmin` flag in AuthContext is `false`. 
+            Please ensure your user profile in Firestore has `isAdmin: true` (boolean) if you are an administrator.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -124,7 +127,7 @@ function AdminDashboardContent() {
     );
   }
   
-  if (!user) { // Should ideally not be reached
+  if (!user) { 
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
             <Alert variant="default" className="max-w-md mx-auto">
@@ -135,7 +138,7 @@ function AdminDashboardContent() {
                 </AlertDescription>
             </Alert>
              <Link href="/login">
-                <Button className="mt-6" onClick={() => localStorage.setItem('redirectAfterLogin', '/admin/dashboard')}>Log In</Button>
+                <Button className="mt-6" onClick={() => typeof window !== 'undefined' && localStorage.setItem('redirectAfterLogin', '/admin/dashboard')}>Log In</Button>
             </Link>
         </div>
      );
@@ -146,7 +149,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="w-full space-y-8"> {/* Removed max-w-screen-2xl, controlled by layout */}
+    <div className="w-full space-y-8 max-w-screen-2xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center">
           <LayoutDashboard className="mr-3 h-8 w-8 text-primary" /> Dashboard Overview
@@ -231,12 +234,8 @@ function AdminDashboardContent() {
                       </TableCell>
                       <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>
-                        {paper.status === 'Payment Pending' && paper.paymentDueDate ? (
-                           (paper as any).displayStatus === 'Payment Overdue' ? (
-                             <span className="text-destructive font-semibold">Overdue</span>
-                           ) : (
-                            <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" className="text-xs text-orange-600"/>
-                           )
+                        {paper.status === 'Payment Pending' || (paper as any).displayStatus === 'Payment Overdue' ? (
+                           <span className="text-destructive font-semibold">Yes</span>
                         ) : (
                           <span className="text-muted-foreground">N/A</span>
                         )}

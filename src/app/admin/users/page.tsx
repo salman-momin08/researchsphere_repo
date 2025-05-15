@@ -2,15 +2,15 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service'; // We'll create this service
+import type { User } from '@/types'; // Ensure User type is correctly imported
+import { getAllUsers } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Users as UsersIcon, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button'; // For future actions
+// import { Button } from '@/components/ui/button'; // For future actions
 import { toast } from '@/hooks/use-toast';
 
 export default function UserManagementPage() {
@@ -22,11 +22,13 @@ export default function UserManagementPage() {
     const fetchUsers = async () => {
       setIsLoading(true);
       setError(null);
+      console.log("UserManagementPage: Fetching all users...");
       try {
         const fetchedUsers = await getAllUsers();
+        console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service.`, fetchedUsers);
         setUsers(fetchedUsers);
       } catch (err: any) {
-        console.error("Error fetching users:", err);
+        console.error("UserManagementPage: Error fetching users:", err);
         setError(err.message || "Failed to load users.");
         toast({ variant: "destructive", title: "Error Loading Users", description: err.message });
       } finally {
