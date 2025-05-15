@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users, FileText as FileTextIcon, Phone, Info as InfoIcon, MessageSquare } from 'lucide-react'; 
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Shield, Sparkles, Menu, Settings, Search as SearchIcon, Users, FileText as FileTextIcon, Phone } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -39,10 +39,10 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false); 
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true); 
+    setIsClient(true);
   }, []);
 
 
@@ -50,7 +50,7 @@ export default function Header() {
     setIsMobileMenuOpen(false);
     setShowLoginModal(true);
   };
-  
+
   const handleSignupClick = () => {
     setIsMobileMenuOpen(false);
     router.push('/signup');
@@ -60,47 +60,54 @@ export default function Header() {
     setIsMobileMenuOpen(false);
     await logout();
   }
-  
+
   const handleSubmitPaperClick = () => {
-    setIsMobileMenuOpen(false); 
-    if (user && !isAdmin) { 
+    setIsMobileMenuOpen(false);
+    if (user && !isAdmin) {
       router.push('/submit');
     } else if (!user) {
       localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
+    // If user is admin, this button isn't shown based on currentNavLinks logic
   };
 
   const baseNavLinks = [
-    { href: "/", label: "Home", icon: null, adminOnly: false, userOnly: false },
-    { href: "/registration", label: "Registration", icon: null, adminOnly: false, userOnly: false },
-    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" />, adminOnly: false, userOnly: false },
+    { href: "/", label: "Home", icon: null },
+    { href: "/registration", label: "Registration", icon: null },
+    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
   ];
 
-  const userSpecificNavLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
-    { href: "/submit", label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
-    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" />, userOnly: true, adminOnly: false },
+  const userNavLinks = [ // Links for logged-in, non-admin users
+    { href: "/", label: "Home", icon: null },
+    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-1 h-4 w-4" /> },
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-1 h-4 w-4" />, href: "/submit" }, // Added href
+    { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-1 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIcon className="mr-1 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-1 h-4 w-4" /> },
   ];
 
-  const adminSpecificNavLinks = [
-    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-1 h-4 w-4" />, adminOnly: true, userOnly: false },
-    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-1 h-4 w-4" />, adminOnly: true, userOnly: false }, // Admins can also search
+  const adminNavLinks = [ // Links for admin users
+    { href: "/", label: "Home", icon: null },
+    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-1 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-1 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <Users className="mr-1 h-4 w-4" /> },
+    // Admins typically don't need Registration, Templates, Contact in their main nav bar
   ];
-  
-  let currentNavLinks = [];
+
+
+  let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
     if (user && isAdmin) {
-      currentNavLinks = [...baseNavLinks.filter(link => !link.userOnly), ...adminSpecificNavLinks];
-      // Filter out links not relevant for admins from baseNavLinks
-      currentNavLinks = currentNavLinks.filter(link => !["/registration", "/submit", "/ai-pre-check", "/sample-templates", "/contact-us"].includes(link.href));
+      currentNavLinks = adminNavLinks;
     } else if (user && !isAdmin) {
-      currentNavLinks = [...baseNavLinks.filter(link => !link.adminOnly), ...userSpecificNavLinks];
-    } else {
-      currentNavLinks = baseNavLinks.filter(link => !link.adminOnly && !link.userOnly);
+      currentNavLinks = userNavLinks;
+    } else { // Guest users
+      currentNavLinks = baseNavLinks;
     }
   }
 
@@ -117,21 +124,21 @@ export default function Header() {
           {currentNavLinks.map(link => (
             link.action ? (
               <Button
-                key={link.href} 
+                key={link.href || link.label}
                 variant="ghost"
                 onClick={link.action}
-                className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium"
+                className="px-3 py-2 transition-colors hover:text-primary hover:bg-transparent text-foreground text-sm font-medium flex items-center"
               >
                 {link.icon}{link.label}
               </Button>
             ) : (
-              <Link 
-                key={link.href} 
-                href={link.href} 
+              <Link
+                key={link.href}
+                href={link.href!}
                 className={cn(
                   "px-3 py-2 transition-colors hover:text-primary text-foreground flex items-center",
                   pathname === link.href && "text-primary font-semibold",
-                  (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "text-primary font-bold underline" 
+                  (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "text-primary font-bold underline"
                 )}
               >
                 {link.icon}{link.label}
@@ -141,7 +148,7 @@ export default function Header() {
         </nav>
 
         <div className="hidden md:flex items-center space-x-2 ml-auto">
-          {isClient && user ? ( 
+          {isClient && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
@@ -174,7 +181,7 @@ export default function Header() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {!isAdmin && ( 
+                {!isAdmin && (
                     <DropdownMenuItem onClick={handleSubmitPaperClick}>
                         <UploadCloud className="mr-2 h-4 w-4" />
                         <span>Submit Paper</span>
@@ -197,7 +204,7 @@ export default function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : isClient ? ( 
+          ) : isClient ? (
             <>
               <Button variant="ghost" onClick={handleLoginClick} className="text-foreground">Log In</Button>
               <Button onClick={handleSignupClick}>Sign Up</Button>
@@ -205,7 +212,7 @@ export default function Header() {
           ) : null }
         </div>
 
-        <div className="flex items-center md:hidden"> 
+        <div className="flex items-center md:hidden">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -220,22 +227,22 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1">
-                {currentNavLinks.map(link => ( 
+                {currentNavLinks.map(link => (
                    link.action ? (
-                        <Button 
-                          key={link.href} 
-                          variant="ghost" 
-                          onClick={() => { link.action!(); setIsMobileMenuOpen(false); }} 
-                          className={cn("w-full justify-start hover:text-primary text-foreground", pathname === link.href && "text-primary bg-secondary")}
+                        <Button
+                          key={link.href || link.label}
+                          variant="ghost"
+                          onClick={() => { link.action!(); setIsMobileMenuOpen(false); }}
+                          className={cn("w-full justify-start hover:text-primary text-foreground flex items-center", pathname === link.href && "text-primary bg-secondary")}
                         >
                           {link.icon}{link.label}
                         </Button>
                   ) : (
-                    <NavLink 
-                      key={link.href} 
-                      href={link.href} 
-                      onClick={() => setIsMobileMenuOpen(false)} 
-                      className={cn("text-foreground", 
+                    <NavLink
+                      key={link.href}
+                      href={link.href!}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn("text-foreground flex items-center",
                                    pathname === link.href && "text-primary bg-secondary",
                                    (link.href === '/admin/dashboard' && pathname.startsWith('/admin')) && "font-bold"
                                   )}
@@ -251,13 +258,22 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className={cn("text-foreground", pathname === "/profile/settings" && "text-primary bg-secondary")}>
+                     <NavLink href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} className={cn("text-foreground flex items-center", pathname === "/profile/settings" && "text-primary bg-secondary")}>
                         <Settings className="mr-2 h-4 w-4" /> Profile Settings
                      </NavLink>
                     {!isAdmin && (
-                       <NavLink href="/ai-pre-check" onClick={() => { router.push('/ai-pre-check'); setIsMobileMenuOpen(false); }} className={cn("text-foreground", pathname === "/ai-pre-check" && "text-primary bg-secondary")}>
+                       <NavLink href="/ai-pre-check" onClick={() => { router.push('/ai-pre-check'); setIsMobileMenuOpen(false); }} className={cn("text-foreground flex items-center", pathname === "/ai-pre-check" && "text-primary bg-secondary")}>
                           <Sparkles className="mr-2 h-4 w-4" /> AI Pre-Check
                        </NavLink>
+                    )}
+                     {!isAdmin && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }}
+                          className={cn("w-full justify-start hover:text-primary text-foreground flex items-center", pathname === "/submit" && "text-primary bg-secondary")}
+                        >
+                          <UploadCloud className="mr-2 h-4 w-4" /> Submit Paper
+                        </Button>
                     )}
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
@@ -277,4 +293,3 @@ export default function Header() {
     </header>
   );
 }
-
