@@ -14,7 +14,8 @@ interface AnimatedInputProps extends InputProps {
 const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
   ({ className, type, label, id, containerClassName, ...props }, ref) => {
     const internalId = id || React.useId();
-    const [hasValue, setHasValue] = React.useState(!!props.value || !!props.defaultValue);
+    // Use props.value or props.defaultValue to initialize hasValue state correctly
+    const [hasValue, setHasValue] = React.useState(!!(props.value || props.defaultValue || ''));
     const [isFocused, setIsFocused] = React.useState(false);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,11 +34,15 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
+      // Ensure hasValue reflects current input value on blur,
+      // especially if component is uncontrolled and props.value isn't set.
+      setHasValue(!!e.target.value);
       if (props.onBlur) {
         props.onBlur(e);
       }
     };
 
+    // Determine if label should float based on focus or if the input has a value
     const isLabelFloating = isFocused || hasValue;
 
     return (
@@ -48,8 +53,8 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
             "absolute left-3 transition-all duration-200 ease-in-out pointer-events-none",
             "text-muted-foreground",
             isLabelFloating
-              ? "top-0 text-xs text-primary" // Floating state
-              : "top-1/2 -translate-y-1/2 text-base" // Resting state (placeholder-like)
+              ? "top-0 text-xs text-primary" // Floating state: above the input
+              : "top-1/2 -translate-y-1/2 text-base" // Resting state: inside the input
           )}
         >
           {label}
@@ -59,13 +64,16 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
           ref={ref}
           type={type}
           className={cn(
-            "h-10 pt-3 text-base", // Adjusted padding for label space
+            "h-10 pt-3 text-base", // Ensure padding-top for label space when it's inside
+            // Custom focus styling for a thinner ring
+            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
             className
           )}
           onChange={handleInputChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          // Use a transparent placeholder to ensure label visibility logic works, or remove placeholder prop
+          // Using a space as a placeholder can help with consistent height/baseline
+          // when the label is not floating, but it's not strictly necessary for the floating label logic
           placeholder={isLabelFloating ? "" : " "} 
           {...props}
         />
