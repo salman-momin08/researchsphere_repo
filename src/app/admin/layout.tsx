@@ -5,9 +5,9 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { Shield, Users, LayoutDashboard, FileText } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, FileText as FileTextIcon, UserCheck } from 'lucide-react'; // Added UserCheck
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button'; // Import Button for consistent styling
+import { Button } from '@/components/ui/button';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -16,8 +16,9 @@ interface AdminLayoutProps {
 const adminNavLinks = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/admin/users', label: 'User Management', icon: <Users className="mr-2 h-5 w-5" /> },
+  { href: '/admin/registered-admins', label: 'Registered Admins', icon: <UserCheck className="mr-2 h-5 w-5" /> }, // New Link
   // Add more admin modules here as they are built
-  // { href: '/admin/papers', label: 'Paper Management', icon: <FileText className="mr-2 h-5 w-5" /> },
+  // { href: '/admin/papers', label: 'Paper Management', icon: <FileTextIcon className="mr-2 h-5 w-5" /> },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

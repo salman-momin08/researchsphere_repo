@@ -21,19 +21,19 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIcon, FileText as FileTextIconLucide, Phone } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIcon, FileText as FileTextIconLucide, Phone, Shield } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 // Adjusted NavLinkItem for better style handling, especially for mobile sheet
-const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }: { 
-  href?: string, 
-  children: React.ReactNode, 
-  onClick?: () => void, 
-  isActive?: boolean, 
-  isAction?: boolean, 
+const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }: {
+  href?: string,
+  children: React.ReactNode,
+  onClick?: () => void,
+  isActive?: boolean,
+  isAction?: boolean,
   icon?: React.ReactNode,
-  isAdminContext?: boolean 
+  isAdminContext?: boolean
 }) => {
   const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-base font-medium";
   let activeStyleClasses = "";
@@ -102,7 +102,6 @@ export default function Header() {
   const handleLogout = async () => {
     setIsMobileMenuOpen(false);
     await logout();
-    // Redirect to home handled by AuthContext on user state change
   };
 
   const handleSubmitPaperClick = () => {
@@ -113,24 +112,23 @@ export default function Header() {
       localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
-    // Admins should not see this option, so no action if isAdmin is true
   };
-  
+
   const isViewingAdminSection = pathname.startsWith('/admin');
 
-  // Navigation link definitions
   const baseNavLinks = [
     { href: "/", label: "Home", icon: null },
-    { href: "/registration", label: "Registration", icon: null },
+    { href: "/registration", label: "Registration", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
   ];
 
   const userNavLinks = [
     { href: "/", label: "Home", icon: null },
     { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
-    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-2 h-4 w-4" />, href:"/submit" },
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-2 h-4 w-4" />, href: "/submit" },
     { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
@@ -138,17 +136,13 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
 
-  const adminNavLinks = [ // "Home" is removed for admin's primary nav
-    { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
-    { href: "/admin/users", label: "Users", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search All Papers", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee Info", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
-  ];
+  // Simplified main navigation for admins
+  const adminMainNavLink = { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-2 h-4 w-4" /> };
 
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
     if (user && isAdmin) {
-      currentNavLinks = adminNavLinks;
+      currentNavLinks = [adminMainNavLink]; // Only Admin Panel link in main nav for admin
     } else if (user && !isAdmin) {
       currentNavLinks = userNavLinks;
     } else {
@@ -164,24 +158,23 @@ export default function Header() {
           <span className="text-xl font-bold">ResearchSphere</span>
         </Link>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
             const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href));
             let buttonClasses = "";
 
-            if (isAdmin) {
+            if (user && isAdmin) { // Styling for the single "Admin Panel" link
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center",
-                isActive 
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                isActive
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-foreground hover:bg-accent hover:text-accent-foreground"
               );
             } else { // Non-admin or logged-out user styles for main nav
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center",
-                isActive 
-                  ? "text-primary font-semibold bg-secondary" 
+                isActive
+                  ? "text-primary font-semibold bg-secondary"
                   : "text-foreground hover:text-primary hover:bg-secondary"
               );
             }
@@ -203,7 +196,6 @@ export default function Header() {
           })}
         </nav>
 
-        {/* Desktop Auth Buttons / User Menu */}
         <div className="hidden md:flex items-center space-x-2 ml-auto">
           {isClient && user ? (
             <DropdownMenu>
@@ -224,33 +216,33 @@ export default function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {isAdmin ? (
-                     <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Admin Panel</span>
-                    </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Admin Panel</span>
+                  </DropdownMenuItem>
                 ) : (
-                    <DropdownMenuItem onClick={() => router.push('/dashboard')}>
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                    </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    <span>Dashboard</span>
+                  </DropdownMenuItem>
                 )}
-                 <DropdownMenuItem onClick={() => router.push('/profile/settings')}>
+                <DropdownMenuItem onClick={() => router.push('/profile/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
                 {!isAdmin && (
-                    <DropdownMenuItem onClick={handleSubmitPaperClick}>
-                        <UploadCloud className="mr-2 h-4 w-4" />
-                        <span>Submit Paper</span>
-                    </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSubmitPaperClick}>
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    <span>Submit Paper</span>
+                  </DropdownMenuItem>
                 )}
                 {!isAdmin && (
-                   <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
+                  <DropdownMenuItem onClick={() => router.push('/ai-pre-check')}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     <span>AI Pre-Check</span>
                   </DropdownMenuItem>
                 )}
-                 <DropdownMenuItem onClick={() => router.push('/search-papers')}>
+                <DropdownMenuItem onClick={() => router.push('/search-papers')}>
                   <SearchIcon className="mr-2 h-4 w-4" />
                   <span>Search Papers</span>
                 </DropdownMenuItem>
@@ -266,10 +258,9 @@ export default function Header() {
               <Button variant="ghost" onClick={handleLoginClick} className="text-foreground">Log In</Button>
               <Button onClick={handleSignupClick}>Sign Up</Button>
             </>
-          ) : null }
+          ) : null}
         </div>
 
-        {/* Mobile Menu Trigger */}
         <div className="flex items-center md:hidden">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -286,50 +277,74 @@ export default function Header() {
               </SheetHeader>
               <div className="flex flex-col space-y-1">
                 {isClient && currentNavLinks.map(link => (
-                   <NavLinkItem
-                      key={link.href || link.label}
-                      href={link.href}
-                      onClick={() => {
-                        if(link.action) link.action();
-                        else if (link.href) router.push(link.href);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href))}
-                      isAction={!!link.action}
-                      icon={link.icon}
-                      isAdminContext={isAdmin} // Pass admin context for styling
-                    >
-                      {link.label}
-                    </NavLinkItem>
+                  <NavLinkItem
+                    key={link.href || link.label}
+                    href={link.href}
+                    onClick={() => {
+                      if (link.action) link.action();
+                      else if (link.href) router.push(link.href);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href))}
+                    isAction={!!link.action}
+                    icon={link.icon}
+                    isAdminContext={!!(user && isAdmin)}
+                  >
+                    {link.label}
+                  </NavLinkItem>
                 ))}
-                <DropdownMenuSeparator className="my-2"/>
+                {/* Additional mobile links if admin */}
+                {isClient && user && isAdmin && (
+                  <>
+                     {/* Add links that are normally in admin sidebar also to mobile for admins if needed */}
+                     {/* For instance, User Management could be added here if not covered by Admin Panel link */}
+                     <NavLinkItem href="/admin/users" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/users")} icon={<UsersIcon className="mr-2 h-4 w-4" />} isAdminContext={true}>
+                       User Management
+                     </NavLinkItem>
+                     <NavLinkItem href="/admin/registered-admins" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/registered-admins")} icon={<Shield className="mr-2 h-4 w-4" />} isAdminContext={true}>
+                       Registered Admins
+                     </NavLinkItem>
+                  </>
+                )}
+                 {/* Links relevant for both user types or logged out, like Search, Committee, etc. should be in currentNavLinks */}
+                 {isClient && user && !isAdmin && (
+                    <>
+                        {/* Regular user links that were in userNavLinks but might not be in baseNavLinks for mobile */}
+                         <NavLinkItem href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/dashboard"} icon={<LayoutDashboard className="mr-2 h-4 w-4" />} >
+                            Dashboard
+                        </NavLinkItem>
+                    </>
+                 )}
+
+
+                <DropdownMenuSeparator className="my-2" />
                 {isClient && user ? (
                   <>
                     <div className="px-3 py-2">
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                    <NavLinkItem href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/profile/settings"} icon={<Settings className="mr-2 h-4 w-4" />} isAdminContext={isAdmin}>
-                         Profile Settings
+                    <NavLinkItem href="/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/profile/settings"} icon={<Settings className="mr-2 h-4 w-4" />} isAdminContext={!!(user && isAdmin)}>
+                      Profile Settings
                     </NavLinkItem>
                     {!isAdmin && (
-                        <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname==="/submit"} isAction={true} icon={<UploadCloud className="mr-2 h-4 w-4" />} isAdminContext={isAdmin}>
-                            Submit Paper
-                        </NavLinkItem>
+                      <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname === "/submit"} isAction={true} icon={<UploadCloud className="mr-2 h-4 w-4" />} >
+                        Submit Paper
+                      </NavLinkItem>
                     )}
-                     {!isAdmin && (
-                       <NavLinkItem href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/ai-pre-check"} icon={<Sparkles className="mr-2 h-4 w-4" />} isAdminContext={isAdmin}>
-                          AI Pre-Check
-                       </NavLinkItem>
+                    {!isAdmin && (
+                      <NavLinkItem href="/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/ai-pre-check"} icon={<Sparkles className="mr-2 h-4 w-4" />} >
+                        AI Pre-Check
+                      </NavLinkItem>
                     )}
-                    <Button variant="ghost" onClick={() => {handleLogout(); setIsMobileMenuOpen(false);}} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium">
+                    <Button variant="ghost" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium">
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
                     </Button>
                   </>
                 ) : isClient ? (
                   <>
-                    <Button variant="default" onClick={() => {handleLoginClick(); setIsMobileMenuOpen(false);}} className="w-full justify-start">Log In</Button>
-                    <Button variant="outline" onClick={() => {handleSignupClick(); setIsMobileMenuOpen(false);}} className="w-full justify-start">Sign Up</Button>
+                    <Button variant="default" onClick={() => { handleLoginClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start">Log In</Button>
+                    <Button variant="outline" onClick={() => { handleSignupClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start">Sign Up</Button>
                   </>
                 ) : null}
               </div>
@@ -340,4 +355,3 @@ export default function Header() {
     </header>
   );
 }
-
