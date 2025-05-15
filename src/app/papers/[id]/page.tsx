@@ -50,7 +50,7 @@ function PaperDetailsContent() {
             if (paper.userId !== user.id && !isAdmin && paper.status !== "Published") {
                 setCurrentPaper(null);
                 toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
-                router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
+                router.push(isAdmin ? '/admin/dashboard' : '/');
                 return;
             }
             setCurrentPaper(paper);
@@ -64,14 +64,14 @@ function PaperDetailsContent() {
           } else {
             setCurrentPaper(null);
             toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
-            router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
+            router.push(isAdmin ? '/admin/dashboard' : '/');
           }
         })
         .catch((err: any) => {
           console.error("Error fetching paper:", err);
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
-          router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
+          router.push(isAdmin ? '/admin/dashboard' : '/');
         })
         .finally(() => setLoadingPaper(false));
     } else if (!user && loadingPaper) {
@@ -117,7 +117,7 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified (simulated).`,
+        description: "Author will be notified.",
         duration: 5000
       });
       setAdminFeedbackText(""); 
@@ -148,13 +148,16 @@ function PaperDetailsContent() {
   };
 
   const handleRunPlagiarismValidation = async () => {
-    if (!currentPaper || !currentPaper.abstract) {
-        toast({ variant: "destructive", title: "Error", description: "Paper abstract is missing for plagiarism validation." });
+    if (!currentPaper || !currentPaper.fileUrl) { // Check for fileUrl instead of abstract
+        toast({ variant: "destructive", title: "Error", description: "Paper file URL is missing for plagiarism validation." });
         return;
     }
     setIsCheckingPlagiarism(true);
     try {
-      const result = await plagiarismCheck({ documentText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
+      const result = await plagiarismCheck({ 
+        documentUrl: currentPaper.fileUrl, // Pass the fileUrl
+        fileName: currentPaper.fileName 
+      });
       await updatePaperData(currentPaper.id, {
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
@@ -164,10 +167,10 @@ function PaperDetailsContent() {
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
       } : null);
-      toast({ title: "Plagiarism Validation Complete" });
+      toast({ title: "Plagiarism Validation (File) Complete" });
     } catch (error: any) {
       console.error("Plagiarism validation error:", error);
-      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error.message || "An error occurred." });
+      toast({ variant: "destructive", title: "Plagiarism Validation (File) Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingPlagiarism(false);
     }
@@ -190,18 +193,17 @@ function PaperDetailsContent() {
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
-      toast({ title: "Acceptance Validation Complete" });
+      toast({ title: "Acceptance Validation (Abstract) Complete" });
     } catch (error: any) {
       console.error("Acceptance validation error:", error);
-      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error.message || "An error occurred." });
+      toast({ variant: "destructive", title: "Acceptance Validation (Abstract) Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingAcceptance(false);
     }
   };
 
-  const handleDownloadOriginalPaper = () => {
+  const handleDownloadOriginalFile = () => {
     if (currentPaper?.fileUrl) {
-        // console.log("PaperDetailsContent: Attempting to open original file URL:", currentPaper.fileUrl);
         window.open(currentPaper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
@@ -253,7 +255,7 @@ function PaperDetailsContent() {
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found or Access Denied</h2>
         <p className="text-muted-foreground">The paper may have been removed, or you might not have permission to view it.</p>
-        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/dashboard')} className="mt-6">Go to Dashboard</Button>
+        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/')} className="mt-6">Go to Dashboard</Button>
       </div>
     );
   }
@@ -299,7 +301,7 @@ function PaperDetailsContent() {
             </div>
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto items-stretch md:items-center">
                 {currentPaper.fileUrl && (
-                  <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full sm:w-auto">
+                  <Button onClick={handleDownloadOriginalFile} size="lg" variant="outline" className="w-full sm:w-auto">
                       <Download className="mr-2 h-5 w-5" /> Download Original File
                   </Button>
                 )}
@@ -331,16 +333,16 @@ function PaperDetailsContent() {
             {isAdmin && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation (Based on Title & Abstract)
+                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation Tools
                 </h3>
                 <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                  <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.fileUrl} variant="outline">
                     {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined ? 'Re-run Plagiarism Validation' : 'Run Plagiarism Validation'}
+                    {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined ? 'Re-run Plagiarism Validation (File)' : 'Run Plagiarism Validation (File)'}
                   </Button>
-                  <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
+                  <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.abstract} variant="outline">
                     {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined ? 'Re-run Acceptance Validation' : 'Run Acceptance Validation'}
+                    {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined ? 'Re-run Acceptance Validation (Abstract)' : 'Run Acceptance Validation (Abstract)'}
                   </Button>
                 </div>
 
@@ -355,7 +357,7 @@ function PaperDetailsContent() {
                       <Sparkles className="h-4 w-4" />
                       <AlertTitle>AI Validation Available</AlertTitle>
                       <AlertDescription>
-                        Run plagiarism and acceptance validations based on the paper's title and abstract using the buttons above.
+                        Run plagiarism validation on the uploaded file and acceptance validation on the paper's abstract using the buttons above.
                       </AlertDescription>
                     </Alert>
                 )}

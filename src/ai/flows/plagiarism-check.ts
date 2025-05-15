@@ -16,9 +16,11 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const PlagiarismCheckInputSchema = z.object({
-  documentText: z
+  documentUrl: z
     .string()
-    .describe('The text content of the document to check for plagiarism.'),
+    .url()
+    .describe('The publicly accessible URL of the document to check for plagiarism.'),
+  fileName: z.string().optional().describe('The original name of the file, for context.'),
 });
 export type PlagiarismCheckInput = z.infer<typeof PlagiarismCheckInputSchema>;
 
@@ -46,11 +48,14 @@ const plagiarismCheckPrompt = ai.definePrompt({
   name: 'plagiarismCheckPrompt',
   input: {schema: PlagiarismCheckInputSchema},
   output: {schema: PlagiarismCheckOutputSchema},
-  prompt: `You are an AI plagiarism checker. Given a document, you will provide a plagiarism score and highlight potentially plagiarized sections.
+  prompt: `You are an AI plagiarism checker. Given a document accessible at the URL below, you will provide a plagiarism score and highlight potentially plagiarized sections.
 
-Document Text: {{{documentText}}}
+Document URL: {{{documentUrl}}}
+{{#if fileName}}
+Original File Name: {{{fileName}}}
+{{/if}}
 
-Return a plagiarism score between 0 and 1, where 1 indicates definite plagiarism. Highlight specific sections that appear to be copied or reused.
+Return a plagiarism score between 0 and 1, where 1 indicates definite plagiarism. Highlight specific sections that appear to be copied or reused from the content accessible at the URL. If you cannot access the URL, state that and provide a placeholder score and message.
 
 Output in JSON format.`,
 });
