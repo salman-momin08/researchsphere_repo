@@ -1,21 +1,22 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react';
+import { Download, Search as SearchIcon, FileText as FileTextIcon, Eye, AlertTriangle } from 'lucide-react'; // Renamed FileText
 import Link from 'next/link';
-import type { Paper } from '@/types';
-import { getPublishedPapers, simulateFileDownload } from '@/lib/paper-service'; // Using mock service
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import type { Paper, PaperStatus } from '@/types';
+import { getPublishedPapers } from '@/lib/paper-service'; 
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useRouter } from 'next/navigation';
+
+// Removed ProtectedRoute import
 
 function SearchPapersContent() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +26,12 @@ function SearchPapersContent() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Added useEffect to perform an initial search if needed or to load all published by default
+  useEffect(() => {
+    // Optional: Load all published papers initially or on empty search term
+    // For now, we require an explicit search action
+  }, []);
+
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast({
@@ -33,24 +40,24 @@ function SearchPapersContent() {
         description: "Please enter an author's name to search.",
       });
       setSearchResults([]);
-      setHasSearched(true);
+      setHasSearched(true); // Mark that a search attempt was made
       return;
     }
     setIsLoading(true);
     setHasSearched(true);
-    setSearchResults([]);
+    setSearchResults([]); // Clear previous results
 
     try {
-      const publishedPapers = await getPublishedPapers(); // From mock service
-      console.log("SearchPapersContent: Fetched published papers from mock service:", publishedPapers.length);
-
+      const publishedPapers = await getPublishedPapers(); 
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      // Client-side filtering by author name (case-insensitive, partial match)
+      // This searches if any author in the paper's author list includes the search term.
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
       setSearchResults(results);
     } catch (error: any) {
-      console.error("SearchPapersContent: Error fetching or filtering papers (mock):", error);
+      console.error("SearchPapersContent: Error fetching or filtering papers:", error);
       toast({
         variant: "destructive",
         title: "Search Error",
@@ -61,10 +68,10 @@ function SearchPapersContent() {
     }
   };
 
-  const handleDownloadOriginal = (paper: Paper) => {
+  const handleDownloadOriginalPaper = (paper: Paper) => {
     if (paper.fileUrl) {
-        simulateFileDownload(paper.fileUrl, paper.fileName); // Use simulateFileDownload
-        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. (Mock download)` });
+        window.open(paper.fileUrl, '_blank');
+        toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {
         toast({
             variant: "destructive",
@@ -84,8 +91,6 @@ function SearchPapersContent() {
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
     content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
-    content += `Mock File URL: ${paper.fileUrl || 'Not available'}\n`;
-
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -96,10 +101,10 @@ function SearchPapersContent() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+    toast({ title: "Details Downloaded", description: `${filename} prepared.` });
   };
 
-  const getStatusBadgeVariant = (status: Paper['status'] | undefined) => {
+  const getStatusBadgeVariant = (status: PaperStatus | undefined) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
       case 'Rejected': case 'Payment Overdue': return 'destructive';
@@ -117,7 +122,7 @@ function SearchPapersContent() {
           <SearchIcon className="mx-auto h-12 w-12 text-primary mb-2" />
           <CardTitle className="text-2xl md:text-3xl">Advanced Paper Search</CardTitle>
           <CardDescription>
-            Find published papers by author name. Results are from mock data.
+            Find published papers by author name.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -170,7 +175,7 @@ function SearchPapersContent() {
                     <TableRow key={paper.id}>
                       <TableCell className="font-medium max-w-xs truncate">
                         <Link href={`/papers/${paper.id}`} className="hover:text-primary flex items-center">
-                          <FileText className="mr-2 h-4 w-4 flex-shrink-0" /> {paper.title}
+                          <FileTextIcon className="mr-2 h-4 w-4 flex-shrink-0" /> {paper.title}
                         </Link>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{paper.authors.join(', ')}</TableCell>
@@ -181,11 +186,11 @@ function SearchPapersContent() {
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <Eye className="h-4 w-4" />
                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File (Mock)">
+                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalPaper(paper)} title="Download Original File">
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Metadata" className="text-muted-foreground hover:text-primary">
-                          <FileText className="h-3 w-3 mr-1" /> Details
+                        <Button variant="ghost" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details" className="text-muted-foreground hover:text-primary">
+                          <FileTextIcon className="h-3 w-3 mr-1" /> Details
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -199,7 +204,7 @@ function SearchPapersContent() {
                 <SearchIcon className="h-4 w-4" />
                 <AlertTitle>Search Published Papers</AlertTitle>
                 <AlertDescription>
-                    Enter an author's name in the search bar above to find relevant published research papers from the mock database.
+                    Enter an author's name in the search bar above to find relevant published research papers.
                 </AlertDescription>
             </Alert>
            )}
@@ -210,9 +215,6 @@ function SearchPapersContent() {
 }
 
 export default function SearchPapersPage() {
-  return (
-    <ProtectedRoute>
-      <SearchPapersContent />
-    </ProtectedRoute>
-  );
+  // Removed ProtectedRoute wrapper to make the page public
+  return <SearchPapersContent />;
 }
