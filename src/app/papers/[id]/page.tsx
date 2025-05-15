@@ -117,9 +117,10 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified of your feedback.`,
+        description: `Author will be notified of your feedback. (Email simulation)`, // Kept email simulation note for clarity of mock
         duration: 5000
       });
+      setAdminFeedbackText(""); // Clear the feedback box
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
@@ -402,7 +403,7 @@ function PaperDetailsContent() {
                         variant={currentPaper.status === statusOption ? "default" : "outline"}
                         size="sm"
                         onClick={() => handleStatusChange(statusOption)}
-                        disabled={currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
+                        disabled={isSubmittingFeedback || currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
                       >
                         Mark as {statusOption}
                       </Button>
@@ -412,6 +413,7 @@ function PaperDetailsContent() {
                             variant="destructive"
                             size="sm"
                             onClick={() => handleStatusChange("Rejected")}
+                            disabled={isSubmittingFeedback}
                         >
                             Confirm Rejection (Overdue)
                         </Button>
