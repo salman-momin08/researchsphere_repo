@@ -7,6 +7,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import LoginModal from '@/components/auth/LoginModal';
+import React, { Suspense } from 'react'; // Import Suspense and React
+import LoadingSpinner from '@/components/shared/LoadingSpinner'; // Assuming you have a loading spinner
 
 const inter = Inter({
   variable: '--font-inter',
@@ -28,7 +30,9 @@ export default function RootLayout({
       <body className="antialiased flex flex-col min-h-screen">
         <AuthProvider>
           <Header />
-          <main className="flex-grow">{children}</main>
+          <Suspense fallback={<div className="flex-grow flex items-center justify-center"><LoadingSpinner size={48} /></div>}>
+            <main className="flex-grow">{children}</main>
+          </Suspense>
           <LoginModal />
           <Footer />
           <Toaster />
