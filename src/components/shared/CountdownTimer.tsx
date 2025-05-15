@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { cn } from "@/lib/utils"; // Added missing import
 
 interface CountdownTimerProps {
   targetDateISO: string | null | undefined;
@@ -11,21 +12,21 @@ interface CountdownTimerProps {
 }
 
 const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDateISO, onDeadline, className, prefixText = "Time left: " }) => {
-  const calculateTimeLeft = () => {
-    if (!targetDateISO) {
-      return { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0, isOverdue: true };
+  const calculateTimeLeft = (target: string | null | undefined) => {
+    if (!target) {
+      return { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0, isOverdue: true, hasTarget: false };
     }
-    const difference = +new Date(targetDateISO) - +new Date();
-    let timeLeft = { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0, isOverdue: false };
+    const difference = +new Date(target) - +new Date();
+    let timeLeft = { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0, isOverdue: false, hasTarget: true };
 
     if (difference > 0) {
       timeLeft = {
+        ...timeLeft,
         total: difference,
         days: Math.floor(difference / (1000 * 60 * 60 * 24)),
         hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
         minutes: Math.floor((difference / 1000 / 60) % 60),
         seconds: Math.floor((difference / 1000) % 60),
-        isOverdue: false,
       };
     } else {
       timeLeft.isOverdue = true;
@@ -33,22 +34,33 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDateISO, onDeadli
     return timeLeft;
   };
 
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft(targetDateISO));
 
   useEffect(() => {
+    // Update timeLeft whenever targetDateISO changes
+    setTimeLeft(calculateTimeLeft(targetDateISO));
+
     if (!targetDateISO || timeLeft.isOverdue) {
-      if (timeLeft.isOverdue && onDeadline) onDeadline();
-      return;
+      if (timeLeft.isOverdue && timeLeft.hasTarget && onDeadline) {
+        onDeadline();
+      }
+      return; // No timer needed if no target or already overdue
     }
 
-    const timer = setTimeout(() => {
-      setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(prevTimeLeft => {
+        const newTimeLeft = calculateTimeLeft(targetDateISO);
+        if (newTimeLeft.isOverdue && !prevTimeLeft.isOverdue && onDeadline) {
+          onDeadline();
+        }
+        return newTimeLeft;
+      });
     }, 1000);
 
-    return () => clearTimeout(timer);
-  }); // No dependency array to re-run every second
+    return () => clearInterval(timer);
+  }, [targetDateISO, onDeadline, timeLeft.isOverdue, timeLeft.hasTarget]); // Added dependencies
 
-  if (!targetDateISO) {
+  if (!timeLeft.hasTarget) {
     return <span className={className}>No deadline set.</span>;
   }
 
@@ -59,15 +71,12 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDateISO, onDeadli
   const format = (num: number) => num.toString().padStart(2, '0');
 
   return (
-    <span className={className}>
+    <span className={cn("font-medium", className)}> {/* Added font-medium for better visibility */}
       {prefixText}
       {timeLeft.days > 0 && `${timeLeft.days}d `}
       {format(timeLeft.hours)}h {format(timeLeft.minutes)}m {format(timeLeft.seconds)}s
     </span>
   );
 };
-
-// Helper for conditional class names, if not already available
-const cn = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
 
 export default CountdownTimer;
