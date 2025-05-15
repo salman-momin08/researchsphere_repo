@@ -15,8 +15,7 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
   ({ className, type, label, id, containerClassName, value: propValue, defaultValue, onChange, onFocus, onBlur, ...props }, ref) => {
     const internalId = id || React.useId();
     
-    // Initialize hasValue based on defaultValue for uncontrolled, or propValue for controlled.
-    // The useEffect below will further refine this for controlled components.
+    // Initialize hasValue based on whether propValue (controlled) or defaultValue (uncontrolled) has an initial truthy value.
     const [hasValue, setHasValue] = React.useState(!!(propValue !== undefined ? propValue : defaultValue));
     const [isFocused, setIsFocused] = React.useState(false);
 
@@ -37,7 +36,6 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
     const handleBlurEvent = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
       // When blurring, the source of truth for emptiness is the current value of the input element itself.
-      // This handles cases where the field might be cleared without triggering onChange (e.g., browser autofill clear).
       setHasValue(!!e.target.value); 
       if (onBlur) {
         onBlur(e);
@@ -47,10 +45,13 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
     // Effect to sync hasValue with propValue for controlled components
     // This is important if the value is changed programmatically from outside (e.g., form.reset())
     React.useEffect(() => {
-      if (propValue !== undefined) { // This check ensures it only runs for controlled components
-        setHasValue(!!propValue);
+      // console.log(`AnimatedInput (${label}): propValue changed to:`, propValue); // Temporary debug log
+      if (propValue !== undefined) { // Ensures this runs for controlled components
+        const newHasValue = !!propValue;
+        // console.log(`AnimatedInput (${label}): setting hasValue to:`, newHasValue); // Temporary debug log
+        setHasValue(newHasValue);
       }
-    }, [propValue]);
+    }, [propValue, label]); // Added label to dep array for debugging only, can be removed.
 
 
     const isLabelFloating = isFocused || hasValue;
@@ -61,12 +62,10 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
           htmlFor={internalId}
           className={cn(
             "absolute left-3 transition-all duration-200 ease-in-out pointer-events-none",
-            // Set text color: primary if focused, otherwise muted-foreground
             isFocused ? "text-primary" : "text-muted-foreground",
-            // Set position and font size based on floating state
             isLabelFloating
-              ? "top-0 text-xs" // Floating state
-              : "top-1/2 -translate-y-1/2 text-base" // Resting state (inside input)
+              ? "top-0 text-xs" 
+              : "top-1/2 -translate-y-1/2 text-base" 
           )}
         >
           {label}
@@ -76,18 +75,16 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
           ref={ref}
           type={type}
           className={cn(
-            "h-10 pt-3 text-base", // Added pt-3 to ensure text input doesn't overlap with label when resting
-            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1", // Thinner focus ring
+            "h-10 pt-3 text-base", 
+            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
             className
           )}
           onChange={handleInputChange}
           onFocus={handleFocusEvent}
           onBlur={handleBlurEvent}
-          // Using a space as a placeholder can help with consistent height/baseline
-          // when the label is not floating. It's important this doesn't evaluate to true for `hasValue`.
           placeholder={isLabelFloating ? "" : " "} 
-          value={propValue} // Pass value for controlled components
-          defaultValue={defaultValue} // Pass defaultValue for uncontrolled components
+          value={propValue} 
+          defaultValue={defaultValue}
           {...props}
         />
       </div>
