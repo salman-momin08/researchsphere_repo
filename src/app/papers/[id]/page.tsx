@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard
+import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -117,7 +117,7 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified of your feedback. (Email simulation: user notified for paper '${currentPaper.title}')`,
+        description: `Author will be notified of your feedback.`,
         duration: 5000
       });
     } catch (error: any) {
@@ -276,7 +276,7 @@ function PaperDetailsContent() {
               <CardTitle className="text-2xl md:text-3xl font-bold">{currentPaper.title}</CardTitle>
               <CardDescription className="mt-1 text-md">
                 {currentPaper.fileName ? (
-                  <span className="flex items-center"><FileText className="h-4 w-4 mr-2" />{currentPaper.fileName}</span>
+                  <span className="flex items-center"><FileTextIcon className="h-4 w-4 mr-2" />{currentPaper.fileName}</span>
                 ) : "File information not available"}
               </CardDescription>
               {effectiveStatus === 'Payment Pending' && currentPaper.paymentDueDate && (
@@ -293,20 +293,20 @@ function PaperDetailsContent() {
                   </Alert>
               )}
             </div>
-            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-stretch md:items-center">
-                 <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto items-stretch md:items-center">
+                 <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full sm:w-auto">
                     <Download className="mr-2 h-5 w-5" /> Download Original File
                 </Button>
-                 <Button onClick={handleDownloadMetadata} size="lg" variant="outline" className="w-full md:w-auto">
-                    <FileText className="mr-2 h-4 w-4" /> Download Details
+                 <Button onClick={handleDownloadMetadata} size="lg" variant="outline" className="w-full sm:w-auto">
+                    <FileTextIcon className="mr-2 h-4 w-4" /> Download Details
                 </Button>
                 {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdmin && !isPaperOverdue && (
-                <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full md:w-auto">
+                <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full sm:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
                 {isAdmin && (
-                    <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full md:w-auto">
+                    <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
                         <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}

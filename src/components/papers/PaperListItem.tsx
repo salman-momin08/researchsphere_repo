@@ -148,7 +148,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
         )}
 
       </CardContent>
-      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row items-stretch md:items-center justify-end gap-2">
+      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-wrap sm:flex-row items-stretch md:items-center justify-end gap-2">
         {paper.status === 'Payment Pending' && displayStatus !== 'Payment Overdue' && user && user.id === paper.userId && (
           <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto">
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
