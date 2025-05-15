@@ -123,7 +123,7 @@ function PaperDetailsContent() {
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -297,7 +297,7 @@ function PaperDetailsContent() {
                  <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full md:w-auto">
                     <Download className="mr-2 h-5 w-5" /> Download Original File
                 </Button>
-                 <Button onClick={handleDownloadMetadata} size="lg" variant="ghost" className="w-full md:w-auto text-muted-foreground hover:text-primary">
+                 <Button onClick={handleDownloadMetadata} size="lg" variant="outline" className="w-full md:w-auto">
                     <FileText className="mr-2 h-4 w-4" /> Download Details
                 </Button>
                 {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdmin && !isPaperOverdue && (

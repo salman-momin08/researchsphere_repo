@@ -12,7 +12,6 @@ import React, { useEffect, useState } from 'react';
 import CountdownTimer from '../shared/CountdownTimer';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { simulateFileDownload } from '@/lib/paper-service'; // Import mock download
 
 interface PaperListItemProps {
   paper: Paper;
@@ -80,8 +79,8 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
 
   const handleDownloadOriginalFile = () => {
     if (paper.fileUrl) {
-        simulateFileDownload(paper.fileUrl, paper.fileName); // Use simulateFileDownload
-        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. (Mock download)` });
+        window.open(paper.fileUrl, '_blank');
+        toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {
         toast({
             variant: "destructive",
@@ -101,7 +100,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
     content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
-    content += `Mock File URL: ${paper.fileUrl || 'Not available'}\n`;
+    content += `File URL: ${paper.fileUrl || 'Not available'}\n`;
 
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -113,7 +112,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+    toast({ title: "Details Downloaded", description: `${filename} has been downloaded.` });
   };
 
 
@@ -161,7 +160,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
         <Button variant="outline" size="sm" onClick={handleDownloadOriginalFile} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" /> Download Original File
         </Button>
-         <Button variant="ghost" size="sm" onClick={handleDownloadMetadata} className="w-full sm:w-auto text-xs text-muted-foreground hover:text-primary">
+         <Button variant="outline" size="sm" onClick={handleDownloadMetadata} className="w-full sm:w-auto text-xs">
             <FileText className="mr-1 h-3 w-3" /> Download Details
         </Button>
       </CardFooter>

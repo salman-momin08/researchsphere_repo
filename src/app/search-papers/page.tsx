@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useRouter } from 'next/navigation';
 
-// Removed ProtectedRoute import
 
 function SearchPapersContent() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,10 +25,8 @@ function SearchPapersContent() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // Added useEffect to perform an initial search if needed or to load all published by default
   useEffect(() => {
     // Optional: Load all published papers initially or on empty search term
-    // For now, we require an explicit search action
   }, []);
 
   const handleSearch = async () => {
@@ -40,23 +37,27 @@ function SearchPapersContent() {
         description: "Please enter an author's name to search.",
       });
       setSearchResults([]);
-      setHasSearched(true); // Mark that a search attempt was made
+      setHasSearched(true);
       return;
     }
     setIsLoading(true);
     setHasSearched(true);
-    setSearchResults([]); // Clear previous results
+    setSearchResults([]);
 
     try {
-      const publishedPapers = await getPublishedPapers(); 
+      console.log("SearchPapersContent: Fetching published papers from Firestore via paper-service.");
+      const publishedPapers = await getPublishedPapers();
+      console.log(`SearchPapersContent: Fetched ${publishedPapers.length} published papers. Filtering client-side for author: "${searchTerm}"`);
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       // Client-side filtering by author name (case-insensitive, partial match)
       // This searches if any author in the paper's author list includes the search term.
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
+      console.log(`SearchPapersContent: Found ${results.length} papers matching author.`);
       setSearchResults(results);
-    } catch (error: any) {
+    } catch (error: any)
+     {
       console.error("SearchPapersContent: Error fetching or filtering papers:", error);
       toast({
         variant: "destructive",
@@ -91,6 +92,8 @@ function SearchPapersContent() {
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
     content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
+    content += `File URL: ${paper.fileUrl || 'Not available'}\n`;
+
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -189,7 +192,7 @@ function SearchPapersContent() {
                          <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalPaper(paper)} title="Download Original File">
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details" className="text-muted-foreground hover:text-primary">
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details">
                           <FileTextIcon className="h-3 w-3 mr-1" /> Details
                         </Button>
                       </TableCell>
@@ -215,6 +218,5 @@ function SearchPapersContent() {
 }
 
 export default function SearchPapersPage() {
-  // Removed ProtectedRoute wrapper to make the page public
   return <SearchPapersContent />;
 }
