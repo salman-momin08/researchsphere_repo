@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { User } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, SetStateAction, Dispatch } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation';
 import type { SignupFormValues } from '@/components/auth/SignupForm';
 import {
   auth as firebaseAuth,
@@ -20,8 +21,8 @@ import {
   updateProfile as updateFirebaseProfile,
 } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; 
-import { Info } from 'lucide-react'; 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 const MOCK_ADMIN_EMAIL = 'admin@example.com';
 const ADMIN_CREATOR_EMAIL = 'admin-creator@researchsphere.com';
@@ -40,7 +41,7 @@ interface AuthContextType {
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
-  isSocialLoginInProgress: null | 'google' | 'github'; // More specific type
+  isSocialLoginInProgress: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,13 +49,33 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const getMockUserProfile = (uid: string): Partial<User> | null => {
   if (typeof window === 'undefined') return null;
   const profileStr = localStorage.getItem(`userProfile_${uid}`);
-  return profileStr ? JSON.parse(profileStr) : null;
+  try {
+    return profileStr ? JSON.parse(profileStr) : null;
+  } catch (e) {
+    console.error("AuthContext: Error parsing user profile from localStorage for UID", uid, e);
+    localStorage.removeItem(`userProfile_${uid}`); // Remove corrupted data
+    return null;
+  }
 };
 
 const saveMockUserProfile = (uid: string, profileData: Partial<User>) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(`userProfile_${uid}`, JSON.stringify(profileData));
 };
+
+// Helper to fetch user profile (mocked with localStorage)
+const fetchMockUserProfile = async (uid: string): Promise<Partial<User> | null> => {
+  return getMockUserProfile(uid);
+};
+
+// Helper to create/update user profile (mocked with localStorage)
+const upsertMockUserProfile = async (uid: string, data: Partial<User>): Promise<Partial<User>> => {
+  const existingProfile = getMockUserProfile(uid) || {};
+  const updatedProfile = { ...existingProfile, ...data, id: uid }; // ensure id is part of profile
+  saveMockUserProfile(uid, updatedProfile);
+  return updatedProfile;
+};
+
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -63,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [activeSocialLoginProvider, setActiveSocialLoginProvider] = useState<null | 'google' | 'github'>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const nextSearchParams = useNextSearchParams(); // Use the hook
 
   useEffect(() => {
     if (!firebaseAuth) {
@@ -82,11 +104,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const localProfile = getMockUserProfile(firebaseUser.uid);
-        
+        let localProfile = await fetchMockUserProfile(firebaseUser.uid);
+
         const effectiveDisplayName = localProfile?.displayName || firebaseUser.displayName || "User";
         const effectivePhotoURL = localProfile?.photoURL || firebaseUser.photoURL || null;
-        
+
         let appUser: User = {
           id: firebaseUser.uid,
           email: firebaseUser.email,
@@ -100,48 +122,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           researcherId: localProfile?.researcherId || null,
         };
 
-        if ((firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL) && appUser.isAdmin !== true) {
-            const adminProfile = { ...appUser, isAdmin: true, role: appUser.role || "Admin" };
-            saveMockUserProfile(firebaseUser.uid, adminProfile);
-            appUser = { ...appUser, ...adminProfile };
+        // Special handling for admin creator email during initial signup/login
+        if (firebaseUser.email === ADMIN_CREATOR_EMAIL && !appUser.isAdmin) {
+            const adminProfileData = { ...appUser, isAdmin: true, role: appUser.role || "Admin" };
+            localProfile = await upsertMockUserProfile(firebaseUser.uid, adminProfileData);
+            appUser = { ...appUser, ...localProfile, isAdmin: true, role: localProfile.role || "Admin" };
+        } else if (firebaseUser.email === MOCK_ADMIN_EMAIL && !appUser.isAdmin) {
+            // If it's the generic admin email and they aren't marked as admin in localStorage, ensure they are.
+            const adminProfileData = { ...appUser, isAdmin: true, role: appUser.role || "Admin" };
+            localProfile = await upsertMockUserProfile(firebaseUser.uid, adminProfileData);
+            appUser = { ...appUser, ...localProfile, isAdmin: true, role: localProfile.role || "Admin" };
         }
-        
-        setUser(appUser);
-        
-        const isProfileConsideredComplete = appUser.username && appUser.role && appUser.phoneNumber;
-        const wasCompletingProfile = localStorage.getItem('completingProfile') === 'true';
 
-        if (!isProfileConsideredComplete && (firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime || firebaseUser.providerData.some(pd => pd.providerId !== 'password') || wasCompletingProfile)) {
-          localStorage.setItem('profileIncomplete', 'true');
-          localStorage.setItem('completingProfile', 'true');
+
+        setUser(appUser);
+
+        const isProfileConsideredComplete = appUser.username && appUser.role && appUser.phoneNumber;
+        const wasNewlyCreated = firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime;
+        const wasSocialLogin = firebaseUser.providerData.some(pd => pd.providerId !== 'password' && pd.providerId !== 'emailLink'); // More robust check for social
+        const profileCompleteParam = nextSearchParams.get('complete');
+
+
+        if (!isProfileConsideredComplete && (wasNewlyCreated || wasSocialLogin || (profileCompleteParam === 'true'))) {
           if (pathname !== '/profile/settings') {
             router.push('/profile/settings?complete=true');
           }
         } else {
-          localStorage.removeItem('profileIncomplete');
-          localStorage.removeItem('completingProfile');
           const redirectAfterLoginPath = localStorage.getItem('redirectAfterLogin');
           if (redirectAfterLoginPath && redirectAfterLoginPath !== pathname) {
             localStorage.removeItem('redirectAfterLogin');
             router.push(redirectAfterLoginPath);
-          } else if (isProfileConsideredComplete && (pathname === '/login' || pathname === '/signup' || (pathname === '/profile/settings' && !searchParams.get('complete')))) {
+          } else if (isProfileConsideredComplete && (pathname === '/login' || pathname === '/signup' || (pathname === '/profile/settings' && !profileCompleteParam))) {
              router.push('/');
           }
         }
-        setShowLoginModal(false); // Close modal if open
+        setShowLoginModal(false);
       } else {
         setUser(null);
-        localStorage.removeItem('completingProfile');
       }
       setLoading(false);
       setActiveSocialLoginProvider(null);
     });
 
     return () => unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, router]); // Added searchParams for conditional redirect from profile/settings
-
-  const searchParams = usePathname() ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  }, [pathname, router, nextSearchParams]);
 
 
   const login = async (identifier: string, pass: string) => {
@@ -150,7 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setActiveSocialLoginProvider(null);
     let emailToLogin = identifier;
 
-    if (!identifier.includes('@')) {
+    if (!identifier.includes('@')) { // Assuming it's a username
       let foundEmailForUsername: string | null = null;
       if (typeof window !== 'undefined') {
         for (let i = 0; i < localStorage.length; i++) {
@@ -163,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 break;
               }
             } catch (e) {
-              console.warn("AuthContext (login): Error parsing user profile from localStorage", e);
+              // console.warn("AuthContext (login): Error parsing user profile from localStorage", e);
             }
           }
         }
@@ -180,7 +204,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await signInWithEmailAndPassword(firebaseAuth, emailToLogin, pass);
-      // onAuthStateChanged handles setting user and actual redirect
+      // onAuthStateChanged handles setting user and redirect
     } catch (error) {
       setLoading(false);
       const firebaseError = error as { code?: string; message?: string };
@@ -205,7 +229,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
       throw new Error(errorMessage);
     }
-    // setLoading(false) is handled by onAuthStateChanged
   };
 
   const signup = async (data: SignupFormValues) => {
@@ -213,6 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setActiveSocialLoginProvider(null);
 
+    // Client-side uniqueness check for username and phone against mock localStorage
     if (typeof window !== 'undefined') {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -222,19 +246,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (profile.username === data.username) {
                   setLoading(false);
                   const errorMsg = "Username is already taken. Please choose another one.";
-                  toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
+                  // toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
                   throw new Error(errorMsg);
                 }
-                if (data.phoneNumber && profile.phoneNumber && profile.phoneNumber === data.phoneNumber) {
+                if (data.phoneNumber && profile.phoneNumber && profile.phoneNumber === data.phoneNumber) { // Ensure phoneNumber is defined before checking
                      setLoading(false);
                      const errorMsg = "Phone number is already in use. Please use a different one.";
-                     toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
+                    //  toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
                      throw new Error(errorMsg);
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) { /* ignore parsing errors for other keys */ }
             }
         }
     }
+
 
     let userCredential: FirebaseUser;
     try {
@@ -260,8 +285,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             await updateFirebaseProfile(userCredential, { displayName: data.fullName });
             const initialProfileData: Partial<User> = {
+              id: userCredential.uid, // Important to set id here
               displayName: data.fullName,
-              email: data.email, 
+              email: data.email,
               username: data.username,
               role: data.role,
               phoneNumber: data.phoneNumber,
@@ -269,15 +295,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               researcherId: data.researcherId,
               isAdmin: data.email === MOCK_ADMIN_EMAIL || data.email === ADMIN_CREATOR_EMAIL,
             };
-            saveMockUserProfile(userCredential.uid, initialProfileData);
-            // onAuthStateChanged will pick up the new user state, set user, and trigger profile completion redirect
-            toast({ title: "Signup Successful!", description: "Please complete your profile."});
-             // No router.push('/') here, onAuthStateChanged handles it
-        } catch (profileUpdateError) {
-            toast({ variant: "destructive", title: "Signup Incomplete", description: "Account created, but profile setup had an issue. Please try updating your profile." });
+            await upsertMockUserProfile(userCredential.uid, initialProfileData);
+            // onAuthStateChanged will pick up the new user state and trigger profile completion redirect if needed
+            toast({ title: "Signup Successful!", description: "Please complete your profile if prompted."});
+        } catch (profileUpdateError: any) {
+            toast({ variant: "destructive", title: "Signup Incomplete", description: `Account created, but profile setup had an issue: ${profileUpdateError.message}. Please try updating your profile.` });
         }
     }
-    // setLoading(false) is handled by onAuthStateChanged
   };
 
   const logout = async () => {
@@ -285,11 +309,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signOut(firebaseAuth);
-      // setUser(null); // onAuthStateChanged will handle this
+      // setUser(null) and localStorage removal for user profile is handled by onAuthStateChanged indirectly
+      // Clearing specific items on explicit logout:
+      if (user) { // Clear profile of the logged-out user
+          localStorage.removeItem(`userProfile_${user.id}`);
+      }
       localStorage.removeItem('redirectAfterLogin');
-      localStorage.removeItem('profileIncomplete');
-      localStorage.removeItem('completingProfile');
-      router.push('/'); // Redirect to home on logout
+      router.push('/');
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error: any) {
       toast({variant: "destructive", title: "Logout Failed", description: error.message || "Could not log out."});
@@ -308,13 +334,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
           toastTitle = `${providerName} Sign-In Cancelled`;
-          toastMessage = `The ${providerName} sign-in popup was closed before completing. Please ensure popups are enabled and try again. If the issue persists, you might consider trying a different browser or network.`;
-           toast({
+          toastMessage = `The ${providerName} sign-in popup was closed or cancelled. Please ensure popups are enabled for this site and try again. If you continue to experience issues, try a different browser or check your network connection.`;
+          toast({
             title: toastTitle,
             description: toastMessage,
-            duration: 10000, 
+            duration: 15000,
           });
-          break; // Break here so it doesn't fall through
+          break;
         case 'auth/account-exists-with-different-credential':
           toastTitle = "Account Exists";
           toastMessage = "An account already exists with this email using a different sign-in method. Try that method or use a different email.";
@@ -327,8 +353,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
         toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
     }
-    setLoading(false); // Ensure loading is reset on error
-    setActiveSocialLoginProvider(null); // Reset active provider on error
+    setLoading(false);
+    setActiveSocialLoginProvider(null);
   };
 
   const processSocialLogin = async (providerInstance: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: 'google' | 'github') => {
@@ -342,25 +368,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const result = await signInWithPopup(firebaseAuth, providerInstance);
       const firebaseUser = result.user;
-      const localProfile = getMockUserProfile(firebaseUser.uid);
+      let localProfile = await fetchMockUserProfile(firebaseUser.uid);
 
-      const initialProfile: Partial<User> = {
-        displayName: firebaseUser.displayName,
-        email: firebaseUser.email,
-        photoURL: firebaseUser.photoURL,
-        isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || localProfile?.isAdmin === true,
-        username: localProfile?.username || null,
-        role: localProfile?.role || null,
-        phoneNumber: localProfile?.phoneNumber || null,
-        institution: localProfile?.institution || null,
-        researcherId: localProfile?.researcherId || null,
-      };
-      saveMockUserProfile(firebaseUser.uid, initialProfile);
-      // onAuthStateChanged handles setting user and redirect/profile completion logic
+      if (!localProfile) { // New user via social login, create a basic profile
+        const initialProfile: Partial<User> = {
+          id: firebaseUser.uid,
+          displayName: firebaseUser.displayName,
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL,
+          isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL,
+          // username, role, phoneNumber will be null until profile completion
+        };
+        localProfile = await upsertMockUserProfile(firebaseUser.uid, initialProfile);
+      } else { // Existing user, ensure their admin status is correct if they use special emails
+         if ((firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL) && !localProfile.isAdmin) {
+            localProfile = await upsertMockUserProfile(firebaseUser.uid, { ...localProfile, isAdmin: true, role: localProfile.role || "Admin" });
+        }
+      }
+      // onAuthStateChanged handles setting the main user state and profile completion redirect
     } catch (error) {
       handleSocialLoginError(error, providerName);
     }
-    // setLoading(false) and setActiveSocialLoginProvider(null) handled by onAuthStateChanged or error handler
   };
 
   const loginWithGoogle = () => processSocialLogin(googleAuthCredentialProvider, "google");
@@ -378,6 +406,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
 
     try {
+      // Client-side uniqueness check against mock localStorage
       if (typeof window !== 'undefined') {
         if (updatedData.username && updatedData.username !== user.username) {
           for (let i = 0; i < localStorage.length; i++) {
@@ -387,12 +416,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (otherProfile.username === updatedData.username) {
                 setLoading(false);
                 const errorMsg = "Username already taken. Please choose another one.";
+                // toast({variant: "destructive", title: "Update Failed", description: errorMsg}); // Handled by form
                 throw new Error(errorMsg);
               }
             }
           }
         }
-        if (updatedData.phoneNumber && updatedData.phoneNumber !== user.phoneNumber) {
+        if (updatedData.phoneNumber && updatedData.phoneNumber !== user.phoneNumber) { // Ensure phoneNumber is defined
            for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('userProfile_') && key !== `userProfile_${user.id}`) {
@@ -400,6 +430,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (otherProfile.phoneNumber && otherProfile.phoneNumber === updatedData.phoneNumber) {
                 setLoading(false);
                 const errorMsg = "Phone number already in use. Please use a different one.";
+                // toast({variant: "destructive", title: "Update Failed", description: errorMsg}); // Handled by form
                 throw new Error(errorMsg);
               }
             }
@@ -407,44 +438,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      const currentLocalProfile = getMockUserProfile(user.id) || {};
-      const newProfileData: User = {
-        ...user, 
-        ...currentLocalProfile, 
-        ...updatedData, 
+
+      const currentLocalProfile = await fetchMockUserProfile(user.id) || {};
+      const newProfileDataForStorage: User = { // This is for localStorage
+        ...user, // Start with current app user state
+        ...currentLocalProfile, // Overlay with potentially more complete localStorage data
+        ...updatedData, // Apply the new updates
+        // Ensure core fields are not accidentally overwritten to undefined if not in updatedData
         id: user.id,
         email: user.email,
-        photoURL: user.photoURL, 
-        isAdmin: user.isAdmin, 
+        photoURL: user.photoURL,
+        isAdmin: user.isAdmin, // isAdmin cannot be changed by user update
       };
 
+      // Update Firebase Auth profile (only displayName)
       if (updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
         await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
-        newProfileData.displayName = updatedData.displayName; 
+        newProfileDataForStorage.displayName = updatedData.displayName;
       }
 
-      saveMockUserProfile(user.id, newProfileData);
-      setUser(newProfileData);
+      await upsertMockUserProfile(user.id, newProfileDataForStorage);
+      setUser(newProfileDataForStorage); // Update context state
 
-      if (localStorage.getItem('profileIncomplete') === 'true' || localStorage.getItem('completingProfile') === 'true') {
-          if (newProfileData.username && newProfileData.role && newProfileData.phoneNumber) {
+      // Profile completion logic after update
+      if (localStorage.getItem('profileIncomplete') === 'true' || nextSearchParams.get('complete') === 'true') {
+          if (newProfileDataForStorage.username && newProfileDataForStorage.role && newProfileDataForStorage.phoneNumber) {
               localStorage.removeItem('profileIncomplete');
-              localStorage.removeItem('completingProfile');
+              // No need to remove 'completingProfile' as it's not used anymore here
               const redirectPath = localStorage.getItem('redirectAfterLogin');
               if (redirectPath && redirectPath !== pathname && redirectPath !== '/profile/settings') {
                   router.push(redirectPath);
                   localStorage.removeItem('redirectAfterLogin');
-              } else {
-                  router.push('/'); 
+              } else if (pathname !== '/') { // Avoid pushing to / if already there
+                  router.push('/');
               }
           }
       }
-      return newProfileData;
+      return newProfileDataForStorage;
     } catch(error: any) {
+      // Errors for username/phone uniqueness are thrown and caught by form.
+      // Other errors will be re-thrown here.
       if (error.message !== "Username already taken. Please choose another one." && error.message !== "Phone number already in use. Please use a different one.") {
           toast({ variant: "destructive", title: "Update Failed", description: error.message || "Could not update your profile." });
       }
-      throw error; 
+      throw error;
     } finally {
         setLoading(false);
     }
@@ -458,7 +495,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithGoogle, loginWithGitHub,
         sendPasswordResetEmail, updateUserProfile,
         showLoginModal, setShowLoginModal, isAdmin,
-        isSocialLoginInProgress: activeSocialLoginProvider,
+        isSocialLoginInProgress: activeSocialLoginProvider !== null,
     }}>
       {children}
     </AuthContext.Provider>
