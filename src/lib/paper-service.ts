@@ -1,5 +1,5 @@
 
-import { db, storage } from '@/lib/firebase'; // Added storage
+import { db, storage } from '@/lib/firebase';
 import type { Paper, PaperStatus } from '@/types';
 import {
   collection,
@@ -16,15 +16,14 @@ import {
   deleteDoc,
   writeBatch
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'; // Added Firebase Storage imports
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
-// Helper to convert Firestore Timestamps to ISO strings
 const convertPaperTimestamps = (paperData: any): Paper => {
   const convertTimestamp = (timestampField: any): string | null => {
     if (timestampField instanceof Timestamp) {
       return timestampField.toDate().toISOString();
     }
-    if (typeof timestampField === 'string') { // Already a string
+    if (typeof timestampField === 'string') {
         return timestampField;
     }
     return null;
@@ -39,40 +38,50 @@ const convertPaperTimestamps = (paperData: any): Paper => {
   } as Paper;
 };
 
-
-// Updated addPaper to handle file upload to Firebase Storage
 export const addPaper = async (
   paperData: Omit<Paper, 'id' | 'uploadDate' | 'fileUrl' | 'fileName'> & { uploadDate?: any },
   fileToUpload: File,
   userId: string
 ): Promise<string> => {
+  console.log("paper-service: addPaper called with userId:", userId, "fileName:", fileToUpload.name);
   try {
-    // 1. Upload file to Firebase Storage
     const timestamp = Date.now();
-    const storageFileName = `${timestamp}-${fileToUpload.name.replace(/\s+/g, '_')}`; // Sanitize filename
+    const storageFileName = `${timestamp}-${fileToUpload.name.replace(/\s+/g, '_')}`;
     const storageRef = ref(storage, `papers/${userId}/${storageFileName}`);
+
+    console.log(`paper-service: Attempting to upload ${fileToUpload.name} to Storage path: ${storageRef.fullPath}`);
     const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
-    await uploadTask; 
+    await uploadTask; // Wait for the upload to complete
+    console.log(`paper-service: File ${fileToUpload.name} uploaded successfully to Storage.`);
 
     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+    console.log(`paper-service: Obtained download URL: ${downloadURL}`);
 
-    // 2. Add paper metadata (including downloadURL and fileName) to Firestore
-    const docRef = await addDoc(collection(db, "papers"), {
+    const paperDocData = {
       ...paperData,
-      userId: userId, 
-      fileName: fileToUpload.name, // Store original file name
+      userId: userId,
+      fileName: fileToUpload.name,
       fileUrl: downloadURL,
       uploadDate: paperData.uploadDate ? Timestamp.fromDate(new Date(paperData.uploadDate)) : serverTimestamp(),
       submissionDate: paperData.submissionDate ? Timestamp.fromDate(new Date(paperData.submissionDate)) : null,
       paymentDueDate: paperData.paymentDueDate ? Timestamp.fromDate(new Date(paperData.paymentDueDate)) : null,
       paidAt: paperData.paidAt ? Timestamp.fromDate(new Date(paperData.paidAt)) : null,
       lastUpdatedAt: serverTimestamp(),
-    });
+    };
+
+    console.log("paper-service: Attempting to add paper metadata to Firestore with data:", paperDocData);
+    const docRef = await addDoc(collection(db, "papers"), paperDocData);
+    console.log(`paper-service: Paper metadata added to Firestore with ID: ${docRef.id}`);
     return docRef.id;
-  } catch (error) {
-    console.error("Error adding paper (service): ", error);
-    throw error;
+
+  } catch (error: any) {
+    console.error("paper-service: Error in addPaper:", error);
+    // Log specific Firebase Storage or Firestore errors if possible
+    if (error.code && error.message) { // Firebase errors often have code and message
+      console.error(`paper-service: Firebase Error Code: ${error.code}, Message: ${error.message}`);
+    }
+    throw new Error(`Failed to add paper: ${error.message || 'Unknown error during paper submission service.'}`);
   }
 };
 
@@ -120,18 +129,14 @@ export const updatePaperStatus = async (paperId: string, status: PaperStatus, pa
   try {
     const paperRef = doc(db, "papers", paperId);
     const updateData: { [key: string]: any } = { status, lastUpdatedAt: serverTimestamp() };
-    
+
     if (paymentDetails?.paidAt) {
       updateData.paidAt = Timestamp.fromDate(new Date(paymentDetails.paidAt));
-      // If status is being set to 'Submitted' due to payment, also set submissionDate
       if (status === "Submitted") {
-         updateData.submissionDate = Timestamp.fromDate(new Date(paymentDetails.paidAt));
-         updateData.paymentDueDate = null; // Clear payment due date if paid
+         updateData.submissionDate = serverTimestamp(); // Use server timestamp for submission
+         updateData.paymentDueDate = null;
       }
     } else if (status === "Payment Pending" && !updateData.paymentDueDate) {
-      // If paper becomes "Payment Pending" and no specific due date is set by caller,
-      // set a default 2-hour due date from now.
-      // This case might not be common if PaperUploadForm always sets it initially.
       const dueDate = new Date();
       dueDate.setHours(dueDate.getHours() + 2);
       updateData.paymentDueDate = Timestamp.fromDate(dueDate);
@@ -150,7 +155,6 @@ export const updatePaperData = async (paperId: string, data: Partial<Omit<Paper,
     const paperRef = doc(db, "papers", paperId);
     const dataToUpdate = { ...data, lastUpdatedAt: serverTimestamp() };
 
-    // Convert any date strings in `data` to Timestamps if necessary
     if (data.submissionDate && typeof data.submissionDate === 'string') {
       dataToUpdate.submissionDate = Timestamp.fromDate(new Date(data.submissionDate));
     }
@@ -160,7 +164,7 @@ export const updatePaperData = async (paperId: string, data: Partial<Omit<Paper,
     if (data.paidAt && typeof data.paidAt === 'string') {
       dataToUpdate.paidAt = Timestamp.fromDate(new Date(data.paidAt));
     }
-    
+
     await updateDoc(paperRef, dataToUpdate);
   } catch (error) {
     console.error("Error updating paper data in Firestore: ", error);
@@ -188,12 +192,12 @@ export const seedMockPapersToFirestore = async (mockPapers: Paper[]) => {
     const q = query(papersRef, orderBy("uploadDate", "desc"));
     const existingPapersSnap = await getDocs(q);
 
-    if (existingPapersSnap.docs.length < mockPapers.length) { 
+    if (existingPapersSnap.docs.length < mockPapers.length) {
         console.log("Seeding mock papers to Firestore...");
         mockPapers.forEach(paper => {
-            const { id, ...paperData } = paper; 
-            const docRef = doc(papersRef); 
-            
+            const { id, ...paperData } = paper;
+            const docRef = doc(papersRef);
+
             const firestorePaperData = {
                 ...paperData,
                 uploadDate: paperData.uploadDate ? Timestamp.fromDate(new Date(paperData.uploadDate)) : serverTimestamp(),
@@ -215,23 +219,22 @@ export const seedMockPapersToFirestore = async (mockPapers: Paper[]) => {
     }
 };
 
-// Function to delete a paper file from Firebase Storage
 export const deletePaperFileFromStorage = async (fileUrl: string): Promise<void> => {
   if (!fileUrl || !fileUrl.startsWith('https://firebasestorage.googleapis.com/')) {
     console.log("Invalid or non-Firebase Storage URL, skipping delete from storage:", fileUrl);
     return;
   }
   try {
-    const fileRef = ref(storage, fileUrl); // Get reference from URL
+    const fileRef = ref(storage, fileUrl);
     await deleteObject(fileRef);
     console.log("File deleted successfully from Firebase Storage:", fileUrl);
   } catch (error: any) {
-    // It's okay if the file doesn't exist (e.g., already deleted or URL was wrong)
     if (error.code === 'storage/object-not-found') {
       console.warn("File not found in Firebase Storage, skipping delete:", fileUrl);
     } else {
       console.error("Error deleting file from Firebase Storage:", error);
-      // Decide if this should throw or just log, depending on desired app behavior
     }
   }
 };
+
+    

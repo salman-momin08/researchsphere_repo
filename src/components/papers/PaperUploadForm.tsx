@@ -25,14 +25,14 @@ const paperSchema = z.object({
   abstract: z.string().min(50, "Abstract must be at least 50 characters.").max(2000, "Abstract must be less than 2000 characters."),
   authors: z.string().min(1, "At least one author is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
-  file: z.any() 
+  file: z.any()
     .refine(files => {
-      if (typeof window === 'undefined') return true; // Skip validation on server
+      if (typeof window === 'undefined') return true;
       return files instanceof FileList && files.length > 0;
     }, "A paper file is required.")
     .refine(files => {
       if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
-      return files[0].size <= 5 * 1024 * 1024; 
+      return files[0].size <= 5 * 1024 * 1024;
     }, "File size must be less than 5MB.")
     .refine(files => {
       if (typeof window === 'undefined' || !(files instanceof FileList) || files.length === 0) return true;
@@ -49,7 +49,7 @@ export default function PaperUploadForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  
+
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [formDataForSubmission, setFormDataForSubmission] = useState<PaperFormValues | null>(null);
 
@@ -58,8 +58,8 @@ export default function PaperUploadForm() {
     defaultValues: {
       title: "",
       abstract: "",
-      authors: [], 
-      keywords: [], 
+      authors: [],
+      keywords: [],
       file: undefined,
       paymentOption: "payLater",
     },
@@ -69,34 +69,38 @@ export default function PaperUploadForm() {
   useEffect(() => {
     if (watchedFile && typeof window !== 'undefined' && watchedFile instanceof FileList && watchedFile.length > 0) {
       setFileName(watchedFile[0].name);
-      form.clearErrors("file"); // Clear error if file is selected
+      form.clearErrors("file");
+      console.log("PaperUploadForm: File selected:", watchedFile[0].name, "Type:", watchedFile[0].type, "Size:", watchedFile[0].size);
     } else {
       setFileName(null);
     }
   }, [watchedFile, form]);
 
-  
+
   const proceedWithSubmission = async (data: PaperFormValues, initialStatus: PaperStatus, paidAt?: string): Promise<string> => {
     console.log("PaperUploadForm: Entering proceedWithSubmission with data:", data, "Status:", initialStatus, "PaidAt:", paidAt);
-    if (!user) {
-      throw new Error("Authentication Error: You must be logged in to submit a paper.");
+    if (!user || !user.id) {
+      console.error("PaperUploadForm: proceedWithSubmission - User or user.id is not available.");
+      const authError = new Error("Authentication Error: User session is invalid. Please log in again.");
+      setFormError(authError.message);
+      throw authError;
     }
-    
-    setFormError(null); 
+
+    setFormError(null);
 
     if (typeof window === 'undefined' || !(data.file instanceof FileList) || data.file.length === 0) {
-        console.error("PaperUploadForm: proceedWithSubmission - File is not a valid FileList or is empty.", data.file);
-        const error = new Error("No file provided for submission or file list is invalid. Please select a file.");
-        setFormError(error.message); // Set form error to display in Alert
-        throw error;
+      console.error("PaperUploadForm: proceedWithSubmission - File is not a valid FileList or is empty. Data.file:", data.file);
+      const fileError = new Error("No file provided for submission or file list is invalid. Please select a file.");
+      setFormError(fileError.message);
+      throw fileError;
     }
     const fileToUpload = data.file[0];
     console.log("PaperUploadForm: proceedWithSubmission - File to upload:", fileToUpload.name, "Type:", fileToUpload.type, "Size:", fileToUpload.size);
-    
+
     let paymentDueDate: string | null = null;
     if (initialStatus === "Payment Pending") {
       const dueDate = new Date();
-      dueDate.setHours(dueDate.getHours() + 2); 
+      dueDate.setHours(dueDate.getHours() + 2);
       paymentDueDate = dueDate.toISOString();
     }
 
@@ -109,37 +113,38 @@ export default function PaperUploadForm() {
       status: initialStatus,
       paymentOption: data.paymentOption,
       paymentDueDate: paymentDueDate,
-      submissionDate: paidAt ? new Date().toISOString() : null, 
+      submissionDate: paidAt ? new Date().toISOString() : null,
       plagiarismScore: null,
       plagiarismReport: null,
       acceptanceProbability: null,
       acceptanceReport: null,
       paidAt: paidAt || null,
     };
-    
+
     try {
-      console.log("PaperUploadForm: proceedWithSubmission - Calling addPaper service...");
+      console.log("PaperUploadForm: proceedWithSubmission - Calling addPaper service with paperData:", newPaperFirestoreData, "and file:", fileToUpload.name);
       const newPaperId = await addPaper(newPaperFirestoreData, fileToUpload, user.id);
       console.log("PaperUploadForm: proceedWithSubmission - addPaper service successful, newPaperId:", newPaperId);
       return newPaperId;
     } catch (error) {
       console.error("PaperUploadForm: Error in proceedWithSubmission calling addPaper:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during file upload or database write.";
-      setFormError(errorMessage); 
-      throw error; 
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during paper submission processing.";
+      setFormError(errorMessage);
+      throw error;
     }
   };
-  
+
   const onFormSubmit = async (data: PaperFormValues) => {
     console.log("PaperUploadForm: onFormSubmit triggered. Data:", data);
-    setIsSubmitting(true); 
+    setIsSubmitting(true);
     setFormError(null);
 
     if (data.paymentOption === "payNow") {
       console.log("PaperUploadForm: PayNow selected. Setting formDataForSubmission and opening modal.");
       setFormDataForSubmission(data);
       setShowPayNowModal(true);
-    } else { 
+      // setIsSubmitting is handled by the modal flow
+    } else {
       console.log("PaperUploadForm: PayLater selected. Proceeding with submission.");
       try {
         const newPaperId = await proceedWithSubmission(data, "Payment Pending");
@@ -148,8 +153,8 @@ export default function PaperUploadForm() {
         setFileName(null);
         router.push(`/papers/${newPaperId}`);
       } catch (error) {
-        // formError is set by proceedWithSubmission and will be displayed in the Alert
-        if (!formError && error instanceof Error) { // Fallback toast if formError wasn't set
+        // formError should be set by proceedWithSubmission
+        if (!formError && error instanceof Error) {
              toast({variant: "destructive", title: "Submission Failed", description: error.message});
         }
         console.error("PaperUploadForm: Error during 'Pay Later' submission:", error);
@@ -164,11 +169,11 @@ export default function PaperUploadForm() {
     if (!formDataForSubmission) {
       toast({ variant: "destructive", title: "Error", description: "No submission data found to process payment." });
       setShowPayNowModal(false);
-      setIsSubmitting(false); 
+      setIsSubmitting(false);
       return;
     }
 
-    setFormError(null); 
+    setFormError(null);
     setIsSubmitting(true); // Ensure this is true for the processing after payment
 
     try {
@@ -176,38 +181,42 @@ export default function PaperUploadForm() {
       if (formDataForSubmission.file && typeof window !== 'undefined' && formDataForSubmission.file instanceof FileList && formDataForSubmission.file.length > 0) {
         console.log("PaperUploadForm: File details in formData for PayNow:", formDataForSubmission.file[0]?.name, formDataForSubmission.file[0]?.type);
       } else {
-        console.error("PaperUploadForm: handleSuccessfulPayNowPayment - File data missing or invalid in formDataForSubmission.");
-        throw new Error("File data is missing. Cannot proceed with submission.");
+        console.error("PaperUploadForm: handleSuccessfulPayNowPayment - File data missing or invalid in formDataForSubmission. formDataForSubmission.file:", formDataForSubmission.file);
+        throw new Error("File data is missing or invalid. Cannot proceed with submission.");
       }
 
       const newPaperId = await proceedWithSubmission(formDataForSubmission, "Submitted", new Date().toISOString());
-      
+
       toast({ title: "Paper Submitted & Paid Successfully!", description: `"${formDataForSubmission.title}" has been processed.` });
       form.reset();
       setFileName(null);
       router.push(`/papers/${newPaperId}`);
 
     } catch (error) {
-      // formError should have been set by proceedWithSubmission if it threw an error.
-      // The Alert on the main form will display this formError when the modal closes.
       const displayMessage = formError || (error instanceof Error ? error.message : "Submission failed after payment.");
       toast({ variant: "destructive", title: "Submission Failed After Payment", description: displayMessage });
       console.error("PaperUploadForm: Error during 'Pay Now' submission after payment:", error);
+      // Form error should be displayed via formError state
     } finally {
-      setFormDataForSubmission(null); 
-      setShowPayNowModal(false);     
-      setIsSubmitting(false); 
+      setFormDataForSubmission(null);
+      setShowPayNowModal(false);
+      setIsSubmitting(false);
     }
   };
 
   const handlePayNowModalOpenChange = (open: boolean) => {
     setShowPayNowModal(open);
     if (!open) {
+      console.log("PaperUploadForm: PayNow modal closed. formDataForSubmission:", formDataForSubmission);
       if (formDataForSubmission) { // If modal closed before payment success
-        console.log("PaperUploadForm: PayNow modal closed by user before payment success.");
-        setFormDataForSubmission(null); // Clear data
+        setFormDataForSubmission(null);
       }
-      setIsSubmitting(false); 
+      // Crucially, reset isSubmitting only if the modal was closed *before* submission attempt after payment
+      // If payment was successful, setIsSubmitting(false) is handled in handleSuccessfulPayNowPayment's finally block.
+      // If payment was not attempted, or user cancelled modal, then form should be re-enabled.
+      if(!isSubmitting && !showPayNowModal) { // Check if not already in submitting phase from modal
+         setIsSubmitting(false);
+      }
     }
   };
 
@@ -227,7 +236,7 @@ export default function PaperUploadForm() {
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
             )}
-            
+
             <div>
               <Label htmlFor="title">Paper Title</Label>
               <Input id="title" {...form.register("title")} disabled={isSubmitting} />
@@ -251,7 +260,7 @@ export default function PaperUploadForm() {
               <Input id="keywords" placeholder="e.g., AI, Machine Learning, Academia" {...form.register("keywords")} disabled={isSubmitting} />
               {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message as string}</p>}
             </div>
-            
+
             <div>
               <Label htmlFor="file-upload">Upload Paper (PDF or DOCX, max 5MB)</Label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md border-input hover:border-primary transition-colors">
@@ -263,9 +272,9 @@ export default function PaperUploadForm() {
                       className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-ring"
                     >
                       <span>Upload a file</span>
-                      <input id="file-upload" type="file" className="sr-only" 
+                      <input id="file-upload" type="file" className="sr-only"
                             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            {...form.register("file")} // RHF handles this for validation
+                            {...form.register("file")}
                             disabled={isSubmitting}
                       />
                     </label>
@@ -287,6 +296,7 @@ export default function PaperUploadForm() {
                 value={form.watch("paymentOption")}
                 onValueChange={(value) => form.setValue("paymentOption", value as "payNow" | "payLater", {shouldValidate: true})}
                 className="mt-2 space-y-2"
+                disabled={isSubmitting} // Disable radiogroup when submitting
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="payNow" id="payNow" disabled={isSubmitting && form.getValues("paymentOption") === "payLater"} />
@@ -312,7 +322,7 @@ export default function PaperUploadForm() {
               ) : isSubmitting && form.getValues("paymentOption") === "payLater" ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
               ) : (
-                <><UploadCloud className="mr-2 h-4 w-4" /> 
+                <><UploadCloud className="mr-2 h-4 w-4" />
                  {form.getValues("paymentOption") === "payNow" ? "Proceed to Payment & Submit" : "Submit Paper & Pay Later"}
                 </>
               )}
@@ -321,15 +331,16 @@ export default function PaperUploadForm() {
         </form>
       </Card>
 
-      {user && formDataForSubmission && ( 
-        <PaymentModal 
-            isOpen={showPayNowModal} 
+      {user && formDataForSubmission && (
+        <PaymentModal
+            isOpen={showPayNowModal}
             onOpenChange={handlePayNowModalOpenChange}
-            paper={ { title: formDataForSubmission.title } as Paper } 
-            onPaymentSuccess={handleSuccessfulPayNowPayment} 
+            paper={ { title: formDataForSubmission.title } as Paper } // Pass minimal paper info
+            onPaymentSuccess={handleSuccessfulPayNowPayment}
         />
       )}
     </>
   );
 }
 
+    
