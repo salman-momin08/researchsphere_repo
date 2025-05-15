@@ -49,19 +49,19 @@ export const addPaper = async (
   try {
     // 1. Upload file to Firebase Storage
     const timestamp = Date.now();
-    const storageRef = ref(storage, `papers/${userId}/${timestamp}-${fileToUpload.name}`);
+    const storageFileName = `${timestamp}-${fileToUpload.name.replace(/\s+/g, '_')}`; // Sanitize filename
+    const storageRef = ref(storage, `papers/${userId}/${storageFileName}`);
     const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
-    // It's good practice to handle upload progress/errors, but for brevity, we'll await completion
-    await uploadTask; // Wait for upload to complete
+    await uploadTask; 
 
     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
     // 2. Add paper metadata (including downloadURL and fileName) to Firestore
     const docRef = await addDoc(collection(db, "papers"), {
       ...paperData,
-      userId: userId, // Ensure userId is explicitly set from authenticated user
-      fileName: fileToUpload.name,
+      userId: userId, 
+      fileName: fileToUpload.name, // Store original file name
       fileUrl: downloadURL,
       uploadDate: paperData.uploadDate ? Timestamp.fromDate(new Date(paperData.uploadDate)) : serverTimestamp(),
       submissionDate: paperData.submissionDate ? Timestamp.fromDate(new Date(paperData.submissionDate)) : null,
@@ -72,8 +72,6 @@ export const addPaper = async (
     return docRef.id;
   } catch (error) {
     console.error("Error adding paper (service): ", error);
-    // If Firestore write fails after storage upload, consider deleting the uploaded file from storage
-    // This is an advanced error handling scenario (orphaned file cleanup)
     throw error;
   }
 };
@@ -121,14 +119,26 @@ export const getAllPapers = async (): Promise<Paper[]> => {
 export const updatePaperStatus = async (paperId: string, status: PaperStatus, paymentDetails?: { paidAt: string }): Promise<void> => {
   try {
     const paperRef = doc(db, "papers", paperId);
-    const updateData: Partial<Paper> & { lastUpdatedAt: any, paidAt?: any, submissionDate?: any } = { status, lastUpdatedAt: serverTimestamp() };
+    const updateData: { [key: string]: any } = { status, lastUpdatedAt: serverTimestamp() };
+    
     if (paymentDetails?.paidAt) {
       updateData.paidAt = Timestamp.fromDate(new Date(paymentDetails.paidAt));
+      // If status is being set to 'Submitted' due to payment, also set submissionDate
       if (status === "Submitted") {
          updateData.submissionDate = Timestamp.fromDate(new Date(paymentDetails.paidAt));
+         updateData.paymentDueDate = null; // Clear payment due date if paid
       }
+    } else if (status === "Payment Pending" && !updateData.paymentDueDate) {
+      // If paper becomes "Payment Pending" and no specific due date is set by caller,
+      // set a default 2-hour due date from now.
+      // This case might not be common if PaperUploadForm always sets it initially.
+      const dueDate = new Date();
+      dueDate.setHours(dueDate.getHours() + 2);
+      updateData.paymentDueDate = Timestamp.fromDate(dueDate);
     }
-    await updateDoc(paperRef, updateData as any);
+
+
+    await updateDoc(paperRef, updateData);
   } catch (error) {
     console.error("Error updating paper status in Firestore: ", error);
     throw error;
@@ -138,10 +148,20 @@ export const updatePaperStatus = async (paperId: string, status: PaperStatus, pa
 export const updatePaperData = async (paperId: string, data: Partial<Omit<Paper, 'id'>>): Promise<void> => {
   try {
     const paperRef = doc(db, "papers", paperId);
-    await updateDoc(paperRef, {
-      ...data,
-      lastUpdatedAt: serverTimestamp()
-    });
+    const dataToUpdate = { ...data, lastUpdatedAt: serverTimestamp() };
+
+    // Convert any date strings in `data` to Timestamps if necessary
+    if (data.submissionDate && typeof data.submissionDate === 'string') {
+      dataToUpdate.submissionDate = Timestamp.fromDate(new Date(data.submissionDate));
+    }
+    if (data.paymentDueDate && typeof data.paymentDueDate === 'string') {
+      dataToUpdate.paymentDueDate = Timestamp.fromDate(new Date(data.paymentDueDate));
+    }
+    if (data.paidAt && typeof data.paidAt === 'string') {
+      dataToUpdate.paidAt = Timestamp.fromDate(new Date(data.paidAt));
+    }
+    
+    await updateDoc(paperRef, dataToUpdate);
   } catch (error) {
     console.error("Error updating paper data in Firestore: ", error);
     throw error;

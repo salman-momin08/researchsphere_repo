@@ -1,63 +1,74 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions
-    function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    function isPaperOwner() {
-      // This checks if the currently evaluated document's userId matches the authenticated user.
-      // It's suitable for 'get', 'update', 'delete' on a specific document.
-      return request.auth != null && resource.data.userId == request.auth.uid;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // Check if the user document exists and then if isAdmin is true
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     // Users Collection
     match /users/{userId} {
-      // Authenticated users can read their own profile.
-      // Admins can read any user profile.
-      // Any authenticated user can list user data (needed for client-side uniqueness checks).
-      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow list: if request.auth != null; // For username/phone uniqueness checks
+      // Authenticated users can read their own profile. Admins can read any.
+      allow get: if isOwner(userId) || isAdmin();
+
+      // Authenticated users can list user data (needed for client-side uniqueness checks for username/phone).
+      allow list: if isSignedIn();
 
       // Authenticated users can create their own profile document during signup.
       // The userId in the document must match their auth uid.
-      allow create: if request.auth != null && request.auth.uid == userId &&
+      allow create: if isOwner(userId) &&
                        request.resource.data.userId == request.auth.uid;
 
       // Authenticated users can update their own profile.
       // They cannot change their isAdmin status.
       // If isAdmin field is present in the update, its value must match existing.
-      allow update: if request.auth != null && request.auth.uid == userId &&
+      allow update: if isOwner(userId) &&
                        (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin);
     }
 
     // Papers Collection
-    match /papers/{paperId} {
-      // Read operations (get)
-      // Paper owner, admin, or anyone authenticated if paper is 'Published' can get it.
-      allow get: if request.auth != null &&
-                    (isPaperOwner() || isAdmin() || resource.data.status == 'Published');
+    match /papers/{paperDocId} {
+      // Read operations:
+      // 1. Owner can get their paper.
+      // 2. Admin can get any paper.
+      // 3. Any authenticated user can get a 'Published' paper.
+      allow get: if isSignedIn() &&
+                    (resource.data.userId == request.auth.uid || // Owner
+                     isAdmin() || // Admin
+                     resource.data.status == 'Published');     // Published paper
 
-      // Create operations
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // List operations:
+      // This rule is evaluated for each document that *could* be returned by a query.
+      // So, if a client queries .where('userId', '==', auth.uid), this allows it.
+      // If client queries .where('status', '==', 'Published'), this allows it.
+      // If admin queries for all papers (no specific restrictive filter from client), isAdmin() allows it.
+      allow list: if isSignedIn() &&
+                    (isAdmin() || // Admins can list all
+                     resource.data.userId == request.auth.uid || // User listing their own papers
+                     resource.data.status == 'Published');      // Any authenticated user listing 'Published' papers
 
-      // Update and Delete operations
-      allow update, delete: if isPaperOwner() || isAdmin();
+      // Create operations:
+      // Authenticated users can create papers for themselves.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
 
-      // List operations
-      // Authenticated users can list papers if:
-      // 1. They are an admin (can list all).
-      // 2. OR The query is for their own papers (client must filter by userId, rule verifies against potential results).
-      // 3. OR The query is for published papers (client must filter by status, rule verifies against potential results).
-      allow list: if request.auth != null &&
-                     (isAdmin() || // Admins can list all
-                      (resource.data.userId == request.auth.uid) || // For user's own papers query
-                      (resource.data.status == 'Published')       // For listing published papers
-                     );
+      // Update and Delete operations:
+      // 1. Owner can update/delete their paper.
+      // 2. Admin can update/delete any paper.
+      allow update, delete: if isSignedIn() &&
+                              (resource.data.userId == request.auth.uid || isAdmin());
     }
   }
 }
