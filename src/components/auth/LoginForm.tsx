@@ -8,7 +8,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
-import { toast } from "@/hooks/use-toast";
+// import { toast } from "@/hooks/use-toast"; // Toast for errors handled by AuthContext
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -98,3 +98,4 @@ export default function LoginForm() {
     </form>
   );
 }
+

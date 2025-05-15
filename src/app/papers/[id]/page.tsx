@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon } from 'lucide-react';
+import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Shield } from 'lucide-react'; // Added Shield
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -68,7 +68,7 @@ function PaperDetailsContent() {
           }
         })
         .catch((err: any) => {
-          console.error("Error fetching paper:", err);
+          // console.error("Error fetching paper:", err);
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
           router.push(isAdmin ? '/admin/dashboard' : '/');
@@ -117,10 +117,10 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: "Author will be notified.",
+        description: "Author will be notified (simulated).",
         duration: 5000
       });
-      setAdminFeedbackText(""); 
+      setAdminFeedbackText(""); // Clear feedback box
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
@@ -148,14 +148,14 @@ function PaperDetailsContent() {
   };
 
   const handleRunPlagiarismValidation = async () => {
-    if (!currentPaper || !currentPaper.fileUrl) { // Check for fileUrl instead of abstract
+    if (!currentPaper || !currentPaper.fileUrl) {
         toast({ variant: "destructive", title: "Error", description: "Paper file URL is missing for plagiarism validation." });
         return;
     }
     setIsCheckingPlagiarism(true);
     try {
       const result = await plagiarismCheck({ 
-        documentUrl: currentPaper.fileUrl, // Pass the fileUrl
+        documentUrl: currentPaper.fileUrl,
         fileName: currentPaper.fileName 
       });
       await updatePaperData(currentPaper.id, {
@@ -169,7 +169,7 @@ function PaperDetailsContent() {
       } : null);
       toast({ title: "Plagiarism Validation (File) Complete" });
     } catch (error: any) {
-      console.error("Plagiarism validation error:", error);
+      // console.error("Plagiarism validation error:", error);
       toast({ variant: "destructive", title: "Plagiarism Validation (File) Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingPlagiarism(false);
@@ -195,7 +195,7 @@ function PaperDetailsContent() {
       } : null);
       toast({ title: "Acceptance Validation (Abstract) Complete" });
     } catch (error: any) {
-      console.error("Acceptance validation error:", error);
+      // console.error("Acceptance validation error:", error);
       toast({ variant: "destructive", title: "Acceptance Validation (Abstract) Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingAcceptance(false);
@@ -204,6 +204,7 @@ function PaperDetailsContent() {
 
   const handleDownloadOriginalFile = () => {
     if (currentPaper?.fileUrl) {
+        // console.log("File URL:", currentPaper.fileUrl);
         window.open(currentPaper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
@@ -315,7 +316,7 @@ function PaperDetailsContent() {
                 )}
                 {isAdmin && (
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
-                        <AdminDashboardIcon className="mr-2 h-4 w-4" /> Admin Dashboard
+                        <Shield className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}
             </div>
@@ -493,3 +494,4 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
+

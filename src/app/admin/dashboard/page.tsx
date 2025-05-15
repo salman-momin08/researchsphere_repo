@@ -32,7 +32,7 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers();
+        const fetchedPapers = await getAllPapers(); // Fetch from Firestore
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -50,7 +50,7 @@ function AdminDashboardContent() {
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
       } catch (error: any) {
-        console.error("AdminDashboard: Error fetching papers:", error);
+        // console.error("AdminDashboard: Error fetching papers from Firestore:", error);
         toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
@@ -92,7 +92,7 @@ function AdminDashboardContent() {
           duration: 7000,
         });
       }
-      fetchAndSetPapers();
+      fetchAndSetPapers(); // Refresh paper list
     } catch (error: any) {
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
     }
@@ -218,7 +218,6 @@ function AdminDashboardContent() {
                   {papers.map((paper) => {
                     const effectiveStatus = (paper as any).displayStatus || paper.status;
                     const isPaymentOverdue = effectiveStatus === 'Payment Overdue';
-                    const isPaymentPending = effectiveStatus === 'Payment Pending';
                     
                     return (
                       <TableRow key={paper.id}>
@@ -233,8 +232,10 @@ function AdminDashboardContent() {
                         </TableCell>
                         <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell>
-                          {isPaymentOverdue || isPaymentPending ? (
-                             <span className={isPaymentOverdue ? "text-destructive font-semibold" : "text-yellow-600 font-semibold"}>Yes</span>
+                          {isPaymentOverdue ? (
+                             <span className={"text-destructive font-semibold"}>Yes</span>
+                          ) : paper.status === 'Payment Pending' ? (
+                             <span className={"text-yellow-600 font-semibold"}>Yes</span>
                           ) : (
                             <span className="text-muted-foreground">N/A</span>
                           )}
@@ -263,3 +264,4 @@ function AdminDashboardContent() {
 export default function AdminDashboardPage() {
   return <AdminDashboardContent />;
 }
+

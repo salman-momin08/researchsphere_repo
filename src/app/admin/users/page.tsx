@@ -23,7 +23,6 @@ export default function UserManagementPage() {
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
-    // console.log("UserManagementPage: Fetching all users...");
     try {
       const fetchedUsers = await getAllUsers();
       // console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service.`);
@@ -53,9 +52,9 @@ export default function UserManagementPage() {
     try {
       await toggleUserAdminStatus(targetUserId, !!currentIsAdmin);
       toast({ title: "Success", description: `User admin status updated.` });
-      fetchUsers();
+      fetchUsers(); // Refresh the list
     } catch (err: any) {
-      console.error("UserManagementPage: Error toggling admin status:", err);
+      // console.error("UserManagementPage: Error toggling admin status:", err);
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update admin status." });
     }
   };
@@ -81,7 +80,7 @@ export default function UserManagementPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-lg">
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <div className="flex items-center gap-2">
             <UsersIcon className="h-6 w-6 text-primary" />
@@ -155,3 +154,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+

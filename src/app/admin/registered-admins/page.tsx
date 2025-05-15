@@ -21,14 +21,12 @@ export default function RegisteredAdminsPage() {
     const fetchAdminUsers = async () => {
       setIsLoading(true);
       setError(null);
-      // console.log("RegisteredAdminsPage: Fetching all users to filter for admins...");
       try {
         const allUsers = await getAllUsers();
         const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
-        // console.log(`RegisteredAdminsPage: Found ${filteredAdmins.length} admin users.`);
         setAdminUsers(filteredAdmins);
       } catch (err: any) {
-        console.error("RegisteredAdminsPage: Error fetching users:", err);
+        // console.error("RegisteredAdminsPage: Error fetching users:", err);
         setError(err.message || "Failed to load admin users.");
         toast({ variant: "destructive", title: "Error Loading Admins", description: err.message });
       } finally {
@@ -105,3 +103,4 @@ export default function RegisteredAdminsPage() {
     </div>
   );
 }
+

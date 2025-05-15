@@ -21,14 +21,12 @@ export default function ReviewerManagementPage() {
     const fetchReviewerUsers = async () => {
       setIsLoading(true);
       setError(null);
-      // console.log("ReviewerManagementPage: Fetching all users to filter for reviewers...");
       try {
         const allUsers = await getAllUsers();
         const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
-        // console.log(`ReviewerManagementPage: Found ${filteredReviewers.length} reviewer users.`);
         setReviewerUsers(filteredReviewers);
       } catch (err: any) {
-        console.error("ReviewerManagementPage: Error fetching users:", err);
+        // console.error("ReviewerManagementPage: Error fetching users:", err);
         setError(err.message || "Failed to load reviewer users.");
         toast({ variant: "destructive", title: "Error Loading Reviewers", description: err.message });
       } finally {
@@ -101,3 +99,4 @@ export default function ReviewerManagementPage() {
     </div>
   );
 }
+
