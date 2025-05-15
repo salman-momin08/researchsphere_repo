@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon } from 'lucide-react'; // Renamed LayoutDashboard to avoid conflict
+import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -95,8 +95,6 @@ function PaperDetailsContent() {
     if (!targetPaperId) return;
 
     try {
-      // Status update to "Submitted" and paidAt timestamp are now handled by paper-service when paymentOption is 'payNow'
-      // For payments made on a "Payment Pending" paper, update status
       await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
       setCurrentPaper(prev => {
         if (prev && prev.id === targetPaperId) {
@@ -119,14 +117,14 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified.`, // Removed "Email simulation"
+        description: `Author will be notified.`,
         duration: 5000
       });
-      setAdminFeedbackText(""); // Clear the feedback box
+      setAdminFeedbackText(""); 
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
-      setIsSubmittingFeedback(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -203,7 +201,7 @@ function PaperDetailsContent() {
 
   const handleDownloadOriginalPaper = () => {
     if (currentPaper?.fileUrl) {
-        // This URL should now point to Cloudinary or another external storage
+        console.log("PaperDetailsContent: Attempting to open original file URL:", currentPaper.fileUrl);
         window.open(currentPaper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
@@ -226,8 +224,7 @@ function PaperDetailsContent() {
     content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${currentPaper.abstract}\n\n`;
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
-    // The fileUrl might be very long, so consider if it's needed in this metadata text file
-    // content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
+    content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
 
     if (isAdmin) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;

@@ -79,6 +79,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
 
   const handleDownloadOriginalFile = () => {
     if (paper.fileUrl) {
+        console.log("PaperListItem: Attempting to open original file URL:", paper.fileUrl);
         window.open(paper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {

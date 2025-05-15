@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Search as SearchIcon, FileText as FileTextIcon, Eye, AlertTriangle } from 'lucide-react'; // Renamed FileText
+import { Download, Search as SearchIcon, FileText as FileTextIcon, Eye, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper, PaperStatus } from '@/types';
 import { getPublishedPapers } from '@/lib/paper-service'; 
@@ -45,20 +45,15 @@ function SearchPapersContent() {
     setSearchResults([]);
 
     try {
-      console.log("SearchPapersContent: Fetching published papers from Firestore via paper-service.");
       const publishedPapers = await getPublishedPapers();
-      console.log(`SearchPapersContent: Fetched ${publishedPapers.length} published papers. Filtering client-side for author: "${searchTerm}"`);
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      // Client-side filtering by author name (case-insensitive, partial match)
-      // This searches if any author in the paper's author list includes the search term.
+      // Client-side filtering by author name (case-insensitive, partial match on any author in the list)
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
-      console.log(`SearchPapersContent: Found ${results.length} papers matching author.`);
       setSearchResults(results);
     } catch (error: any)
      {
-      console.error("SearchPapersContent: Error fetching or filtering papers:", error);
       toast({
         variant: "destructive",
         title: "Search Error",
@@ -71,6 +66,7 @@ function SearchPapersContent() {
 
   const handleDownloadOriginalPaper = (paper: Paper) => {
     if (paper.fileUrl) {
+        console.log("SearchPapersContent: Attempting to open original file URL:", paper.fileUrl);
         window.open(paper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {
