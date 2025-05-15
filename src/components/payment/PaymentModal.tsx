@@ -23,17 +23,17 @@ import LoadingSpinner from "@/components/shared/LoadingSpinner";
 interface PaymentModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  paper: Paper | null; 
-  onPaymentSuccess: (paperId?: string) => void; 
+  paper: Paper | null;
+  onPaymentSuccess: (paperId?: string) => void;
 }
 
-const SUBMISSION_FEE = 50.00; 
+const SUBMISSION_FEE = 499.00; // Updated to INR
 type PaymentMethod = "card" | "upi";
 
 export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuccess }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
-  
+
   const [cardNumber, setCardNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [cvc, setCvc] = useState("");
@@ -41,7 +41,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
   const [paymentStep, setPaymentStep] = useState<"form" | "success">("form");
 
   useEffect(() => {
-    if (isOpen) { // Reset form fields when modal opens, but keep paymentStep if already 'success'
+    if (isOpen) {
         if(paymentStep === "form") {
             setCardNumber("");
             setExpiryDate("");
@@ -49,7 +49,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             setUpiId("");
             setPaymentMethod("card");
         }
-    } else { // Reset completely when modal is closed
+    } else {
         setPaymentStep("form");
         setIsProcessing(false);
         setCardNumber("");
@@ -58,9 +58,8 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         setUpiId("");
         setPaymentMethod("card");
     }
-  }, [isOpen]); // Removed paymentStep and paper from deps to avoid premature reset on prop changes
+  }, [isOpen, paymentStep]);
 
-  // Effect to reset to 'form' step if paper prop changes (modal reused for different paper)
   useEffect(() => {
     if(isOpen) {
         setPaymentStep("form");
@@ -69,7 +68,6 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
 
 
   const handleDialogClose = () => {
-    // This function is now called by onOpenChange(false) or the X button
     setPaymentStep("form");
     setIsProcessing(false);
     setCardNumber("");
@@ -77,7 +75,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     setCvc("");
     setUpiId("");
     setPaymentMethod("card");
-    onOpenChange(false); // Call the original onOpenChange to update parent state
+    onOpenChange(false);
   };
 
 
@@ -111,12 +109,12 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
 
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
-      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       if (paper && paper.id) {
-        onPaymentSuccess(paper.id); 
+        onPaymentSuccess(paper.id);
       } else {
-        onPaymentSuccess(); // For "Pay Now" from submission form where paper ID isn't known yet
+        onPaymentSuccess();
       }
       setPaymentStep("success");
     } catch (error) {
@@ -138,7 +136,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               </div>
               <DialogTitle className="text-2xl font-bold text-center">Complete Your Submission</DialogTitle>
               <DialogDescription className="text-center">
-                A submission fee of <strong>${SUBMISSION_FEE.toFixed(2)}</strong> is required for 
+                A submission fee of <strong>₹{SUBMISSION_FEE.toFixed(2)}</strong> is required for
                 {paper ? ` "${paper.title}"` : " your paper"}.
               </DialogDescription>
             </DialogHeader>
@@ -196,11 +194,11 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                   <div className="flex flex-col items-center space-y-2">
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-white inline-block">
-                       <Image 
-                        src="https://placehold.co/120x120/FFFFFF/000000.png?text=Scan+QR"
-                        alt="Scan QR Code for UPI Payment" 
-                        width={120} 
-                        height={120} 
+                       <Image
+                        src="https://placehold.co/120x120/e2e8f0/e2e8f0.png?text=_" // Placeholder for QR
+                        alt="Scan QR Code for UPI Payment"
+                        width={120}
+                        height={120}
                         className="rounded"
                         data-ai-hint="qr code payment"
                       />
@@ -215,11 +213,11 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
               <Button variant="outline" onClick={handleDialogClose} disabled={isProcessing}>Cancel</Button>
               <Button onClick={handlePayment} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentMethod === 'card' ? <CreditCard className="mr-2 h-4 w-4" /> : <AtSign className="mr-2 h-4 w-4" />)}
-                {isProcessing ? "Processing..." : `Pay $${SUBMISSION_FEE.toFixed(2)}`}
+                {isProcessing ? "Processing..." : `Pay ₹${SUBMISSION_FEE.toFixed(2)}`}
               </Button>
             </DialogFooter>
           </>
-        ) : paymentStep === "success" ? ( // Removed paper check here, success screen should show regardless
+        ) : paymentStep === "success" ? (
           <>
             <DialogHeader>
               <div className="mx-auto mb-4 h-16 w-16 text-green-500 flex items-center justify-center">
@@ -236,7 +234,6 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </DialogFooter>
           </>
         ) : (
-            // Fallback for loading or unexpected state, though `isOpen` should prevent this usually
             <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
                 <LoadingSpinner size={32} />
                 <p className="mt-3 text-muted-foreground">Loading payment details...</p>
@@ -246,5 +243,3 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     </Dialog>
   );
 }
-
-    
