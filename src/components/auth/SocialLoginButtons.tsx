@@ -7,18 +7,22 @@ import { Chrome, Github, Loader2 } from "lucide-react";
 import { useState } from 'react';
 
 export default function SocialLoginButtons() {
-  const { loginWithGoogle, loginWithGitHub, loading: authGlobalLoading } = useAuth();
+  const { loginWithGoogle, loginWithGitHub, isSocialLoginInProgress: authGlobalLoading, /* loading: authGlobalLoading - replaced */ } = useAuth();
+  // Use local state to track which button was clicked, for individual spinner
   const [processingProvider, setProcessingProvider] = useState<null | 'google' | 'github'>(null);
+
 
   const handleGoogleLogin = async () => {
     setProcessingProvider('google');
     try {
       await loginWithGoogle();
+      // Success is handled by onAuthStateChanged
     } catch (error) {
-      // Error is already handled by toast in AuthContext, but can log here if needed
-      console.error("SocialLoginButtons: Google login error", error);
+      // Error is already handled by toast in AuthContext
+      console.error("SocialLoginButtons: Google login error caught (already handled by context)", error);
     } finally {
-      setProcessingProvider(null);
+       // setActiveSocialLoginProvider(null) is handled in AuthContext
+       // No need to setProcessingProvider(null) here if it's handled globally by onAuthStateChanged
     }
   };
 
@@ -26,11 +30,12 @@ export default function SocialLoginButtons() {
     setProcessingProvider('github');
     try {
       await loginWithGitHub();
+      // Success is handled by onAuthStateChanged
     } catch (error) {
       // Error is already handled by toast in AuthContext
-      console.error("SocialLoginButtons: GitHub login error", error);
+      console.error("SocialLoginButtons: GitHub login error caught (already handled by context)", error);
     } finally {
-      setProcessingProvider(null);
+      // setActiveSocialLoginProvider(null) is handled in AuthContext
     }
   };
 
@@ -62,9 +67,7 @@ export default function SocialLoginButtons() {
         )}
         Continue with GitHub
       </Button>
-      <p className="text-xs text-muted-foreground text-center mt-2 px-2">
-        Please ensure popups are enabled in your browser for social sign-in to work correctly.
-      </p>
+      {/* Removed instructional paragraph about popups as the error message is now clearer */}
     </>
   );
 }

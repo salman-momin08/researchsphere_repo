@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard } from 'lucide-react';
+import { FileText, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { getPaper, updatePaperStatus, updatePaperData, simulateFileDownload } from '@/lib/paper-service'; // Using mock service
+import { getPaper, updatePaperStatus, updatePaperData } from '@/lib/paper-service';
 import CountdownTimer from '@/components/shared/CountdownTimer';
 
 function PaperDetailsContent() {
@@ -44,10 +44,9 @@ function PaperDetailsContent() {
     const paperId = params.id as string;
     if (paperId && user) {
       setLoadingPaper(true);
-      getPaper(paperId) // Fetches from mock service
+      getPaper(paperId)
         .then(paper => {
           if (paper) {
-            // Basic permission check for mock data
             if (paper.userId !== user.id && !isAdmin && paper.status !== "Published") {
                 setCurrentPaper(null);
                 toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
@@ -64,12 +63,12 @@ function PaperDetailsContent() {
             }
           } else {
             setCurrentPaper(null);
-            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper does not exist." });
+            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
             router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
           }
         })
         .catch((err: any) => {
-          console.error("Error fetching paper (mock):", err);
+          console.error("Error fetching paper:", err);
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
           router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
@@ -82,7 +81,7 @@ function PaperDetailsContent() {
         setLoadingPaper(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, user, isAdmin]); // router removed from deps as it's stable
+  }, [params.id, user, isAdmin]);
 
   useEffect(() => {
     const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
@@ -96,7 +95,7 @@ function PaperDetailsContent() {
     if (!targetPaperId) return;
 
     try {
-      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() }); // mock service
+      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
       setCurrentPaper(prev => {
         if (prev && prev.id === targetPaperId) {
           return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString(), paymentDueDate: null };
@@ -114,27 +113,24 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin || !adminFeedbackText.trim()) return;
     setIsSubmittingFeedback(true);
     try {
-      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText }); // mock service
+      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
-
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified (Simulated email to user for paper: ${currentPaper.title}).`,
-        duration: 7000
+        description: `Author will be notified of your feedback. (Email simulation: user notified for paper '${currentPaper.title}')`,
+        duration: 5000
       });
-      console.log(`SIMULATING EMAIL: Feedback provided for paper "${currentPaper.title}" (ID: ${currentPaper.id}) by admin. Email would be sent to user ID: ${currentPaper.userId}.`);
-
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
-      setIsSubmittingFeedback(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleStatusChange = async (newStatus: Paper['status']) => {
     if (!currentPaper || !isAdmin) return;
     try {
-      await updatePaperStatus(currentPaper.id, newStatus); // mock service
+      await updatePaperStatus(currentPaper.id, newStatus);
       setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
@@ -158,7 +154,7 @@ function PaperDetailsContent() {
     setIsCheckingPlagiarism(true);
     try {
       const result = await plagiarismCheck({ documentText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, { // mock service
+      await updatePaperData(currentPaper.id, {
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
       });
@@ -170,7 +166,7 @@ function PaperDetailsContent() {
       toast({ title: "Plagiarism Validation Complete" });
     } catch (error: any) {
       console.error("Plagiarism validation error:", error);
-      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error.message || "Unknown error" });
+      toast({ variant: "destructive", title: "Plagiarism Validation Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingPlagiarism(false);
     }
@@ -184,7 +180,7 @@ function PaperDetailsContent() {
     setIsCheckingAcceptance(true);
     try {
       const result = await acceptanceProbability({ paperText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, { // mock service
+      await updatePaperData(currentPaper.id, {
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       });
@@ -193,10 +189,10 @@ function PaperDetailsContent() {
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       } : null);
-      toast({ title: "Acceptance Probability Validation Complete" });
+      toast({ title: "Acceptance Validation Complete" });
     } catch (error: any) {
       console.error("Acceptance validation error:", error);
-      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error.message || "Unknown error" });
+      toast({ variant: "destructive", title: "Acceptance Validation Failed", description: error.message || "An error occurred." });
     } finally {
       setIsCheckingAcceptance(false);
     }
@@ -204,8 +200,8 @@ function PaperDetailsContent() {
 
   const handleDownloadOriginalPaper = () => {
     if (currentPaper?.fileUrl) {
-        simulateFileDownload(currentPaper.fileUrl, currentPaper.fileName); // Use simulateFileDownload
-        toast({ title: "Initiating Download", description: `Attempting to download ${currentPaper.fileName || 'the paper'}. (Mock download)` });
+        window.open(currentPaper.fileUrl, '_blank');
+        toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
         toast({
             variant: "destructive",
@@ -226,8 +222,7 @@ function PaperDetailsContent() {
     content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${currentPaper.abstract}\n\n`;
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
-    content += `Mock File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
-     if (isAdmin) {
+    if (isAdmin) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
     }
@@ -241,7 +236,7 @@ function PaperDetailsContent() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
+    toast({ title: "Details Downloaded", description: `${filename} prepared.` });
   };
 
   if (loadingPaper) {
@@ -354,7 +349,7 @@ function PaperDetailsContent() {
                       <Sparkles className="h-4 w-4" />
                       <AlertTitle>AI Validation Available</AlertTitle>
                       <AlertDescription>
-                        Run plagiarism and acceptance probability validations based on the paper's title and abstract using the buttons above.
+                        Run plagiarism and acceptance validations based on the paper's title and abstract using the buttons above.
                       </AlertDescription>
                     </Alert>
                 )}

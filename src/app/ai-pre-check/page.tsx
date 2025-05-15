@@ -42,7 +42,7 @@ async function readFileContentSimulated(file: File): Promise<string> {
 const preCheckSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
   paperText: z.string().max(10000, "Abstract/Text content is too long (max 10000 chars).").optional(),
-  file: z.any() // For FileList, client-side validation
+  file: z.any() 
     .optional()
     .refine(files => {
       if (typeof window === 'undefined' || !files || !(files instanceof FileList) || files.length === 0) return true;
@@ -54,7 +54,7 @@ const preCheckSchema = z.object({
     }, "Only PDF or DOCX files are allowed."),
 }).refine(data => data.paperText || (typeof window !== 'undefined' && data.file instanceof FileList && data.file.length > 0), {
   message: "Either abstract/text content or a file upload is required.",
-  path: ["paperText"], // This error will appear under the paperText field or use a general form error.
+  path: ["paperText"], 
 });
 
 
@@ -81,7 +81,6 @@ function AiPreCheckContent() {
     if (files && files.length > 0) {
       setFileName(files[0].name);
       form.setValue("file", files, { shouldValidate: true });
-      // If a file is uploaded, and there's no text, clear the text field error (if any)
       if (!form.getValues("paperText")) {
         form.clearErrors("paperText");
       }
@@ -120,7 +119,6 @@ function AiPreCheckContent() {
         return;
     }
 
-
     let contentToAnalyze = `Paper Title: ${data.title}`;
     if (data.paperText) {
         contentToAnalyze += `\n\nAbstract/Provided Text:\n${data.paperText}`;
@@ -129,8 +127,6 @@ function AiPreCheckContent() {
         contentToAnalyze += `\n\n--- Start of Uploaded File Content (Simulated) ---\n${fileContentForAnalysis}\n--- End of Uploaded File Content (Simulated) ---`;
     }
     
-    // Ensure total content length for AI is reasonable if needed (Genkit handles large inputs but good to be mindful)
-    // Minimum length check: title + some content (either text or indication of file)
     if (data.title.length < 5 || (!data.paperText && !fileToUpload)) { 
         setAiError("Content is too short for meaningful analysis. Please provide more details in the title, and either provide abstract/text or upload a file.");
         toast({variant: "destructive", title: "Content Too Short", description: "Provide more details."});
@@ -138,10 +134,7 @@ function AiPreCheckContent() {
         return;
     }
 
-
     try {
-      toast({title: "AI Analysis Started", description: "Checking plagiarism and acceptance probability..."});
-
       const plagiarism = await plagiarismCheck({ documentText: contentToAnalyze });
       setPlagiarismResult(plagiarism);
       toast({title: "Plagiarism Check Complete"});
@@ -208,7 +201,7 @@ function AiPreCheckContent() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: "Feedback Downloaded", description: "Check your downloads folder." });
+    toast({ title: "Feedback Report Downloaded"});
   };
 
   return (
@@ -263,7 +256,7 @@ function AiPreCheckContent() {
                       <span>Upload a file</span>
                       <input id="file-upload" type="file" className="sr-only" 
                             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            {...form.register("file")} // Register file input
+                            {...form.register("file")}
                             onChange={handleFileChange} 
                             disabled={isLoading}
                       />
@@ -334,4 +327,3 @@ export default function AiPreCheckPage() {
     </ProtectedRoute>
   );
 }
-
