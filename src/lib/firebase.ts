@@ -25,16 +25,13 @@ for (const key in requiredConfigs) {
   if (!requiredConfigs[key]) {
     allConfigsPresent = false;
     const message =
-      `Firebase configuration variable ${key} is missing. ` +
-      "Please ensure it is set in your .env.local file and the development server has been restarted. " +
-      "This can lead to Firebase initialization errors (e.g., auth/api-key-not-valid or auth/configuration-not-found).";
+      `Firebase CLIENT SDK configuration variable ${key} is missing. ` +
+      "Please ensure it is set in your .env.local file and the development server has been restarted. ";
 
     if (typeof window !== 'undefined') {
-      console.error(message); // Log error in browser
+      console.error(message); 
     } else {
-      console.error(`CRITICAL SETUP ERROR: ${message}`);
-      // Consider throwing an error here if running in a Node.js environment (e.g., build time)
-      // to make the failure more explicit: throw new Error(message);
+      console.error(`CRITICAL CLIENT SDK SETUP ERROR: ${message}`);
     }
   }
 }
@@ -48,39 +45,46 @@ const firebaseConfig: FirebaseOptions = {
   appId: firebaseAppId,
 };
 
-// Log the authDomain to help debug auth/unauthorized-domain issues
-if (typeof window !== 'undefined') { // Only log on client-side where auth happens
-  console.log("Firebase SDK attempting to use Auth Domain:", firebaseAuthDomain);
+if (typeof window !== 'undefined') { 
+  console.log("Firebase Client SDK: Attempting to initialize with Project ID:", firebaseProjectId);
+  console.log("Firebase Client SDK: Using Auth Domain:", firebaseAuthDomain);
   if (!firebaseAuthDomain) {
-    console.error("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is undefined. This will likely cause auth/unauthorized-domain or auth/configuration-not-found errors.");
+    console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is undefined. This will likely cause auth/unauthorized-domain or auth/configuration-not-found errors.");
+  }
+   if (!firebaseApiKey) {
+    console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_API_KEY is undefined. This will likely cause auth/api-key-not-valid errors.");
   }
 }
 
 
-// Initialize Firebase
 let app;
-// Check if Firebase has already been initialized to avoid re-initialization error
 if (!getApps().length) {
-  // Only initialize if no apps exist and all required configs are present
-  if (allConfigsPresent) { // Check if all configurations were found
-    app = initializeApp(firebaseConfig);
+  if (allConfigsPresent) { 
+    try {
+      app = initializeApp(firebaseConfig);
+      if (typeof window !== 'undefined') {
+        console.log("Firebase Client SDK: Initialized successfully.");
+      }
+    } catch (e: any) {
+      console.error("Firebase Client SDK: Initialization FAILED.", e.message, e.code);
+      app = null; // Ensure app is null if init fails
+    }
   } else {
-    console.error("Firebase initialization skipped due to missing configuration variables. Firebase services will not be available.");
-    // Optionally, you could throw an error here to halt execution if Firebase is critical
-    // throw new Error("Firebase initialization failed due to missing configuration.");
+    console.error("Firebase Client SDK: Initialization SKIPPED due to missing configuration variables. Firebase services will not be available.");
+    app = null;
   }
 } else {
-  app = getApp(); // Get the default app if already initialized
+  app = getApp(); 
+  if (typeof window !== 'undefined') {
+      console.log("Firebase Client SDK: Using existing app.");
+  }
 }
 
-// Export auth, db, storage conditionally based on app initialization
-// This prevents errors if initialization failed.
-export const auth = app ? getAuth(app) : null!; // Use null assertion for now, but handle potential null elsewhere
-export const db = app ? getFirestore(app) : null!;
-export const storage = app ? getStorage(app) : null!;
+export const auth = app ? getAuth(app) : null!; 
+export const db = app ? getFirestore(app) : null!; // Firestore DB if needed, not for MongoDB Atlas
+export const storage = app ? getStorage(app) : null!; // Firebase Storage
 
 
-// Export providers for convenience
 export const googleAuthCredentialProvider = new GoogleAuthProvider();
 export const githubAuthCredentialProvider = new GithubAuthProvider();
 

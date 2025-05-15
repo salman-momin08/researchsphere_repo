@@ -1,6 +1,6 @@
 
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
-import { verifyIdToken, firebaseAdminApp } from '@/lib/firebase-admin'; // Import firebaseAdminApp
+import { verifyIdToken, firebaseAdminApp } from '@/lib/firebase-admin'; 
 import type admin from 'firebase-admin';
 
 export interface NextApiRequestWithUser extends NextApiRequest {
@@ -10,6 +10,7 @@ export interface NextApiRequestWithUser extends NextApiRequest {
 const withAuth = (handler: NextApiHandler) =>
   async (req: NextApiRequestWithUser, res: NextApiResponse) => {
     const authHeader = req.headers.authorization;
+    console.log(`withAuth Middleware: Received request for ${req.url}. Auth Header: ${authHeader ? authHeader.substring(0, 15) + '...' : 'MISSING'}`);
 
     if (!firebaseAdminApp) {
       console.error('withAuth Middleware: Firebase Admin SDK (firebaseAdminApp) is not initialized. Authentication will fail. Check server logs for Admin SDK initialization errors.');
@@ -17,30 +18,30 @@ const withAuth = (handler: NextApiHandler) =>
     }
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('withAuth Middleware: No token provided or invalid format.');
-      return res.status(401).json({ message: 'Unauthorized: No token provided' });
+      console.warn('withAuth Middleware: No token provided or invalid format.');
+      return res.status(401).json({ message: 'Unauthorized: No token provided or invalid format' });
     }
 
     const idToken = authHeader.split('Bearer ')[1];
     if (!idToken) {
-      console.log('withAuth Middleware: Token format invalid (empty after Bearer).');
-      return res.status(401).json({ message: 'Unauthorized: Invalid token format' });
+      console.warn('withAuth Middleware: Token format invalid (empty after Bearer).');
+      return res.status(401).json({ message: 'Unauthorized: Invalid token format (empty token)' });
     }
 
-    // console.log(`withAuth Middleware: Attempting to verify token starting with: ${idToken.substring(0, 20)}...`);
+    console.log(`withAuth Middleware: Attempting to verify token (first 20 chars): ${idToken.substring(0, 20)}...`);
 
     try {
       const decodedToken = await verifyIdToken(idToken);
       if (!decodedToken) {
-        console.log('withAuth Middleware: Token verification failed (verifyIdToken returned null). Token might be invalid, expired, or Admin SDK misconfigured.');
+        console.warn('withAuth Middleware: Token verification failed (verifyIdToken returned null). Token might be invalid, expired, or Admin SDK misconfigured.');
         return res.status(401).json({ message: 'Unauthorized: Invalid token' });
       }
-      // console.log(`withAuth Middleware: Token verified successfully for UID: ${decodedToken.uid}`);
+      console.log(`withAuth Middleware: Token verified successfully for UID: ${decodedToken.uid}`);
       req.user = decodedToken;
       return handler(req, res);
-    } catch (error) { // This catch might be redundant if verifyIdToken handles its own errors, but good for safety.
-      console.error('withAuth Middleware: Unexpected error during token verification process:', error);
-      return res.status(401).json({ message: 'Unauthorized: Token verification failed unexpectedly' });
+    } catch (error: any) { 
+      console.error('withAuth Middleware: Unexpected error during token verification process:', error.message, error.code, error.stack);
+      return res.status(401).json({ message: `Unauthorized: Token verification failed unexpectedly. Details: ${error.message}` });
     }
   };
 
