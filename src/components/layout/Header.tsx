@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIcon, FileText as FileTextIconLucide, Phone, Shield } from 'lucide-react';
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIconLucide, FileText as FileTextIconLucide, Phone, Shield, UserCheck } from 'lucide-react'; // Added UsersIconLucide
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -119,7 +119,7 @@ export default function Header() {
   const baseNavLinks = [
     { href: "/", label: "Home", icon: null },
     { href: "/registration", label: "Registration", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
@@ -131,18 +131,24 @@ export default function Header() {
     { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-2 h-4 w-4" />, href: "/submit" },
     { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
-    { href: "/key-committee", label: "Committee", icon: <UsersIcon className="mr-2 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
-
-  // Simplified main navigation for admins
-  const adminMainNavLink = { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-2 h-4 w-4" /> };
+  
+  const adminNavLinks = [
+    { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-2 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
+    // Admins might still want to see contact page or templates for reference
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact Us", icon: <Phone className="mr-2 h-4 w-4" /> },
+  ];
 
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
     if (user && isAdmin) {
-      currentNavLinks = [adminMainNavLink]; // Only Admin Panel link in main nav for admin
+      currentNavLinks = adminNavLinks;
     } else if (user && !isAdmin) {
       currentNavLinks = userNavLinks;
     } else {
@@ -160,17 +166,18 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
-            const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href));
+            const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'));
+            
             let buttonClasses = "";
 
-            if (user && isAdmin) { // Styling for the single "Admin Panel" link
+            if (user && isAdmin) {
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center",
                 isActive
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-foreground hover:bg-accent hover:text-accent-foreground"
               );
-            } else { // Non-admin or logged-out user styles for main nav
+            } else { 
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center",
                 isActive
@@ -285,7 +292,7 @@ export default function Header() {
                       else if (link.href) router.push(link.href);
                       setIsMobileMenuOpen(false);
                     }}
-                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href))}
+                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'))}
                     isAction={!!link.action}
                     icon={link.icon}
                     isAdminContext={!!(user && isAdmin)}
@@ -293,30 +300,18 @@ export default function Header() {
                     {link.label}
                   </NavLinkItem>
                 ))}
-                {/* Additional mobile links if admin */}
+                
                 {isClient && user && isAdmin && (
                   <>
-                     {/* Add links that are normally in admin sidebar also to mobile for admins if needed */}
-                     {/* For instance, User Management could be added here if not covered by Admin Panel link */}
-                     <NavLinkItem href="/admin/users" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/users")} icon={<UsersIcon className="mr-2 h-4 w-4" />} isAdminContext={true}>
+                     <NavLinkItem href="/admin/users" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/users")} icon={<UsersIconLucide className="mr-2 h-4 w-4" />} isAdminContext={true}>
                        User Management
                      </NavLinkItem>
-                     <NavLinkItem href="/admin/registered-admins" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/registered-admins")} icon={<Shield className="mr-2 h-4 w-4" />} isAdminContext={true}>
+                     <NavLinkItem href="/admin/registered-admins" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/registered-admins")} icon={<UserCheck className="mr-2 h-4 w-4" />} isAdminContext={true}>
                        Registered Admins
                      </NavLinkItem>
                   </>
                 )}
-                 {/* Links relevant for both user types or logged out, like Search, Committee, etc. should be in currentNavLinks */}
-                 {isClient && user && !isAdmin && (
-                    <>
-                        {/* Regular user links that were in userNavLinks but might not be in baseNavLinks for mobile */}
-                         <NavLinkItem href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname==="/dashboard"} icon={<LayoutDashboard className="mr-2 h-4 w-4" />} >
-                            Dashboard
-                        </NavLinkItem>
-                    </>
-                 )}
-
-
+                
                 <DropdownMenuSeparator className="my-2" />
                 {isClient && user ? (
                   <>
@@ -355,3 +350,4 @@ export default function Header() {
     </header>
   );
 }
+
