@@ -1,54 +1,50 @@
+
 import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  throw new Error(
-    'Please define the MONGODB_URI environment variable inside .env.local'
-  );
-}
+let connectionPromise: Promise<typeof mongoose> | null = null;
+let mongooseInstance: typeof mongoose | null = null;
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
- */
-// @ts-ignore
-let cached = global.mongoose;
-
-if (!cached) {
-  // @ts-ignore
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function dbConnect() {
-  if (cached.conn) {
-    return cached.conn;
+async function dbConnect(): Promise<typeof mongoose | null> {
+  if (!MONGODB_URI) {
+    console.error(
+      'CRITICAL ERROR: MONGODB_URI is not defined in your .env.local file. MongoDB connection will fail.'
+    );
+    return null; // Prevent throwing at module level, let API routes handle null connection
   }
 
-  if (!cached.promise) {
+  if (mongooseInstance) {
+    console.log('MongoDB: Using existing connection.');
+    return mongooseInstance;
+  }
+
+  if (!connectionPromise) {
     const opts = {
       bufferCommands: false,
     };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+    console.log('MongoDB: Creating new connection promise.');
+    connectionPromise = mongoose.connect(MONGODB_URI!, opts).then((mongooseModule) => {
       console.log('MongoDB connected successfully.');
-      return mongoose;
+      mongooseInstance = mongooseModule;
+      return mongooseModule;
     }).catch(err => {
       console.error('MongoDB connection error:', err.message);
-      cached.promise = null; // Reset promise on error
-      throw err; // Re-throw error to be caught by caller
+      connectionPromise = null; // Reset promise on error so it can be retried
+      mongooseInstance = null;
+      throw err; // Re-throw error to be caught by API route using dbConnect
     });
+  } else {
+    console.log('MongoDB: Waiting for existing connection promise to resolve.');
   }
   
   try {
-    cached.conn = await cached.promise;
+    mongooseInstance = await connectionPromise;
+    return mongooseInstance;
   } catch (e) {
-    cached.promise = null;
-    throw e;
+    // Error already logged by the catch block in the promise chain
+    return null; // Ensure function returns null on error
   }
-
-  return cached.conn;
 }
 
 export default dbConnect;
