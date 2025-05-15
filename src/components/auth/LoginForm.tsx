@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,8 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -15,8 +15,8 @@ import { Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  identifier: z.string().min(1, { message: "Email or Username is required." }),
+  password: z.string().min(1, { message: "Password is required." }), // Min 1 for presence check, AuthContext handles actual length
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -30,7 +30,7 @@ export default function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
   });
@@ -39,21 +39,22 @@ export default function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      await login(data.email, data.password);
+      // The login function in AuthContext now handles email/username logic
+      await login(data.identifier, data.password);
       toast({ title: "Login Successful", description: "Welcome back!" });
-      // Router push is handled in AuthContext after successful login
-      // router.push("/dashboard"); 
+      // Redirect is handled by AuthContext
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
+      // Toast is now handled by AuthContext for login errors to avoid duplication
+      // toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Reduced space-y */}
       {error && (
         <Alert variant="destructive">
           <Terminal className="h-4 w-4" />
@@ -61,41 +62,38 @@ export default function LoginForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="you@example.com"
-          {...form.register("email")}
-          disabled={isLoading}
-        />
-        {form.formState.errors.email && (
-          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-        )}
+      <AnimatedInput
+        id="identifier"
+        label="Email or Username *"
+        {...form.register("identifier")}
+        disabled={isLoading}
+        autoComplete="username"
+      />
+      {form.formState.errors.identifier && (
+        <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.identifier.message}</p>
+      )}
+      
+      <AnimatedInput
+        id="password"
+        label="Password *"
+        type="password"
+        {...form.register("password")}
+        disabled={isLoading}
+        autoComplete="current-password"
+      />
+      <div className="text-right mt-1">
+        <Link
+          href="/forgot-password"
+          className="text-sm font-medium text-primary hover:underline px-1"
+        >
+          Forgot password?
+        </Link>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          {...form.register("password")}
-          disabled={isLoading}
-        />
-        <div className="text-right">
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Forgot password?
-          </Link>
-        </div>
-        {form.formState.errors.password && (
-          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
-        )}
-      </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      {form.formState.errors.password && (
+        <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>
+      )}
+      
+      <Button type="submit" className="w-full mt-4" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {isLoading ? "Logging in..." : "Log In"}
       </Button>
