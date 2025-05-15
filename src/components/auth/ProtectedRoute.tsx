@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { LockKeyhole, ShieldAlert } from "lucide-react"; 
 import { Button } from "@/components/ui/button"; 
+import { useToast } from "@/hooks/use-toast"; // Correct import path
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,6 +19,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   const router = useRouter();
   const pathname = usePathname();
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
+  const { toast } = useToast(); // Initialize toast here
 
   useEffect(() => {
     // Only proceed with checks if Firebase Auth is no longer loading
@@ -38,7 +40,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
 
         // Check for profile completion
         // This check should only happen if the user object is confirmed
-        const profileIncomplete = !user.username || !user.role;
+        const profileIncomplete = !user.username || !user.role || !user.phoneNumber; // Added phoneNumber
         if (profileIncomplete && pathname !== '/profile/settings') {
           localStorage.setItem('profileIncomplete', 'true'); // Ensure flag is set if navigating away
           router.push('/profile/settings?complete=true');
@@ -53,7 +55,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
         }
       }
     }
-  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal]);
+  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]); // Added toast to dependency array
 
   // Show loading spinner while Firebase Auth is initializing
   if (loading) {
@@ -69,7 +71,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   if (!user) {
     // For truly public pages, they should not be wrapped by ProtectedRoute or should have a different handling.
     // This fallback is for pages that *are* protected.
-     const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check'];
+     const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check', '/search-papers']; // Added /search-papers
      if (!publicPaths.includes(pathname)) {
         return (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
@@ -105,7 +107,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   }
   
   // Profile completion check after confirming user is logged in
-  if (user && (!user.username || !user.role) && pathname !== '/profile/settings') {
+  if (user && (!user.username || !user.role || !user.phoneNumber) && pathname !== '/profile/settings') {
       return (
            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
              <LoadingSpinner size={48} />
@@ -117,4 +119,3 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   // If all checks pass, render children
   return <>{children}</>;
 }
-
