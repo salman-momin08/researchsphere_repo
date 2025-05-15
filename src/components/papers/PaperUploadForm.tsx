@@ -20,6 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addPaper } from '@/lib/paper-service';
 import PaymentModal from '@/components/payment/PaymentModal';
 
+// Schema for form validation
 const paperSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
   abstract: z.string().min(50, "Abstract must be at least 50 characters.").max(2000, "Abstract must be less than 2000 characters."),
@@ -27,7 +28,7 @@ const paperSchema = z.object({
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   file: z.any()
     .refine(files => {
-      if (typeof window === 'undefined') return true;
+      if (typeof window === 'undefined') return true; // Skip validation on server
       return files instanceof FileList && files.length > 0;
     }, "A paper file is required.")
     .refine(files => {
@@ -52,8 +53,7 @@ export default function PaperUploadForm() {
 
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [newlyCreatedPaperForPayment, setNewlyCreatedPaperForPayment] = useState<PaperType | null>(null);
-  const [pendingSubmissionData, setPendingSubmissionData] = useState<PaperFormValues | null>(null);
-
+  const [pendingSubmissionData, setPendingSubmissionData] = useState<PaperFormValues | null>(null); // Declaration
 
   const form = useForm<PaperFormValues>({
     resolver: zodResolver(paperSchema),
@@ -78,8 +78,10 @@ export default function PaperUploadForm() {
   }, [watchedFile, form]);
 
   const proceedWithSubmission = async (data: PaperFormValues, isUpdatingAfterPayNow?: boolean): Promise<PaperType | null> => {
+    console.log("PaperUploadForm: proceedWithSubmission called. isUpdatingAfterPayNow:", isUpdatingAfterPayNow, "Data keys:", Object.keys(data));
     if (!user || !user.id) {
       setFormError("Authentication Error: User session is invalid. Please log in again.");
+      toast({ variant: "destructive", title: "Auth Error", description: "User session invalid. Please re-login." });
       return null;
     }
     setFormError(null);
@@ -88,12 +90,16 @@ export default function PaperUploadForm() {
     let fileToUpload: File | null = null;
 
     if (!isUpdatingAfterPayNow) {
-        if (typeof window === 'undefined' || !(fileList instanceof FileList) || fileList.length === 0) {
-            setFormError("No file provided or file list is invalid.");
-            form.setError("file", { type: "manual", message: "A paper file is required." });
-            return null;
-        }
-        fileToUpload = fileList[0];
+      if (typeof window === 'undefined' || !(fileList instanceof FileList) || fileList.length === 0) {
+        console.error("PaperUploadForm: proceedWithSubmission - No file provided or file list is invalid for new submission.");
+        setFormError("No file provided or file list is invalid. Please select a file.");
+        form.setError("file", { type: "manual", message: "A paper file is required." });
+        return null;
+      }
+      fileToUpload = fileList[0];
+      console.log("PaperUploadForm: proceedWithSubmission - File to upload:", fileToUpload.name, fileToUpload.type);
+    } else {
+      console.log("PaperUploadForm: proceedWithSubmission - Updating after PayNow, file upload skipped.");
     }
 
     const paperApiServiceData = {
@@ -105,16 +111,20 @@ export default function PaperUploadForm() {
     };
 
     try {
+      console.log("PaperUploadForm: proceedWithSubmission - Calling addPaper service. ExistingPaperId:", isUpdatingAfterPayNow ? newlyCreatedPaperForPayment?.id : undefined);
       const createdOrUpdatedPaper = await addPaper(
-          paperApiServiceData,
-          fileToUpload,
-          user.id,
-          isUpdatingAfterPayNow ? newlyCreatedPaperForPayment?.id : undefined
+        paperApiServiceData,
+        fileToUpload,
+        user.id,
+        isUpdatingAfterPayNow ? newlyCreatedPaperForPayment?.id : undefined
       );
+      console.log("PaperUploadForm: proceedWithSubmission - addPaper service call successful. Paper:", createdOrUpdatedPaper);
       return createdOrUpdatedPaper;
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected error occurred during paper submission.";
+      console.error("PaperUploadForm: proceedWithSubmission - Error from addPaper service:", errorMessage, error);
       setFormError(errorMessage);
+      toast({ variant: "destructive", title: "Submission Failed", description: errorMessage });
       return null;
     }
   };
@@ -122,38 +132,42 @@ export default function PaperUploadForm() {
   const onFormSubmit = async (data: PaperFormValues) => {
     setIsSubmitting(true);
     setFormError(null);
+    console.log("PaperUploadForm: onFormSubmit called with data:", data);
 
     if (data.paymentOption === "payNow") {
-      // For "Pay Now", we first create the paper with "Payment Pending" status.
-      // This ensures the file is uploaded and we have a paper ID before payment simulation.
-      const initialPaperDataForPayNow = { ...data, paymentOption: "payLater" as "payLater" }; // Temporarily treat as payLater to set due date etc.
+      console.log("PaperUploadForm: PayNow option selected. Proceeding with initial paper creation.");
+      const initialPaperDataForPayNow = { ...data, paymentOption: "payLater" as "payLater" };
       const createdPaper = await proceedWithSubmission(initialPaperDataForPayNow, false);
 
       if (createdPaper) {
-        setNewlyCreatedPaperForPayment(createdPaper); // Store the created paper (which is 'Payment Pending')
-        setPendingSubmissionData(data); // Store the original form data for post-payment update
+        console.log("PaperUploadForm: Initial paper created for PayNow, ID:", createdPaper.id, "Data:", createdPaper);
+        setNewlyCreatedPaperForPayment(createdPaper);
+        setPendingSubmissionData(data); // Store original form data (with paymentOption: "payNow")
         setShowPayNowModal(true);
-        // isSubmitting remains true until modal flow completes or cancels
       } else {
-        setIsSubmitting(false); // Re-enable form if initial paper creation fails
-        // Error should be set by proceedWithSubmission and displayed in the Alert.
+        console.error("PaperUploadForm: Failed to create initial paper for PayNow flow.");
+        setIsSubmitting(false);
       }
     } else { // Pay Later
+      console.log("PaperUploadForm: PayLater option selected.");
       const createdPaper = await proceedWithSubmission(data, false);
       if (createdPaper) {
+        console.log("PaperUploadForm: Paper submitted successfully for PayLater. Paper ID:", createdPaper.id);
         toast({ title: "Paper Submission Initiated!", description: `"${data.title}" processed. Payment is due shortly.` });
         form.reset();
         setFileNameDisplay(null);
         router.push(`/papers/${createdPaper.id}`);
       } else {
-        // Error message is set by proceedWithSubmission and displayed in the Alert
+        console.error("PaperUploadForm: Paper submission failed for PayLater flow.");
       }
       setIsSubmitting(false);
     }
   };
 
   const handleSuccessfulPayNowPayment = async () => {
+    console.log("PaperUploadForm: handleSuccessfulPayNowPayment Entered. newlyCreatedPaperForPayment:", newlyCreatedPaperForPayment);
     if (!newlyCreatedPaperForPayment || !newlyCreatedPaperForPayment.id || !pendingSubmissionData) {
+      console.error("PaperUploadForm: Error in handleSuccessfulPayNowPayment - No paper data found to finalize payment.");
       toast({ variant: "destructive", title: "Error", description: "No paper data found to finalize payment." });
       setShowPayNowModal(false);
       setIsSubmitting(false);
@@ -162,18 +176,17 @@ export default function PaperUploadForm() {
       return;
     }
     
-    // Now update the paper to "Submitted" and set paidAt, submissionDate
-    // The `pendingSubmissionData` should have `paymentOption: "payNow"`
-    const updatedPaper = await proceedWithSubmission(pendingSubmissionData, true); // Pass true for isUpdatingAfterPayNow
+    console.log("PaperUploadForm: Proceeding to update paper status after PayNow. Using pendingSubmissionData:", pendingSubmissionData);
+    const updatedPaper = await proceedWithSubmission(pendingSubmissionData, true);
 
     if (updatedPaper) {
+      console.log("PaperUploadForm: Paper updated successfully after PayNow. Paper ID:", updatedPaper.id);
       toast({ title: "Paper Submitted & Paid Successfully!", description: `"${updatedPaper.title}" has been processed.` });
       form.reset();
       setFileNameDisplay(null);
       router.push(`/papers/${updatedPaper.id}`);
     } else {
-      // Error message should be set by proceedWithSubmission.
-      // Redirect to the paper page even if update fails, so user sees it's "Payment Pending".
+      console.error("PaperUploadForm: Post-payment update failed for PayNow. Form error:", formError);
       toast({ variant: "destructive", title: "Post-Payment Update Failed", description: formError || "Could not update paper status after payment. Your paper is saved but payment status may be incorrect.", duration: 7000 });
       router.push(`/papers/${newlyCreatedPaperForPayment.id}`);
     }
@@ -184,25 +197,21 @@ export default function PaperUploadForm() {
     setPendingSubmissionData(null);
   };
 
-
   const handlePayNowModalOpenChange = (open: boolean) => {
     setShowPayNowModal(open);
-    if (!open) { // Modal is closing
-      if (isSubmitting && newlyCreatedPaperForPayment && !pendingSubmissionData) {
-        // This means payment was not successful / modal closed before payment success
+    if (!open) { 
+      if (isSubmitting && newlyCreatedPaperForPayment) {
+        console.log("PaperUploadForm: PayNow modal closed before successful payment. Paper ID:", newlyCreatedPaperForPayment.id);
         toast({ title: "Payment Incomplete", description: `Submission for "${newlyCreatedPaperForPayment.title}" is saved but payment is still pending. You can pay later from the paper details page.`, duration: 7000});
         router.push(`/papers/${newlyCreatedPaperForPayment.id}`);
       }
-      // Always reset submitting state and pending data when modal closes, regardless of success
       setIsSubmitting(false);
       setNewlyCreatedPaperForPayment(null);
-      setPendingSubmissionData(null); // Ensure this is reset
-    } else if (open && !pendingSubmissionData) {
-      // When modal is opening for a "Pay Now" flow, capture current form data.
-      // This happens in onFormSubmit *before* setting newlyCreatedPaperForPayment
+      setPendingSubmissionData(null); // Usage of the setter
+    } else if (open && newlyCreatedPaperForPayment) {
+      console.log("PaperUploadForm: PayNow modal opened. Pending data for paper ID:", newlyCreatedPaperForPayment.id, "is:", pendingSubmissionData);
     }
   };
-
 
   return (
     <>
@@ -315,14 +324,15 @@ export default function PaperUploadForm() {
         </form>
       </Card>
 
-      {user && newlyCreatedPaperForPayment && ( // Ensure newlyCreatedPaperForPayment is passed
+      {user && newlyCreatedPaperForPayment && (
         <PaymentModal
             isOpen={showPayNowModal}
             onOpenChange={handlePayNowModalOpenChange}
-            paper={newlyCreatedPaperForPayment} // Pass the paper that's awaiting payment
+            paper={newlyCreatedPaperForPayment}
             onPaymentSuccess={handleSuccessfulPayNowPayment}
         />
       )}
     </>
   );
 }
+
