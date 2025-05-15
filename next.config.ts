@@ -23,9 +23,15 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      { // Added for Cloudinary
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
-  webpack: (config, { isServer, webpack: webpackInstance }) => { 
+  webpack: (config, { isServer, webpack: webpackInstance }) => {
     if (!isServer) {
       config.plugins = config.plugins || [];
       config.plugins.push(

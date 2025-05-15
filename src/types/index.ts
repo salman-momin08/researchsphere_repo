@@ -1,4 +1,6 @@
 
+import type { Timestamp } from "firebase/firestore"; // Ensure Timestamp is imported if used here
+
 export interface User {
   id: string; // Firebase UID, also used as Firestore document ID
   email: string | null;
@@ -34,8 +36,9 @@ export interface Paper {
   authors: string[];
   keywords: string[];
 
-  fileName?: string; // Original filename from upload
-  fileUrl?: string; // Firebase Storage download URL
+  fileName?: string; // Original filename from upload (e.g., from Cloudinary or Storage)
+  fileUrl?: string; // Download URL for the paper file (e.g., from Cloudinary or Storage)
+  // fileMimeType?: string; // Optional: MIME type, useful if serving files directly
 
   uploadDate: string; // ISO date string (after conversion from Firestore Timestamp)
   status: PaperStatus;

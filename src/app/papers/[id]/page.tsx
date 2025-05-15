@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Edit, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard } from 'lucide-react';
+import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon } from 'lucide-react'; // Renamed LayoutDashboard to avoid conflict
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -95,6 +95,8 @@ function PaperDetailsContent() {
     if (!targetPaperId) return;
 
     try {
+      // Status update to "Submitted" and paidAt timestamp are now handled by paper-service when paymentOption is 'payNow'
+      // For payments made on a "Payment Pending" paper, update status
       await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
       setCurrentPaper(prev => {
         if (prev && prev.id === targetPaperId) {
@@ -117,7 +119,7 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified of your feedback. (Email simulation)`, // Kept email simulation note for clarity of mock
+        description: `Author will be notified.`, // Removed "Email simulation"
         duration: 5000
       });
       setAdminFeedbackText(""); // Clear the feedback box
@@ -201,6 +203,7 @@ function PaperDetailsContent() {
 
   const handleDownloadOriginalPaper = () => {
     if (currentPaper?.fileUrl) {
+        // This URL should now point to Cloudinary or another external storage
         window.open(currentPaper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
@@ -216,13 +219,16 @@ function PaperDetailsContent() {
     if (!currentPaper) return;
     const safeTitle = currentPaper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
     const filename = `${safeTitle}_Details.txt`;
-    let content = `Title: ${currentPaper.title}\n`;
+    let content = `Paper Title: ${currentPaper.title}\n`;
     content += `Authors: ${currentPaper.authors.join(', ')}\n`;
     content += `Keywords: ${currentPaper.keywords.join(', ')}\n`;
     content += `Status: ${currentPaper.status}\n`;
     content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${currentPaper.abstract}\n\n`;
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
+    // The fileUrl might be very long, so consider if it's needed in this metadata text file
+    // content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
+
     if (isAdmin) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
@@ -295,9 +301,11 @@ function PaperDetailsContent() {
               )}
             </div>
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto items-stretch md:items-center">
-                 <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-5 w-5" /> Download Original File
-                </Button>
+                {currentPaper.fileUrl && (
+                  <Button onClick={handleDownloadOriginalPaper} size="lg" variant="outline" className="w-full sm:w-auto">
+                      <Download className="mr-2 h-5 w-5" /> Download Original File
+                  </Button>
+                )}
                  <Button onClick={handleDownloadMetadata} size="lg" variant="outline" className="w-full sm:w-auto">
                     <FileTextIcon className="mr-2 h-4 w-4" /> Download Details
                 </Button>
@@ -308,7 +316,7 @@ function PaperDetailsContent() {
                 )}
                 {isAdmin && (
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
-                        <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
+                        <AdminDashboardIcon className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}
             </div>
@@ -331,11 +339,11 @@ function PaperDetailsContent() {
                 <div className="grid sm:grid-cols-2 gap-4 mb-6">
                   <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
                     {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.plagiarismScore !== null ? 'Re-run Plagiarism Validation' : 'Run Plagiarism Validation'}
+                    {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined ? 'Re-run Plagiarism Validation' : 'Run Plagiarism Validation'}
                   </Button>
                   <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance} variant="outline">
                     {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.acceptanceProbability !== null ? 'Re-run Acceptance Validation' : 'Run Acceptance Validation'}
+                    {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined ? 'Re-run Acceptance Validation' : 'Run Acceptance Validation'}
                   </Button>
                 </div>
 
