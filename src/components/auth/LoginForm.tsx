@@ -8,7 +8,6 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
-// useRouter no longer needed here
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Loader2 } from "lucide-react";
@@ -22,9 +21,9 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
-  const { login, loading: authLoading } = useAuth(); // Use authLoading from context
+  const { login, loading: authLoading } = useAuth(); 
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state for form
+  const [isSubmitting, setIsSubmitting] = useState(false); 
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -39,13 +38,12 @@ export default function LoginForm() {
     setError(null);
     try {
       await login(data.identifier, data.password);
-      toast({ title: "Login Successful", description: "Welcome back!" });
-      // Redirect is handled by AuthContext
-      form.reset(); // Reset form on success
+      // Success toast is handled by AuthContext or onAuthStateChanged logic
+      form.reset(); 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      // Toast is handled by AuthContext for login errors to avoid duplication
+      // Error toast is handled by AuthContext
     } finally {
       setIsSubmitting(false);
     }

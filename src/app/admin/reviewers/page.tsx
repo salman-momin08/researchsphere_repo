@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Eye, UserCircle, AlertTriangle } from 'lucide-react'; // Eye for Reviewers
+import { Eye, UserCircle, AlertTriangle } from 'lucide-react'; 
 import { toast } from '@/hooks/use-toast';
 
 export default function ReviewerManagementPage() {
@@ -21,11 +21,11 @@ export default function ReviewerManagementPage() {
     const fetchReviewerUsers = async () => {
       setIsLoading(true);
       setError(null);
-      console.log("ReviewerManagementPage: Fetching all users to filter for reviewers...");
+      // console.log("ReviewerManagementPage: Fetching all users to filter for reviewers...");
       try {
         const allUsers = await getAllUsers();
         const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
-        console.log(`ReviewerManagementPage: Found ${filteredReviewers.length} reviewer users.`);
+        // console.log(`ReviewerManagementPage: Found ${filteredReviewers.length} reviewer users.`);
         setReviewerUsers(filteredReviewers);
       } catch (err: any) {
         console.error("ReviewerManagementPage: Error fetching users:", err);
@@ -59,7 +59,7 @@ export default function ReviewerManagementPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-lg w-full"> {/* Ensure card takes full width */}
+      <Card className="shadow-lg w-full"> 
         <CardHeader>
           <div className="flex items-center gap-2">
             <Eye className="h-6 w-6 text-primary" />
@@ -71,7 +71,7 @@ export default function ReviewerManagementPage() {
           {reviewerUsers.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No reviewers found with the &quot;Reviewer&quot; role.</p>
           ) : (
-            <div className="overflow-x-auto"> {/* Added for responsiveness on smaller screens */}
+            <div className="overflow-x-auto"> 
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -101,4 +101,3 @@ export default function ReviewerManagementPage() {
     </div>
   );
 }
-

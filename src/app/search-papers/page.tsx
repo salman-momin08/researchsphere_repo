@@ -47,13 +47,13 @@ function SearchPapersContent() {
     try {
       const publishedPapers = await getPublishedPapers();
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      // Client-side filtering by author name (case-insensitive, partial match on any author in the list)
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
       setSearchResults(results);
     } catch (error: any)
      {
+      console.error("SearchPapers: Error fetching/filtering papers:", error);
       toast({
         variant: "destructive",
         title: "Search Error",
@@ -66,7 +66,7 @@ function SearchPapersContent() {
 
   const handleDownloadOriginalPaper = (paper: Paper) => {
     if (paper.fileUrl) {
-        console.log("SearchPapersContent: Attempting to open original file URL:", paper.fileUrl);
+        // console.log("SearchPapersContent: Attempting to open original file URL:", paper.fileUrl);
         window.open(paper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {

@@ -3,13 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service'; // Re-use the existing service
+import { getAllUsers } from '@/lib/user-service'; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldCheck, UserCheck, AlertTriangle } from 'lucide-react'; // UserCheck for admins
+import { ShieldCheck, UserCheck, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function RegisteredAdminsPage() {
@@ -21,11 +21,11 @@ export default function RegisteredAdminsPage() {
     const fetchAdminUsers = async () => {
       setIsLoading(true);
       setError(null);
-      console.log("RegisteredAdminsPage: Fetching all users to filter for admins...");
+      // console.log("RegisteredAdminsPage: Fetching all users to filter for admins...");
       try {
         const allUsers = await getAllUsers();
         const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
-        console.log(`RegisteredAdminsPage: Found ${filteredAdmins.length} admin users.`);
+        // console.log(`RegisteredAdminsPage: Found ${filteredAdmins.length} admin users.`);
         setAdminUsers(filteredAdmins);
       } catch (err: any) {
         console.error("RegisteredAdminsPage: Error fetching users:", err);
@@ -59,7 +59,7 @@ export default function RegisteredAdminsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-lg w-full"> {/* Ensure card takes full width */}
+      <Card className="shadow-lg w-full"> 
         <CardHeader>
           <div className="flex items-center gap-2">
             <UserCheck className="h-6 w-6 text-primary" />
@@ -71,7 +71,7 @@ export default function RegisteredAdminsPage() {
           {adminUsers.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No administrators found.</p>
           ) : (
-            <div className="overflow-x-auto"> {/* Added for responsiveness */}
+            <div className="overflow-x-auto"> 
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -105,4 +105,3 @@ export default function RegisteredAdminsPage() {
     </div>
   );
 }
-

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import type { User } from '@/types'; // Ensure User type is correctly imported
+import type { User } from '@/types'; 
 import { getAllUsers, toggleUserAdminStatus } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,10 +12,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth';
 
 export default function UserManagementPage() {
-  const { user: currentAdminUser } = useAuth(); // Get current admin user
+  const { user: currentAdminUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,10 +23,10 @@ export default function UserManagementPage() {
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
-    console.log("UserManagementPage: Fetching all users...");
+    // console.log("UserManagementPage: Fetching all users...");
     try {
       const fetchedUsers = await getAllUsers();
-      console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service. First user (if any):`, fetchedUsers[0]);
+      // console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service.`);
       setUsers(fetchedUsers);
     } catch (err: any) {
       console.error("UserManagementPage: Error fetching users:", err);
@@ -53,7 +53,6 @@ export default function UserManagementPage() {
     try {
       await toggleUserAdminStatus(targetUserId, !!currentIsAdmin);
       toast({ title: "Success", description: `User admin status updated.` });
-      // Re-fetch users to reflect the change
       fetchUsers();
     } catch (err: any) {
       console.error("UserManagementPage: Error toggling admin status:", err);

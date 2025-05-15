@@ -1,7 +1,6 @@
 
 "use client";
 
-// import ProtectedRoute from "@/components/auth/ProtectedRoute"; // Already wraps AdminLayout
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus } from "@/types";
 import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info, LayoutDashboard } from "lucide-react";
@@ -33,7 +32,7 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers(); // This should fetch from Firestore
+        const fetchedPapers = await getAllPapers();
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -47,10 +46,11 @@ function AdminDashboardContent() {
         const totalSubmissions = processedPapers.length;
         const pendingReview = processedPapers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
         const issuesFound = processedPapers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
-        const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length; // Count only pending, not overdue
+        const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length;
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
       } catch (error: any) {
+        console.error("AdminDashboard: Error fetching papers:", error);
         toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
@@ -58,11 +58,9 @@ function AdminDashboardContent() {
     } else if (!authLoading && user && !isAdmin) {
       setPapers([]);
       setIsLoadingPapers(false);
-      // Non-admin should not see this content due to ProtectedRoute in AdminLayout
     } else if (!authLoading && !user) {
       setPapers([]);
       setIsLoadingPapers(false);
-      // Logged-out user should not see this
     }
   };
 
@@ -87,7 +85,6 @@ function AdminDashboardContent() {
       await updatePaperStatus(paperId, 'Rejected');
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
       if (paperToNotify) {
-        // Simulate email notification
         toast({
           title: "Email Notification (Simulated)",
           description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
@@ -95,7 +92,7 @@ function AdminDashboardContent() {
           duration: 7000,
         });
       }
-      fetchAndSetPapers(); // Refresh paper list
+      fetchAndSetPapers();
     } catch (error: any) {
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
     }
@@ -220,7 +217,9 @@ function AdminDashboardContent() {
                 <TableBody>
                   {papers.map((paper) => {
                     const effectiveStatus = (paper as any).displayStatus || paper.status;
-                    const isPaymentReallyDue = effectiveStatus === 'Payment Overdue';
+                    const isPaymentOverdue = effectiveStatus === 'Payment Overdue';
+                    const isPaymentPending = effectiveStatus === 'Payment Pending';
+                    
                     return (
                       <TableRow key={paper.id}>
                         <TableCell className="font-medium max-w-xs truncate">
@@ -234,10 +233,8 @@ function AdminDashboardContent() {
                         </TableCell>
                         <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell>
-                          {isPaymentReallyDue ? (
-                             <span className="text-destructive font-semibold">Yes</span>
-                          ) : effectiveStatus === 'Payment Pending' ? (
-                             <span className="text-yellow-600 font-semibold">Pending</span>
+                          {isPaymentOverdue || isPaymentPending ? (
+                             <span className={isPaymentOverdue ? "text-destructive font-semibold" : "text-yellow-600 font-semibold"}>Yes</span>
                           ) : (
                             <span className="text-muted-foreground">N/A</span>
                           )}
@@ -246,7 +243,7 @@ function AdminDashboardContent() {
                           <Link href={`/papers/${paper.id}`}>
                             <Button variant="outline" size="sm">Review</Button>
                           </Link>
-                          {effectiveStatus === 'Payment Overdue' && (
+                          {isPaymentOverdue && (
                              <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)}>Reject</Button>
                           )}
                         </TableCell>
@@ -264,6 +261,5 @@ function AdminDashboardContent() {
 }
 
 export default function AdminDashboardPage() {
-  // The AdminLayout will handle the ProtectedRoute for adminOnly
   return <AdminDashboardContent />;
 }

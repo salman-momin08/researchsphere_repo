@@ -117,14 +117,14 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted",
-        description: `Author will be notified.`,
+        description: `Author will be notified (simulated).`,
         duration: 5000
       });
       setAdminFeedbackText(""); 
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -201,7 +201,7 @@ function PaperDetailsContent() {
 
   const handleDownloadOriginalPaper = () => {
     if (currentPaper?.fileUrl) {
-        console.log("PaperDetailsContent: Attempting to open original file URL:", currentPaper.fileUrl);
+        // console.log("PaperDetailsContent: Attempting to open original file URL:", currentPaper.fileUrl);
         window.open(currentPaper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
