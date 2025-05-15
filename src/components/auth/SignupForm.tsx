@@ -17,12 +17,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter } from "next/navigation";
+// useRouter no longer needed here as AuthContext handles redirection
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils"; // Added missing import
+import { cn } from "@/lib/utils";
 
 const signupSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -36,7 +36,7 @@ const signupSchema = z.object({
     .min(8, { message: "Password must be at least 8 characters." })
     .regex(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/, { message: "Password must include at least one letter, one number, and can contain special characters." }),
   confirmPassword: z.string(),
-  phoneNumber: z.string().min(1, "Phone number is required.").regex(/^\+?\d[\d\s-]{7,14}$/, { // Updated regex for more flexibility
+  phoneNumber: z.string().min(1, "Phone number is required.").regex(/^\+?\d[\d\s-]{7,14}$/, {
     message: "Invalid phone number format (e.g., +1-123-456-7890 or +91 9876543210).",
   }),
   institution: z.string().optional().or(z.literal("")).refine(val => !val || val.length >= 2, {
@@ -62,10 +62,9 @@ const signupSchema = z.object({
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupForm() {
-  const { signup } = useAuth();
-  const router = useRouter();
+  const { signup, loading: authLoading } = useAuth(); // Use authLoading from context
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state for form
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -84,23 +83,27 @@ export default function SignupForm() {
   });
 
   const onSubmit = async (data: SignupFormValues) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
     setError(null);
     try {
       await signup(data);
-      toast({ title: "Signup Successful", description: "Welcome to ResearchSphere!" });
-      // Redirect is handled by AuthContext
+      toast({ title: "Signup Successful", description: "Welcome to ResearchSphere! Please complete your profile if prompted." });
+      // Redirection is handled by AuthContext after successful signup and profile creation
+      form.reset(); // Reset form on success
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      toast({ variant: "destructive", title: "Signup Failed", description: errorMessage });
+      // Toast is now handled by AuthContext for signup errors to avoid duplication
+      // Only show local error alert
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
+  const currentIsLoading = isSubmitting || authLoading;
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Reduced space-y */}
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
       {error && (
          <Alert variant="destructive">
           <Terminal className="h-4 w-4" />
@@ -109,33 +112,33 @@ export default function SignupForm() {
         </Alert>
       )}
       
-      <AnimatedInput label="Full Name *" id="fullName" {...form.register("fullName")} disabled={isLoading} />
+      <AnimatedInput label="Full Name *" id="fullName" {...form.register("fullName")} disabled={currentIsLoading} />
       {form.formState.errors.fullName && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.fullName.message}</p>}
 
-      <AnimatedInput label="Username *" id="username" {...form.register("username")} disabled={isLoading} />
+      <AnimatedInput label="Username *" id="username" {...form.register("username")} disabled={currentIsLoading} />
       {form.formState.errors.username && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.username.message}</p>}
 
-      <AnimatedInput label="Email Address *" id="email" type="email" {...form.register("email")} disabled={isLoading} />
+      <AnimatedInput label="Email Address *" id="email" type="email" {...form.register("email")} disabled={currentIsLoading} />
       {form.formState.errors.email && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.email.message}</p>}
 
-      <AnimatedInput label="Confirm Email Address *" id="confirmEmail" type="email" {...form.register("confirmEmail")} disabled={isLoading} />
+      <AnimatedInput label="Confirm Email Address *" id="confirmEmail" type="email" {...form.register("confirmEmail")} disabled={currentIsLoading} />
       {form.formState.errors.confirmEmail && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.confirmEmail.message}</p>}
       
-      <AnimatedInput label="Password *" id="password" type="password" {...form.register("password")} disabled={isLoading} />
+      <AnimatedInput label="Password *" id="password" type="password" {...form.register("password")} disabled={currentIsLoading} />
       {form.formState.errors.password && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>}
 
-      <AnimatedInput label="Confirm Password *" id="confirmPassword" type="password" {...form.register("confirmPassword")} disabled={isLoading} />
+      <AnimatedInput label="Confirm Password *" id="confirmPassword" type="password" {...form.register("confirmPassword")} disabled={currentIsLoading} />
       {form.formState.errors.confirmPassword && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.confirmPassword.message}</p>}
 
-      <AnimatedInput label="Phone Number *" id="phoneNumber" {...form.register("phoneNumber")} disabled={isLoading} />
+      <AnimatedInput label="Phone Number *" id="phoneNumber" {...form.register("phoneNumber")} disabled={currentIsLoading} />
       {form.formState.errors.phoneNumber && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.phoneNumber.message}</p>}
 
-      <AnimatedInput label="Institution or Organization (Optional)" id="institution" {...form.register("institution")} disabled={isLoading} />
+      <AnimatedInput label="Institution or Organization (Optional)" id="institution" {...form.register("institution")} disabled={currentIsLoading} />
       {form.formState.errors.institution && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.institution.message}</p>}
 
-      <div className="pt-2"> {/* Added pt-2 for spacing consistency with AnimatedInput */}
-        <Label htmlFor="role" className={form.formState.errors.role ? "text-destructive" : ""}>Role *</Label>
-        <Select onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer")} disabled={isLoading}>
+      <div className="pt-2">
+        <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Role *</Label>
+        <Select onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer")} disabled={currentIsLoading}>
           <SelectTrigger id="role" className="h-10">
             <SelectValue placeholder="Select your role" />
           </SelectTrigger>
@@ -147,7 +150,7 @@ export default function SignupForm() {
         {form.formState.errors.role && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.role.message}</p>}
       </div>
 
-      <AnimatedInput label="ORCID ID / Researcher ID (Optional)" id="researcherId" {...form.register("researcherId")} disabled={isLoading} />
+      <AnimatedInput label="ORCID ID / Researcher ID (Optional)" id="researcherId" {...form.register("researcherId")} disabled={currentIsLoading} />
       {form.formState.errors.researcherId && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.researcherId.message}</p>}
 
       <div className="flex items-center space-x-2 pt-2">
@@ -155,7 +158,7 @@ export default function SignupForm() {
             id="termsAccepted"
             checked={form.watch("termsAccepted")}
             onCheckedChange={(checked) => form.setValue("termsAccepted", Boolean(checked))}
-            disabled={isLoading}
+            disabled={currentIsLoading}
             aria-invalid={!!form.formState.errors.termsAccepted}
         />
         <Label htmlFor="termsAccepted" className={cn("text-sm font-normal", form.formState.errors.termsAccepted && "text-destructive")}>
@@ -167,9 +170,9 @@ export default function SignupForm() {
       </div>
       {form.formState.errors.termsAccepted && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.termsAccepted.message}</p>}
 
-      <Button type="submit" className="w-full mt-4" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isLoading ? "Creating account..." : "Create Account"}
+      <Button type="submit" className="w-full mt-4" disabled={currentIsLoading}>
+        {currentIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {currentIsLoading ? "Creating account..." : "Create Account"}
       </Button>
     </form>
   );

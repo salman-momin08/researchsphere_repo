@@ -4,71 +4,57 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
-      // Check if the user document exists and then if isAdmin is true
-      return isSignedIn() &&
+      // Check if the user is authenticated, their user document exists, and has isAdmin == true
+      return request.auth != null &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
     // Users Collection
     match /users/{userId} {
-      // Authenticated users can read their own profile. Admins can read any.
+      // Authenticated users can read their own profile.
+      // Admins can read any user profile.
       allow get: if isOwner(userId) || isAdmin();
 
-      // Authenticated users can list user data (needed for client-side uniqueness checks for username/phone).
-      allow list: if isSignedIn();
-
-      // Authenticated users can create their own profile document during signup.
-      // The userId in the document must match their auth uid.
+      // Allow creating own user document during signup.
+      // - The userId in the path must match the authenticated user's UID.
+      // - The 'id' field in the document data must also match the UID.
+      // - Users cannot set 'isAdmin' to true during creation via this rule.
+      //   (Initial admin setup is typically manual or via a trusted backend process/special email).
       allow create: if isOwner(userId) &&
-                       request.resource.data.userId == request.auth.uid;
+                       request.resource.data.id == request.auth.uid &&
+                       (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
 
-      // Authenticated users can update their own profile.
-      // They cannot change their isAdmin status.
-      // If isAdmin field is present in the update, its value must match existing.
+      // Allow authenticated users to update their own profile.
+      // - They cannot change their 'id' or 'email' if these fields are stored in the document.
+      // - They cannot change their 'isAdmin' status.
       allow update: if isOwner(userId) &&
+                       (!('id'      in request.resource.data) || request.resource.data.id      == resource.data.id) &&
+                       (!('email'   in request.resource.data) || request.resource.data.email   == resource.data.email) &&
                        (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin);
+
+      // Allow authenticated users to query the users collection.
+      // This is necessary for client-side uniqueness checks (e.g., username, phone number).
+      // Client-side queries should be specific (e.g., .where('username', '==', valueToCheck)).
+      allow list: if request.auth != null;
     }
 
-    // Papers Collection
-    match /papers/{paperDocId} {
-      // Read operations:
-      // 1. Owner can get their paper.
-      // 2. Admin can get any paper.
-      // 3. Any authenticated user can get a 'Published' paper.
-      allow get: if isSignedIn() &&
-                    (resource.data.userId == request.auth.uid || // Owner
-                     isAdmin() || // Admin
-                     resource.data.status == 'Published');     // Published paper
-
-      // List operations:
-      // This rule is evaluated for each document that *could* be returned by a query.
-      // So, if a client queries .where('userId', '==', auth.uid), this allows it.
-      // If client queries .where('status', '==', 'Published'), this allows it.
-      // If admin queries for all papers (no specific restrictive filter from client), isAdmin() allows it.
-      allow list: if isSignedIn() &&
-                    (isAdmin() || // Admins can list all
-                     resource.data.userId == request.auth.uid || // User listing their own papers
-                     resource.data.status == 'Published');      // Any authenticated user listing 'Published' papers
-
-      // Create operations:
-      // Authenticated users can create papers for themselves.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-
-      // Update and Delete operations:
-      // 1. Owner can update/delete their paper.
-      // 2. Admin can update/delete any paper.
-      allow update, delete: if isSignedIn() &&
-                              (resource.data.userId == request.auth.uid || isAdmin());
-    }
+    // Papers collection is currently handled by mock data on the client-side.
+    // If papers were to be stored in Firestore, their rules would go here.
+    // Example (if papers were in Firestore):
+    // match /papers/{paperId} {
+    //   function isPaperOwner() {
+    //     return request.auth != null && resource.data.userId == request.auth.uid;
+    //   }
+    //   allow read: if isPaperOwner() || isAdmin() || resource.data.status == 'Published';
+    //   allow list: if isPaperOwner() || isAdmin() || request.query.filters.find(f => f[0] == 'status' && f[2] == 'Published') != null;
+    //   allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    //   allow update, delete: if isPaperOwner() || isAdmin();
+    // }
   }
 }

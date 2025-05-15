@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, GoogleAuthProvider, GithubAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore"; // Ensure Firestore is imported
 import { getStorage } from "firebase/storage";
 
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -29,7 +29,7 @@ for (const key in requiredConfigs) {
       "Please ensure it is set in your .env.local file and the development server has been restarted. ";
 
     if (typeof window !== 'undefined') {
-      console.error(message); 
+      // console.error(message); // Reduced verbosity
     } else {
       console.error(`CRITICAL CLIENT SDK SETUP ERROR: ${message}`);
     }
@@ -45,44 +45,44 @@ const firebaseConfig: FirebaseOptions = {
   appId: firebaseAppId,
 };
 
-if (typeof window !== 'undefined') { 
-  console.log("Firebase Client SDK: Attempting to initialize with Project ID:", firebaseProjectId);
-  console.log("Firebase Client SDK: Using Auth Domain:", firebaseAuthDomain);
+if (typeof window !== 'undefined') {
+  console.log("Firebase Client SDK: Configured with Project ID:", firebaseProjectId || "MISSING/NOT_CONFIGURED");
+  console.log("Firebase Client SDK: Using Auth Domain:", firebaseAuthDomain || "MISSING/NOT_CONFIGURED");
   if (!firebaseAuthDomain) {
-    console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is undefined. This will likely cause auth/unauthorized-domain or auth/configuration-not-found errors.");
+    // console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is undefined. This will likely cause auth/unauthorized-domain or auth/configuration-not-found errors.");
   }
    if (!firebaseApiKey) {
-    console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_API_KEY is undefined. This will likely cause auth/api-key-not-valid errors.");
+    // console.error("Firebase Client SDK: NEXT_PUBLIC_FIREBASE_API_KEY is undefined. This will likely cause auth/api-key-not-valid errors.");
   }
 }
 
 
 let app;
 if (!getApps().length) {
-  if (allConfigsPresent) { 
+  if (allConfigsPresent) {
     try {
       app = initializeApp(firebaseConfig);
       if (typeof window !== 'undefined') {
-        console.log("Firebase Client SDK: Initialized successfully.");
+        // console.log("Firebase Client SDK: Initialized successfully.");
       }
     } catch (e: any) {
       console.error("Firebase Client SDK: Initialization FAILED.", e.message, e.code);
-      app = null; // Ensure app is null if init fails
+      app = null;
     }
   } else {
     console.error("Firebase Client SDK: Initialization SKIPPED due to missing configuration variables. Firebase services will not be available.");
     app = null;
   }
 } else {
-  app = getApp(); 
-  if (typeof window !== 'undefined') {
-      console.log("Firebase Client SDK: Using existing app.");
-  }
+  app = getApp();
+  // if (typeof window !== 'undefined') {
+      // console.log("Firebase Client SDK: Using existing app.");
+  // }
 }
 
-export const auth = app ? getAuth(app) : null!; 
-export const db = app ? getFirestore(app) : null!; // Firestore DB if needed, not for MongoDB Atlas
-export const storage = app ? getStorage(app) : null!; // Firebase Storage
+export const auth = app ? getAuth(app) : null!;
+export const db = app ? getFirestore(app) : null!; // Initialize Firestore
+export const storage = app ? getStorage(app) : null!;
 
 
 export const googleAuthCredentialProvider = new GoogleAuthProvider();

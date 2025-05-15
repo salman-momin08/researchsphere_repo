@@ -1,17 +1,18 @@
 
 export interface User {
-  id: string; // Firebase UID
+  id: string; // Firebase UID, also used as Firestore document ID
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  isAdmin?: boolean;
+  isAdmin?: boolean; // Stored in Firestore
 
-  // Fields for profile completion, managed by mock/localStorage
-  username?: string | null;
-  phoneNumber?: string | null;
-  institution?: string | null;
-  role?: "Author" | "Reviewer" | "Admin" | null; // Role can be Admin if email matches MOCK_ADMIN_EMAIL
-  researcherId?: string | null;
+  username?: string | null;    // Stored in Firestore
+  phoneNumber?: string | null; // Stored in Firestore
+  institution?: string | null; // Stored in Firestore
+  role?: "Author" | "Reviewer" | "Admin" | null; // Stored in Firestore
+  researcherId?: string | null;// Stored in Firestore
+  createdAt?: string | Timestamp; // Firestore Timestamp on write, string on read (after conversion)
+  updatedAt?: string | Timestamp; // Firestore Timestamp on write, string on read (after conversion)
 }
 
 export type PaperStatus =
@@ -26,7 +27,7 @@ export type PaperStatus =
   | "Published";
 
 export interface Paper {
-  id: string; // Generated ID for mock data
+  id: string; // Firestore document ID
   userId: string; // Firebase UID of the submitter
   title: string;
   abstract: string;
@@ -34,9 +35,9 @@ export interface Paper {
   keywords: string[];
 
   fileName?: string; // Original filename from upload
-  fileUrl?: string; // Mock path, e.g., /uploads/mock/fileName.pdf
+  fileUrl?: string; // Firebase Storage download URL
 
-  uploadDate: string; // ISO date string
+  uploadDate: string; // ISO date string (after conversion from Firestore Timestamp)
   status: PaperStatus;
   plagiarismScore?: number | null;
   plagiarismReport?: {
@@ -47,8 +48,9 @@ export interface Paper {
     reasoning: string;
   } | null;
   adminFeedback?: string | null;
-  submissionDate?: string | null; // ISO date string
-  paymentDueDate?: string | null; // ISO date string
+  submissionDate?: string | null; // ISO date string (after conversion from Firestore Timestamp)
+  paymentDueDate?: string | null; // ISO date string (after conversion from Firestore Timestamp)
   paymentOption?: "payNow" | "payLater" | null;
-  paidAt?: string | null; // ISO date string
+  paidAt?: string | null; // ISO date string (after conversion from Firestore Timestamp)
+  lastUpdatedAt?: string | Timestamp; // ISO date string (after conversion from Firestore Timestamp)
 }

@@ -6,17 +6,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Keep for disabled email
-import { Label } from "@/components/ui/label"; // Keep for Select and general labeling
-import { AnimatedInput } from "@/components/ui/AnimatedInput"; // Import AnimatedInput
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSearchParams, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
-// Schema for updating/completing profile
 const profileUpdateSchema = z.object({
   displayName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
   username: z.string()
@@ -49,13 +49,7 @@ export default function ProfileUpdateForm() {
 
   const form = useForm<ProfileUpdateFormValues>({
     resolver: zodResolver(profileUpdateSchema),
-    defaultValues: {
-      displayName: user?.displayName || "",
-      username: user?.username || "",
-      phoneNumber: user?.phoneNumber || "",
-      institution: user?.institution || "",
-      researcherId: user?.researcherId || "",
-    },
+    // Default values will be set by useEffect based on user state
   });
 
   useEffect(() => {
@@ -82,23 +76,25 @@ export default function ProfileUpdateForm() {
       toast({ title: "Success", description: "Your profile has been updated." });
       
       if (isCompletingProfile && data.username && data.role && data.phoneNumber) {
-        localStorage.removeItem('profileIncomplete');
-        localStorage.removeItem('completingProfile');
-        setTimeout(() => router.push('/'), 1000); 
+        if (typeof window !== 'undefined') localStorage.removeItem('completingProfile');
+        // Redirection is handled by AuthContext's onAuthStateChanged listener
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage); 
-
+      // Specific errors like "Username already taken" will be shown in the Alert.
+      // Avoid generic toast for these specific, actionable errors.
       if (errorMessage !== "Username already taken. Please choose another one." &&
           errorMessage !== "Phone number already in use. Please use a different one.") {
-        // toast({ variant: "destructive", title: "Update Failed", description: errorMessage }); // Already handled by specific error state
+        // toast({ variant: "destructive", title: "Update Failed", description: errorMessage }); // Handled by form alert
       }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const currentIsLoading = isSubmitting || authLoading;
 
   if (authLoading && !user) {
     return <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -142,7 +138,7 @@ export default function ProfileUpdateForm() {
       )}
       
       <div className="pt-2">
-        <Label htmlFor="email">Email Address (Cannot be changed)</Label>
+        <Label htmlFor="email" className="text-muted-foreground">Email Address (Cannot be changed)</Label>
         <Input
           id="email"
           type="email"
@@ -154,9 +150,9 @@ export default function ProfileUpdateForm() {
 
       <AnimatedInput
         label="Full Name *"
-        id="displayName"
-        {...form.register("displayName")}
-        disabled={isSubmitting || authLoading}
+        id="displayName" 
+        {...form.register("displayName")} 
+        disabled={currentIsLoading}
       />
       {form.formState.errors.displayName && (
         <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.displayName.message}</p>
@@ -166,16 +162,16 @@ export default function ProfileUpdateForm() {
         label="Username *"
         id="username" 
         {...form.register("username")} 
-        disabled={isSubmitting || authLoading}
+        disabled={currentIsLoading}
       />
       {form.formState.errors.username && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.username.message}</p>}
       
       <div className="pt-2">
-        <Label htmlFor="role" className={form.formState.errors.role ? "text-destructive" : ""}>Role *</Label>
+        <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Role *</Label>
         <Select 
             onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", { shouldValidate: true })} 
-            defaultValue={user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined}
-            disabled={isSubmitting || authLoading}
+            value={form.watch("role")} // Control the Select component
+            disabled={currentIsLoading}
         >
           <SelectTrigger id="role" className="h-10 mt-1">
             <SelectValue placeholder="Select your role" />
@@ -192,7 +188,7 @@ export default function ProfileUpdateForm() {
         label="Phone Number *"
         id="phoneNumber" 
         {...form.register("phoneNumber")} 
-        disabled={isSubmitting || authLoading}
+        disabled={currentIsLoading}
       />
       {form.formState.errors.phoneNumber && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.phoneNumber.message}</p>}
 
@@ -200,7 +196,7 @@ export default function ProfileUpdateForm() {
         label="Institution or Organization (Optional)"
         id="institution" 
         {...form.register("institution")} 
-        disabled={isSubmitting || authLoading}
+        disabled={currentIsLoading}
       />
       {form.formState.errors.institution && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.institution.message}</p>}
       
@@ -208,16 +204,14 @@ export default function ProfileUpdateForm() {
         label="ORCID ID / Researcher ID (Optional)"
         id="researcherId" 
         {...form.register("researcherId")} 
-        disabled={isSubmitting || authLoading}
+        disabled={currentIsLoading}
       />
       {form.formState.errors.researcherId && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.researcherId.message}</p>}
 
 
-      <Button type="submit" className="w-full mt-4" disabled={isSubmitting || authLoading}>
-        {isSubmitting ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : null}
-        {isSubmitting ? "Saving..." : (isCompletingProfile ? "Complete Profile & Save" : "Save Changes")}
+      <Button type="submit" className="w-full mt-4" disabled={currentIsLoading}>
+        {currentIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {currentIsLoading ? "Saving..." : (isCompletingProfile ? "Complete Profile & Save" : "Save Changes")}
       </Button>
     </form>
   );
