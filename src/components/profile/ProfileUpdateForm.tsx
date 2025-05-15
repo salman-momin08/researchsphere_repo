@@ -6,12 +6,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input"; // Keep for disabled email
+import { Label } from "@/components/ui/label"; // Keep for Select and general labeling
+import { AnimatedInput } from "@/components/ui/AnimatedInput"; // Import AnimatedInput
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CheckCircle, AlertTriangle, UserCog, Info } from "lucide-react";
+import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -23,8 +24,8 @@ const profileUpdateSchema = z.object({
     .max(20, { message: "Username must be 4-20 characters." })
     .regex(/^[a-zA-Z0-9_]+$/, { message: "Username can only contain letters, numbers, and underscores." }),
   role: z.enum(["Author", "Reviewer"], { required_error: "Please select a role." }),
-  phoneNumber: z.string().optional().or(z.literal("")).refine(val => !val || /^\+?\d[\d-]{7,14}$/.test(val), {
-    message: "Invalid phone number format (e.g., +1-1234567890).",
+  phoneNumber: z.string().optional().or(z.literal("")).refine(val => !val || /^\+?\d[\d\s-]{7,14}$/.test(val), { // Updated regex for more flexibility
+    message: "Invalid phone number format (e.g., +1-123-456-7890 or +91 9876543210).",
   }),
   institution: z.string().optional().or(z.literal("")).refine(val => !val || val.length >= 2, {
     message: "Institution must be at least 2 characters if provided.",
@@ -51,7 +52,7 @@ export default function ProfileUpdateForm() {
     defaultValues: {
       displayName: user?.displayName || "",
       username: user?.username || "",
-      role: user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined,
+      // role: user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined, // Handled by Select defaultValue
       phoneNumber: user?.phoneNumber || "",
       institution: user?.institution || "",
       researcherId: user?.researcherId || "",
@@ -83,15 +84,14 @@ export default function ProfileUpdateForm() {
       
       if (isCompletingProfile && data.username && data.role) {
         localStorage.removeItem('profileIncomplete');
+        localStorage.removeItem('completingProfile');
         setTimeout(() => router.push('/'), 1000); 
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-      setError(errorMessage); // Display the error in the Alert component within the form.
+      setError(errorMessage); 
 
-      // Only show a generic "Update Failed" toast if it's not a specific uniqueness error,
-      // as those are handled by the Alert within the form.
       if (errorMessage !== "Username already taken. Please choose another one." &&
           errorMessage !== "Phone number already in use. Please use a different one.") {
         toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
@@ -117,9 +117,9 @@ export default function ProfileUpdateForm() {
 
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Reduced space-y */}
       {isCompletingProfile && (
-        <Alert variant="default" className="bg-primary/10 border-primary/30">
+        <Alert variant="default" className="bg-primary/10 border-primary/30 mb-4"> {/* Added mb-4 */}
             <Info className="h-4 w-4 text-primary" />
             <AlertTitle className="text-primary">Complete Your Profile</AlertTitle>
             <AlertDescription>
@@ -128,64 +128,57 @@ export default function ProfileUpdateForm() {
         </Alert>
       )}
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="mb-4"> {/* Added mb-4 */}
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Update Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {successMessage && !isCompletingProfile && (
-        <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+        <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 mb-4">  {/* Added mb-4 */}
             <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
             <AlertTitle>Success!</AlertTitle>
             <AlertDescription className="!text-green-700 dark:!text-green-400">{successMessage}</AlertDescription>
         </Alert>
       )}
       
-      <div>
-        <Label htmlFor="email">Email Address</Label>
+      <div className="pt-2"> {/* Added pt-2 for spacing consistency */}
+        <Label htmlFor="email">Email Address (Cannot be changed)</Label>
         <Input
           id="email"
           type="email"
           value={user.email || ""}
           disabled
-          className="bg-muted/50"
+          className="bg-muted/50 mt-1 h-10" // Ensure consistent height
         />
-         <p className="text-xs text-muted-foreground mt-1">Email address cannot be changed here.</p>
       </div>
 
-      <div>
-        <Label htmlFor="displayName">Full Name *</Label>
-        <Input
-          id="displayName"
-          {...form.register("displayName")}
-          disabled={isSubmitting || authLoading}
-          placeholder="Enter your full name"
-        />
-        {form.formState.errors.displayName && (
-          <p className="text-sm text-destructive mt-1">{form.formState.errors.displayName.message}</p>
-        )}
-      </div>
+      <AnimatedInput
+        label="Full Name *"
+        id="displayName"
+        {...form.register("displayName")}
+        disabled={isSubmitting || authLoading}
+      />
+      {form.formState.errors.displayName && (
+        <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.displayName.message}</p>
+      )}
       
-      <div>
-        <Label htmlFor="username">Username * (letters, numbers, and underscores only)</Label>
-        <Input 
-            id="username" 
-            {...form.register("username")} 
-            disabled={isSubmitting || authLoading}
-            placeholder="Choose a unique username"
-        />
-        {form.formState.errors.username && <p className="text-sm text-destructive mt-1">{form.formState.errors.username.message}</p>}
-      </div>
+      <AnimatedInput
+        label="Username *"
+        id="username" 
+        {...form.register("username")} 
+        disabled={isSubmitting || authLoading}
+      />
+      {form.formState.errors.username && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.username.message}</p>}
       
-      <div>
-        <Label htmlFor="role">Role *</Label>
+      <div className="pt-2"> {/* Add pt-2 for consistency */}
+        <Label htmlFor="role" className={form.formState.errors.role ? "text-destructive" : ""}>Role *</Label>
         <Select 
             onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", { shouldValidate: true })} 
             defaultValue={user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined}
             disabled={isSubmitting || authLoading}
         >
-          <SelectTrigger id="role">
+          <SelectTrigger id="role" className="h-10 mt-1"> {/* Ensure consistent height and add mt-1 */}
             <SelectValue placeholder="Select your role" />
           </SelectTrigger>
           <SelectContent>
@@ -193,44 +186,35 @@ export default function ProfileUpdateForm() {
             <SelectItem value="Reviewer">Reviewer</SelectItem>
           </SelectContent>
         </Select>
-        {form.formState.errors.role && <p className="text-sm text-destructive mt-1">{form.formState.errors.role.message}</p>}
+        {form.formState.errors.role && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.role.message}</p>}
       </div>
 
-      <div>
-        <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
-        <Input 
-            id="phoneNumber" 
-            placeholder="+1-1234567890" 
-            {...form.register("phoneNumber")} 
-            disabled={isSubmitting || authLoading}
-        />
-        {form.formState.errors.phoneNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.phoneNumber.message}</p>}
-      </div>
+      <AnimatedInput
+        label="Phone Number (Optional)"
+        id="phoneNumber" 
+        {...form.register("phoneNumber")} 
+        disabled={isSubmitting || authLoading}
+      />
+      {form.formState.errors.phoneNumber && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.phoneNumber.message}</p>}
 
-      <div>
-        <Label htmlFor="institution">Institution or Organization (Optional)</Label>
-        <Input 
-            id="institution" 
-            {...form.register("institution")} 
-            disabled={isSubmitting || authLoading}
-            placeholder="Your university or company"
-        />
-        {form.formState.errors.institution && <p className="text-sm text-destructive mt-1">{form.formState.errors.institution.message}</p>}
-      </div>
+      <AnimatedInput
+        label="Institution or Organization (Optional)"
+        id="institution" 
+        {...form.register("institution")} 
+        disabled={isSubmitting || authLoading}
+      />
+      {form.formState.errors.institution && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.institution.message}</p>}
       
-      <div>
-        <Label htmlFor="researcherId">ORCID ID / Researcher ID (Optional)</Label>
-        <Input 
-            id="researcherId" 
-            placeholder="e.g., 0000-0001-2345-6789" 
-            {...form.register("researcherId")} 
-            disabled={isSubmitting || authLoading}
-        />
-        {form.formState.errors.researcherId && <p className="text-sm text-destructive mt-1">{form.formState.errors.researcherId.message}</p>}
-      </div>
+      <AnimatedInput
+        label="ORCID ID / Researcher ID (Optional)"
+        id="researcherId" 
+        {...form.register("researcherId")} 
+        disabled={isSubmitting || authLoading}
+      />
+      {form.formState.errors.researcherId && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.researcherId.message}</p>}
 
 
-      <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
+      <Button type="submit" className="w-full mt-4" disabled={isSubmitting || authLoading}> {/* Add mt-4 */}
         {isSubmitting ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : null}
@@ -239,4 +223,3 @@ export default function ProfileUpdateForm() {
     </form>
   );
 }
-
