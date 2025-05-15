@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { getPaper, updatePaperStatus, updatePaperData } from '@/lib/paper-service'; // Calls API now
+import { getPaper, updatePaperStatus, updatePaperData, simulateFileDownload } from '@/lib/paper-service'; // Using mock service
 import CountdownTimer from '@/components/shared/CountdownTimer';
 
 function PaperDetailsContent() {
@@ -29,7 +29,7 @@ function PaperDetailsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  
+
   const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
   const [loadingPaper, setLoadingPaper] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -42,11 +42,18 @@ function PaperDetailsContent() {
 
   useEffect(() => {
     const paperId = params.id as string;
-    if (paperId && user) { 
+    if (paperId && user) {
       setLoadingPaper(true);
-      getPaper(paperId) // Fetches from MongoDB via API
+      getPaper(paperId) // Fetches from mock service
         .then(paper => {
-          if (paper) { // API should handle auth, but client can double check if needed
+          if (paper) {
+            // Basic permission check for mock data
+            if (paper.userId !== user.id && !isAdmin && paper.status !== "Published") {
+                setCurrentPaper(null);
+                toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
+                router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
+                return;
+            }
             setCurrentPaper(paper);
             if(paper.adminFeedback) setAdminFeedbackText(paper.adminFeedback);
             const paymentDueDateValid = paper.paymentDueDate && !isNaN(new Date(paper.paymentDueDate).getTime());
@@ -56,26 +63,26 @@ function PaperDetailsContent() {
               }
             }
           } else {
-            setCurrentPaper(null); 
-            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper does not exist or you do not have permission to view it." });
+            setCurrentPaper(null);
+            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper does not exist." });
             router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
           }
         })
         .catch((err: any) => {
-          console.error("Error fetching paper from API:", err);
+          console.error("Error fetching paper (mock):", err);
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
           router.push(isAdmin ? '/admin/dashboard' : '/dashboard');
         })
         .finally(() => setLoadingPaper(false));
-    } else if (!user && loadingPaper) { 
+    } else if (!user && loadingPaper) {
         // Wait for user
     } else if (!user && !loadingPaper) {
-        setCurrentPaper(null); 
+        setCurrentPaper(null);
         setLoadingPaper(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, user, isAdmin, router]); 
+  }, [params.id, user, isAdmin]); // router removed from deps as it's stable
 
   useEffect(() => {
     const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
@@ -84,15 +91,15 @@ function PaperDetailsContent() {
     }
   }, [searchParams, currentPaper, isPaperOverdue, user, isAdmin]);
 
-  const handlePaymentSuccess = async (paperIdToUpdate?: string) => { 
+  const handlePaymentSuccess = async (paperIdToUpdate?: string) => {
     const targetPaperId = paperIdToUpdate || currentPaper?.id;
     if (!targetPaperId) return;
 
     try {
-      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() }); // Calls API
+      await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() }); // mock service
       setCurrentPaper(prev => {
         if (prev && prev.id === targetPaperId) {
-          return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString() };
+          return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString(), paymentDueDate: null };
         }
         return prev;
       });
@@ -102,16 +109,16 @@ function PaperDetailsContent() {
       toast({variant: "destructive", title: "Payment Update Failed", description: error.message || "Could not update paper status after payment."});
     }
   };
-  
+
   const handleAdminFeedbackSubmit = async () => {
     if (!currentPaper || !isAdmin || !adminFeedbackText.trim()) return;
     setIsSubmittingFeedback(true);
     try {
-      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText }); // Calls API
+      await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText }); // mock service
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
-      
+
       toast({
-        title: "Feedback Submitted", 
+        title: "Feedback Submitted",
         description: `Author will be notified (Simulated email to user for paper: ${currentPaper.title}).`,
         duration: 7000
       });
@@ -127,14 +134,14 @@ function PaperDetailsContent() {
   const handleStatusChange = async (newStatus: Paper['status']) => {
     if (!currentPaper || !isAdmin) return;
     try {
-      await updatePaperStatus(currentPaper.id, newStatus); // Calls API
+      await updatePaperStatus(currentPaper.id, newStatus); // mock service
       setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
       } else {
         toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
       }
-       
+
       if (newStatus !== "Payment Pending") {
         setIsPaperOverdue(false);
       }
@@ -151,7 +158,7 @@ function PaperDetailsContent() {
     setIsCheckingPlagiarism(true);
     try {
       const result = await plagiarismCheck({ documentText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, { // Calls API
+      await updatePaperData(currentPaper.id, { // mock service
         plagiarismScore: result.plagiarismScore,
         plagiarismReport: { highlightedSections: result.highlightedSections }
       });
@@ -177,7 +184,7 @@ function PaperDetailsContent() {
     setIsCheckingAcceptance(true);
     try {
       const result = await acceptanceProbability({ paperText: `${currentPaper.title}\n\n${currentPaper.abstract}` });
-      await updatePaperData(currentPaper.id, { // Calls API
+      await updatePaperData(currentPaper.id, { // mock service
         acceptanceProbability: result.probabilityScore,
         acceptanceReport: { reasoning: result.reasoning }
       });
@@ -195,18 +202,15 @@ function PaperDetailsContent() {
     }
   };
 
-  const handleDownloadOriginalPaper = async () => {
-    if (currentPaper?.id) {
-        // Construct the API endpoint URL for downloading the file
-        const downloadUrl = `/api/papers/download/${currentPaper.id}`;
-        // Open the URL in a new tab/window. The browser will handle the download.
-        window.open(downloadUrl, '_blank');
-        toast({ title: "Initiating Download", description: `Attempting to download ${currentPaper.fileName || 'the paper'}. Check your browser.` });
+  const handleDownloadOriginalPaper = () => {
+    if (currentPaper?.fileUrl) {
+        simulateFileDownload(currentPaper.fileUrl, currentPaper.fileName); // Use simulateFileDownload
+        toast({ title: "Initiating Download", description: `Attempting to download ${currentPaper.fileName || 'the paper'}. (Mock download)` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The paper ID is missing or file data is not available.",
+            description: "File URL is missing for this paper.",
         });
     }
   };
@@ -221,8 +225,8 @@ function PaperDetailsContent() {
     content += `Status: ${currentPaper.status}\n`;
     content += `Upload Date: ${currentPaper.uploadDate ? new Date(currentPaper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${currentPaper.abstract}\n\n`;
-    // File URL is not stored directly now; download is via API.
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
+    content += `Mock File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
      if (isAdmin) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
@@ -254,7 +258,7 @@ function PaperDetailsContent() {
       </div>
     );
   }
-  
+
   const getStatusBadgeVariant = (status: Paper['status']) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
@@ -306,7 +310,7 @@ function PaperDetailsContent() {
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
-                {isAdmin && ( 
+                {isAdmin && (
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full md:w-auto">
                         <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
@@ -320,9 +324,9 @@ function PaperDetailsContent() {
               <h3 className="text-lg font-semibold mb-2 flex items-center"><User className="h-5 w-5 mr-2 text-primary" />Abstract</h3>
               <p className="text-muted-foreground whitespace-pre-wrap">{currentPaper.abstract}</p>
             </div>
-            
+
             <Separator />
-            
+
             {isAdmin && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -357,8 +361,8 @@ function PaperDetailsContent() {
                  <Separator className="my-6"/>
               </div>
             )}
-            
-            
+
+
             {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdmin) && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />
@@ -372,14 +376,14 @@ function PaperDetailsContent() {
               </div>
             )}
 
-            
+
             {isAdmin && effectiveStatus !== "Payment Overdue" && (
               <div className="mt-6 p-4 border rounded-md">
                 <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
                 <Label htmlFor="adminFeedback">Feedback / Comments (this will be visible to the author)</Label>
-                <Textarea 
-                  id="adminFeedback" 
-                  value={adminFeedbackText} 
+                <Textarea
+                  id="adminFeedback"
+                  value={adminFeedbackText}
                   onChange={(e) => setAdminFeedbackText(e.target.value)}
                   rows={4}
                   placeholder="Enter feedback for the author..."
@@ -398,7 +402,7 @@ function PaperDetailsContent() {
                   <h3 className="text-lg font-semibold mb-2">Change Paper Status</h3>
                   <div className="flex flex-wrap gap-2">
                     {(["Submitted", "Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
-                      <Button 
+                      <Button
                         key={statusOption}
                         variant={currentPaper.status === statusOption ? "default" : "outline"}
                         size="sm"
@@ -409,7 +413,7 @@ function PaperDetailsContent() {
                       </Button>
                     ))}
                      {isPaperOverdue && currentPaper.status === "Payment Pending" && (
-                        <Button 
+                        <Button
                             variant="destructive"
                             size="sm"
                             onClick={() => handleStatusChange("Rejected")}
@@ -466,12 +470,12 @@ function PaperDetailsContent() {
           </aside>
         </CardContent>
       </Card>
-      {user && currentPaper && ( 
-        <PaymentModal 
-          isOpen={isPaymentModalOpen && currentPaper.userId === user.id && !isAdmin} 
-          onOpenChange={setIsPaymentModalOpen} 
-          paper={currentPaper} 
-          onPaymentSuccess={handlePaymentSuccess} 
+      {user && currentPaper && (
+        <PaymentModal
+          isOpen={isPaymentModalOpen && currentPaper.userId === user.id && !isAdmin}
+          onOpenChange={setIsPaymentModalOpen}
+          paper={currentPaper}
+          onPaymentSuccess={handlePaymentSuccess}
         />
       )}
     </div>

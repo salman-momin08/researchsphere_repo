@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { getUserPapers, getAllPapers } from "@/lib/paper-service"; 
+import { getUserPapers, getAllPapers } from "@/lib/paper-service";
 import { useToast } from "@/hooks/use-toast";
 
 function DashboardContent() {
@@ -27,23 +27,30 @@ function DashboardContent() {
         try {
           let fetchedPapers: Paper[];
           if (user.isAdmin) {
-            fetchedPapers = await getAllPapers(); // Fetches from MongoDB via API
-            console.log("DashboardContent (Admin): Fetched all papers from API:", fetchedPapers.length);
+            console.log("DashboardContent (Admin): Fetching all papers from mock service.");
+            fetchedPapers = await getAllPapers();
           } else {
-            fetchedPapers = await getUserPapers(user.id); // Fetches from MongoDB via API
-            console.log(`DashboardContent (User ${user.id}): Fetched user papers from API:`, fetchedPapers.length);
+            console.log(`DashboardContent (User ${user.id}): Fetching user papers from mock service.`);
+            fetchedPapers = await getUserPapers(user.id);
           }
           setPapers(fetchedPapers);
+          console.log("DashboardContent: Papers fetched successfully from mock service:", fetchedPapers.length);
         } catch (error: any) {
-          console.error("DashboardContent: Failed to fetch papers from API:", error);
-          toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load your papers from the database." });
+          console.error("DashboardContent: Failed to fetch papers from mock service:", error);
+          toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load your papers." });
         } finally {
           setIsLoadingPapers(false);
         }
       };
       fetchPapers();
+    } else {
+      // if user is null and not loading, means they are logged out or auth still initializing
+      if(!user && !isLoadingPapers) {
+        setPapers([]); // Clear papers if user logs out
+      }
     }
-  }, [user, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // Removed toast from deps as it's stable
 
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading papers...</p></div>;

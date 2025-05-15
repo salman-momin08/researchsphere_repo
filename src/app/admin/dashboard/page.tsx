@@ -13,15 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; 
+import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
 function AdminDashboardContent() {
-  const { user, isAdmin, loading: authLoading } = useAuth(); 
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState(true);
-  
+
   const [stats, setStats] = useState({
     totalSubmissions: 0,
     pendingReview: 0,
@@ -33,15 +33,14 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers(); // Fetches from MongoDB via API
-        console.log("AdminDashboard: Fetched all papers from API:", fetchedPapers.length);
-        
+        console.log("AdminDashboard: Fetching all papers from mock service.");
+        const fetchedPapers = await getAllPapers();
+
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
-          // Ensure paymentDueDate is a valid date string before creating a Date object
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
           if (p.status === 'Payment Pending' && paymentDueDateValid && new Date(p.paymentDueDate!) < now) {
-            return { ...p, displayStatus: 'Payment Overdue' as PaperStatus }; 
+            return { ...p, displayStatus: 'Payment Overdue' as PaperStatus };
           }
           return { ...p, displayStatus: p.status };
         });
@@ -55,8 +54,8 @@ function AdminDashboardContent() {
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
 
       } catch (error: any) {
-        console.error("AdminDashboard: Error fetching papers from API:", error);
-        toast({ variant: "destructive", title: "Error", description: error.message || "Could not load papers from the database." });
+        console.error("AdminDashboard: Error fetching papers from mock service:", error);
+        toast({ variant: "destructive", title: "Error", description: error.message || "Could not load papers." });
       } finally {
         setIsLoadingPapers(false);
       }
@@ -72,8 +71,8 @@ function AdminDashboardContent() {
   useEffect(() => {
     fetchAndSetPapers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isAdmin, authLoading]); // Dependencies remain the same
-  
+  }, [user, isAdmin, authLoading]);
+
   const getStatusBadgeVariant = (status: PaperStatus | undefined) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
@@ -85,9 +84,9 @@ function AdminDashboardContent() {
   };
 
   const handleManualRejectOverdue = async (paperId: string) => {
-    const paperToNotify = papers.find(p => p.id === paperId); 
+    const paperToNotify = papers.find(p => p.id === paperId);
     try {
-      await updatePaperStatus(paperId, 'Rejected'); // Calls API
+      await updatePaperStatus(paperId, 'Rejected');
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
 
       if (paperToNotify) {
@@ -99,7 +98,7 @@ function AdminDashboardContent() {
           duration: 7000,
         });
       }
-      fetchAndSetPapers(); 
+      fetchAndSetPapers();
     } catch (error: any) {
       console.error("Failed to reject paper:", error);
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
@@ -111,7 +110,6 @@ function AdminDashboardContent() {
   }
 
   if (user && !isAdmin) {
-     // This Alert has been updated in a previous step to be more informative
     return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
@@ -120,11 +118,11 @@ function AdminDashboardContent() {
           <AlertDescription>
             Your account is not recognized as an administrator.
             <ul className="list-disc list-inside text-left mt-2 text-sm">
-              <li>**Crucial Check:** Ensure the `isAdmin` field in your user document (in the MongoDB `users` collection, accessed via Firebase Admin or your User API) is set to `true` (boolean type).</li>
+              <li>**Crucial Check:** Ensure the `isAdmin` field in your user profile (mocked via `localStorage` or by using the email `{MOCK_ADMIN_EMAIL}`) is set to `true`.</li>
               <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
-              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted after fetching from the API.</li>
+              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted.</li>
             </ul>
-            If the issue persists, please verify your MongoDB data or contact support.
+            If the issue persists, please verify your mock admin setup or contact support.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -133,7 +131,7 @@ function AdminDashboardContent() {
       </div>
     );
   }
-  
+
   if (!user) {
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
@@ -206,7 +204,7 @@ function AdminDashboardContent() {
         </Card>
       </div>
 
-      <Card className="shadow-lg w-full"> 
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><BarChartHorizontalBig className="mr-2 h-5 w-5 text-primary" />All Submissions</CardTitle>
           <CardDescription>Review and manage all papers submitted to the platform.</CardDescription>

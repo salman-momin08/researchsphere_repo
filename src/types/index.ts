@@ -1,19 +1,20 @@
 
 export interface User {
-  id: string;
+  id: string; // Firebase UID
   email: string | null;
-  displayName: string | null; 
+  displayName: string | null;
   photoURL?: string | null;
-  isAdmin?: boolean; 
+  isAdmin?: boolean;
 
-  username?: string | null; 
+  // Fields for profile completion, managed by mock/localStorage
+  username?: string | null;
   phoneNumber?: string | null;
   institution?: string | null;
-  role?: "Author" | "Reviewer" | "Admin" | null; 
-  researcherId?: string | null; 
+  role?: "Author" | "Reviewer" | "Admin" | null; // Role can be Admin if email matches MOCK_ADMIN_EMAIL
+  researcherId?: string | null;
 }
 
-export type PaperStatus = 
+export type PaperStatus =
   | "Draft"
   | "Submitted"
   | "Under Review"
@@ -21,38 +22,33 @@ export type PaperStatus =
   | "Accepted"
   | "Rejected"
   | "Payment Pending"
-  | "Payment Overdue" 
+  | "Payment Overdue"
   | "Published";
 
 export interface Paper {
-  id: string; // In MongoDB, this will be _id from the document
-  userId: string;
+  id: string; // Generated ID for mock data
+  userId: string; // Firebase UID of the submitter
   title: string;
   abstract: string;
-  authors: string[]; 
+  authors: string[];
   keywords: string[];
-  
-  // For MongoDB embedded file storage (small files)
-  fileName?: string; // Original filename
-  fileMimeType?: string; // e.g. 'application/pdf'
-  // fileData: Buffer; // This is stored in MongoDB but NOT typically sent to client unless downloading
 
-  // fileUrl is no longer used if embedding files. Download will be via API endpoint.
-  // fileUrl?: string; 
+  fileName?: string; // Original filename from upload
+  fileUrl?: string; // Mock path, e.g., /uploads/mock/fileName.pdf
 
   uploadDate: string; // ISO date string
   status: PaperStatus;
-  plagiarismScore?: number | null; 
+  plagiarismScore?: number | null;
   plagiarismReport?: {
     highlightedSections: string[];
   } | null;
-  acceptanceProbability?: number | null; 
+  acceptanceProbability?: number | null;
   acceptanceReport?: {
     reasoning: string;
   } | null;
   adminFeedback?: string | null;
-  submissionDate?: string | null; 
-  paymentDueDate?: string | null; 
+  submissionDate?: string | null; // ISO date string
+  paymentDueDate?: string | null; // ISO date string
   paymentOption?: "payNow" | "payLater" | null;
-  paidAt?: string | null; 
+  paidAt?: string | null; // ISO date string
 }

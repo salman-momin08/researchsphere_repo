@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, Search as SearchIcon, FileText, Eye, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper } from '@/types';
-import { getPublishedPapers } from '@/lib/paper-service'; // Fetches from MongoDB API
+import { getPublishedPapers, simulateFileDownload } from '@/lib/paper-service'; // Using mock service
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -38,21 +38,19 @@ function SearchPapersContent() {
     }
     setIsLoading(true);
     setHasSearched(true);
-    setSearchResults([]); 
+    setSearchResults([]);
 
     try {
-      // Fetch all published papers first
-      const publishedPapers = await getPublishedPapers(); // Calls API
-      console.log("SearchPapersContent: Fetched published papers from API:", publishedPapers.length);
+      const publishedPapers = await getPublishedPapers(); // From mock service
+      console.log("SearchPapersContent: Fetched published papers from mock service:", publishedPapers.length);
 
-      // Client-side filtering for author name (case-insensitive, partial match)
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
       setSearchResults(results);
     } catch (error: any) {
-      console.error("SearchPapersContent: Error fetching or filtering papers:", error);
+      console.error("SearchPapersContent: Error fetching or filtering papers (mock):", error);
       toast({
         variant: "destructive",
         title: "Search Error",
@@ -64,15 +62,14 @@ function SearchPapersContent() {
   };
 
   const handleDownloadOriginal = (paper: Paper) => {
-    if (paper.id) {
-        const downloadUrl = `/api/papers/download/${paper.id}`;
-        window.open(downloadUrl, '_blank');
-        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. Check your browser.` });
+    if (paper.fileUrl) {
+        simulateFileDownload(paper.fileUrl, paper.fileName); // Use simulateFileDownload
+        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. (Mock download)` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The paper ID is missing or file data is not available for download.",
+            description: "File URL is missing for this paper.",
         });
     }
   };
@@ -87,6 +84,7 @@ function SearchPapersContent() {
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
     content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
+    content += `Mock File URL: ${paper.fileUrl || 'Not available'}\n`;
 
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -100,7 +98,7 @@ function SearchPapersContent() {
     URL.revokeObjectURL(url);
     toast({ title: "Metadata Downloaded", description: `${filename} has been downloaded.` });
   };
-  
+
   const getStatusBadgeVariant = (status: Paper['status'] | undefined) => {
     switch (status) {
       case 'Accepted': case 'Published': return 'default';
@@ -119,7 +117,7 @@ function SearchPapersContent() {
           <SearchIcon className="mx-auto h-12 w-12 text-primary mb-2" />
           <CardTitle className="text-2xl md:text-3xl">Advanced Paper Search</CardTitle>
           <CardDescription>
-            Find published papers by author name. Results are fetched from the live database.
+            Find published papers by author name. Results are from mock data.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -183,7 +181,7 @@ function SearchPapersContent() {
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <Eye className="h-4 w-4" />
                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File">
+                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginal(paper)} title="Download Original File (Mock)">
                           <Download className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Metadata" className="text-muted-foreground hover:text-primary">
@@ -201,7 +199,7 @@ function SearchPapersContent() {
                 <SearchIcon className="h-4 w-4" />
                 <AlertTitle>Search Published Papers</AlertTitle>
                 <AlertDescription>
-                    Enter an author's name in the search bar above to find relevant published research papers from the database.
+                    Enter an author's name in the search bar above to find relevant published research papers from the mock database.
                 </AlertDescription>
             </Alert>
            )}

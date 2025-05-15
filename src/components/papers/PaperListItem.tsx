@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock, Download } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react'; 
+import React, { useEffect, useState } from 'react';
 import CountdownTimer from '../shared/CountdownTimer';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth'; 
+import { useAuth } from '@/hooks/use-auth';
+import { simulateFileDownload } from '@/lib/paper-service'; // Import mock download
 
 interface PaperListItemProps {
   paper: Paper;
@@ -20,7 +21,7 @@ interface PaperListItemProps {
 const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
   const [isOverdue, setIsOverdue] = useState(false);
 
@@ -31,7 +32,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
             setDisplayStatus("Payment Overdue");
             setIsOverdue(true);
         } else {
-            setDisplayStatus(paper.status); 
+            setDisplayStatus(paper.status);
             setIsOverdue(false);
       }
     } else {
@@ -45,7 +46,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     switch (status) {
       case 'Accepted':
       case 'Published':
-        return 'default'; 
+        return 'default';
       case 'Rejected':
       case 'Payment Overdue':
         return 'destructive';
@@ -54,7 +55,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
         return 'secondary';
       case 'Payment Pending':
       case 'Action Required':
-        return 'outline'; 
+        return 'outline';
       default:
         return 'secondary';
     }
@@ -71,22 +72,21 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
       case 'Payment Pending':
         return <DollarSign className="h-4 w-4 text-orange-500" />;
       case 'Action Required':
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />; 
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   }
 
   const handleDownloadOriginalFile = () => {
-    if (paper.id) {
-        const downloadUrl = `/api/papers/download/${paper.id}`;
-        window.open(downloadUrl, '_blank');
-        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. Check your browser.` });
+    if (paper.fileUrl) {
+        simulateFileDownload(paper.fileUrl, paper.fileName); // Use simulateFileDownload
+        toast({ title: "Initiating Download", description: `Attempting to download ${paper.fileName || 'the paper'}. (Mock download)` });
     } else {
         toast({
             variant: "destructive",
             title: "File Not Available",
-            description: "The paper ID is missing or file data is not available.",
+            description: "File URL is missing for this paper.",
         });
     }
   };
@@ -101,6 +101,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
     content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
+    content += `Mock File URL: ${paper.fileUrl || 'Not available'}\n`;
 
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -139,14 +140,14 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
           {getStatusIcon(displayStatus)}
           <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
         </div>
-        
+
         {displayStatus === 'Payment Pending' && paper.paymentDueDate && !isOverdue && (
           <div className="text-xs text-orange-600 flex items-center">
             <Clock className="h-3 w-3 mr-1" />
             <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" />
           </div>
         )}
-        
+
       </CardContent>
       <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row items-stretch md:items-center justify-end gap-2">
         {paper.status === 'Payment Pending' && displayStatus !== 'Payment Overdue' && user && user.id === paper.userId && (
