@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { User } from '@/types';
@@ -21,11 +20,12 @@ import {
   updateProfile as updateFirebaseProfile,
 } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Kept for potential future use if specific alerts are needed here
-import { Info } from 'lucide-react'; // Kept for potential future use
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; 
+import { Info } from 'lucide-react'; 
 
 const MOCK_ADMIN_EMAIL = 'admin@example.com';
 const ADMIN_CREATOR_EMAIL = 'admin-creator@researchsphere.com';
+
 
 interface AuthContextType {
   user: User | null;
@@ -40,7 +40,7 @@ interface AuthContextType {
   showLoginModal: boolean;
   setShowLoginModal: Dispatch<SetStateAction<boolean>>;
   isAdmin: boolean;
-  isSocialLoginInProgress: boolean;
+  isSocialLoginInProgress: null | 'google' | 'github'; // More specific type
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,65 +80,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
     }
 
-
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
-      console.log("AuthContext: onAuthStateChanged triggered. Firebase user UID:", firebaseUser?.uid || "null");
       if (firebaseUser) {
         const localProfile = getMockUserProfile(firebaseUser.uid);
+        
         const effectiveDisplayName = localProfile?.displayName || firebaseUser.displayName || "User";
         const effectivePhotoURL = localProfile?.photoURL || firebaseUser.photoURL || null;
-        const effectivePhoneNumber = localProfile?.phoneNumber || null; // Prioritize localProfile for phone as Firebase doesn't always have it
-
-        const isNewlyCreatedUser = firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime;
-        const isSocialLoginUser = firebaseUser.providerData.some(pd => pd.providerId !== 'password');
-
+        
         let appUser: User = {
           id: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: effectiveDisplayName,
           photoURL: effectivePhotoURL,
-          isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || localProfile?.isAdmin === true || firebaseUser.email === ADMIN_CREATOR_EMAIL,
+          isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || localProfile?.isAdmin === true,
           username: localProfile?.username || null,
           role: localProfile?.role || null,
-          phoneNumber: effectivePhoneNumber,
+          phoneNumber: localProfile?.phoneNumber || null,
           institution: localProfile?.institution || null,
           researcherId: localProfile?.researcherId || null,
         };
 
-        if ((effectiveDisplayName && effectiveDisplayName !== firebaseUser.displayName && !localProfile?.displayName) || 
-            (effectivePhotoURL && effectivePhotoURL !== firebaseUser.photoURL && !localProfile?.photoURL)) {
-            try {
-                await updateFirebaseProfile(firebaseUser, { displayName: effectiveDisplayName, photoURL: effectivePhotoURL });
-                console.log("AuthContext: Synced Firebase Auth profile (displayName/photoURL) from social provider for UID:", firebaseUser.uid);
-                if (localProfile) {
-                    saveMockUserProfile(firebaseUser.uid, { ...localProfile, displayName: effectiveDisplayName, photoURL: effectivePhotoURL });
-                } else {
-                     saveMockUserProfile(firebaseUser.uid, { displayName: effectiveDisplayName, photoURL: effectivePhotoURL, email: firebaseUser.email });
-                }
-            } catch (profileSyncError) {
-                console.warn("AuthContext: Error syncing social profile to Firebase Auth:", profileSyncError);
-            }
-        } else if (localProfile) { // Ensure local profile takes precedence for display name if it exists
-            appUser.displayName = localProfile.displayName || appUser.displayName;
-        }
-
-
-        if ((firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL) && localProfile?.isAdmin !== true) {
-            const adminProfile = { ...localProfile, isAdmin: true, role: localProfile?.role || "Admin" };
+        if ((firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL) && appUser.isAdmin !== true) {
+            const adminProfile = { ...appUser, isAdmin: true, role: appUser.role || "Admin" };
             saveMockUserProfile(firebaseUser.uid, adminProfile);
             appUser = { ...appUser, ...adminProfile };
         }
         
-        console.log("AuthContext: Raw localProfile from localStorage for UID", firebaseUser.uid, ":", localProfile);
-        console.log("AuthContext: Effective appUser state for UID", firebaseUser.uid, ":", appUser);
-
         setUser(appUser);
-        setShowLoginModal(false);
-
+        
         const isProfileConsideredComplete = appUser.username && appUser.role && appUser.phoneNumber;
         const wasCompletingProfile = localStorage.getItem('completingProfile') === 'true';
 
-        if (!isProfileConsideredComplete && (isNewlyCreatedUser || isSocialLoginUser || wasCompletingProfile)) {
+        if (!isProfileConsideredComplete && (firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime || firebaseUser.providerData.some(pd => pd.providerId !== 'password') || wasCompletingProfile)) {
           localStorage.setItem('profileIncomplete', 'true');
           localStorage.setItem('completingProfile', 'true');
           if (pathname !== '/profile/settings') {
@@ -151,21 +124,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (redirectAfterLoginPath && redirectAfterLoginPath !== pathname) {
             localStorage.removeItem('redirectAfterLogin');
             router.push(redirectAfterLoginPath);
-          } else if (pathname === '/login' || pathname === '/signup' || pathname === '/profile/settings') {
-            // If profile is complete and user is on an auth page, redirect to home
-            router.push('/');
+          } else if (isProfileConsideredComplete && (pathname === '/login' || pathname === '/signup' || (pathname === '/profile/settings' && !searchParams.get('complete')))) {
+             router.push('/');
           }
         }
+        setShowLoginModal(false); // Close modal if open
       } else {
         setUser(null);
-        localStorage.removeItem('completingProfile'); // Clear if logged out
+        localStorage.removeItem('completingProfile');
       }
       setLoading(false);
       setActiveSocialLoginProvider(null);
     });
 
     return () => unsubscribe();
-  }, [router, pathname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, router]); // Added searchParams for conditional redirect from profile/settings
+
+  const searchParams = usePathname() ? new URLSearchParams(window.location.search) : new URLSearchParams();
+
 
   const login = async (identifier: string, pass: string) => {
     if (!firebaseAuth) throw new Error("Authentication service not available.");
@@ -228,6 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
       throw new Error(errorMessage);
     }
+    // setLoading(false) is handled by onAuthStateChanged
   };
 
   const signup = async (data: SignupFormValues) => {
@@ -236,17 +214,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setActiveSocialLoginProvider(null);
 
     if (typeof window !== 'undefined') {
-        // Check username uniqueness
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('userProfile_')) {
             try {
                 const profile = JSON.parse(localStorage.getItem(key) || '{}') as Partial<User>;
                 if (profile.username === data.username) {
-                setLoading(false);
-                const errorMsg = "Username is already taken. Please choose another one.";
-                toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
-                throw new Error(errorMsg);
+                  setLoading(false);
+                  const errorMsg = "Username is already taken. Please choose another one.";
+                  toast({variant: "destructive", title: "Signup Failed", description: errorMsg});
+                  throw new Error(errorMsg);
                 }
                 if (data.phoneNumber && profile.phoneNumber && profile.phoneNumber === data.phoneNumber) {
                      setLoading(false);
@@ -258,7 +235,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     }
-
 
     let userCredential: FirebaseUser;
     try {
@@ -285,7 +261,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await updateFirebaseProfile(userCredential, { displayName: data.fullName });
             const initialProfileData: Partial<User> = {
               displayName: data.fullName,
-              email: data.email, // Store email for username lookup
+              email: data.email, 
               username: data.username,
               role: data.role,
               phoneNumber: data.phoneNumber,
@@ -295,13 +271,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             };
             saveMockUserProfile(userCredential.uid, initialProfileData);
             // onAuthStateChanged will pick up the new user state, set user, and trigger profile completion redirect
-            toast({ title: "Signup Successful!", description: "Welcome to ResearchSphere! Please complete your profile."});
+            toast({ title: "Signup Successful!", description: "Please complete your profile."});
+             // No router.push('/') here, onAuthStateChanged handles it
         } catch (profileUpdateError) {
             toast({ variant: "destructive", title: "Signup Incomplete", description: "Account created, but profile setup had an issue. Please try updating your profile." });
-             // User is created in Firebase Auth, but local mock profile might be incomplete.
-             // onAuthStateChanged will still run.
         }
     }
+    // setLoading(false) is handled by onAuthStateChanged
   };
 
   const logout = async () => {
@@ -309,13 +285,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signOut(firebaseAuth);
-      //setUser(null); // onAuthStateChanged will handle this
+      // setUser(null); // onAuthStateChanged will handle this
       localStorage.removeItem('redirectAfterLogin');
       localStorage.removeItem('profileIncomplete');
       localStorage.removeItem('completingProfile');
-      // Optionally, clear all userProfile_ items from localStorage if desired,
-      // but Firebase Auth state is the primary source of truth.
-      router.push('/');
+      router.push('/'); // Redirect to home on logout
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error: any) {
       toast({variant: "destructive", title: "Logout Failed", description: error.message || "Could not log out."});
@@ -325,8 +299,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleSocialLoginError = (error: any, providerName: string) => {
-    setLoading(false);
-    setActiveSocialLoginProvider(null);
     const firebaseError = error as { code?: string; message?: string };
     let toastMessage = `${providerName} Sign-In failed. Please try again.`;
     let toastTitle = `${providerName} Login Error`;
@@ -336,22 +308,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
           toastTitle = `${providerName} Sign-In Cancelled`;
-          toastMessage = `The ${providerName} sign-in process was cancelled or the popup was closed. Please try again.`;
+          toastMessage = `The ${providerName} sign-in popup was closed before completing. Please ensure popups are enabled and try again. If the issue persists, you might consider trying a different browser or network.`;
            toast({
             title: toastTitle,
             description: toastMessage,
-            duration: 7000, // Shorter duration for this specific informational error
+            duration: 10000, 
           });
-          return;
+          break; // Break here so it doesn't fall through
         case 'auth/account-exists-with-different-credential':
           toastTitle = "Account Exists";
           toastMessage = "An account already exists with this email using a different sign-in method. Try that method or use a different email.";
+          toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
           break;
         default:
           toastMessage = firebaseError.message || toastMessage;
+          toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
       }
+    } else {
+        toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
     }
-    toast({ variant: "destructive", title: toastTitle, description: toastMessage, duration: 10000 });
+    setLoading(false); // Ensure loading is reset on error
+    setActiveSocialLoginProvider(null); // Reset active provider on error
   };
 
   const processSocialLogin = async (providerInstance: typeof googleAuthCredentialProvider | typeof githubAuthCredentialProvider, providerName: 'google' | 'github') => {
@@ -371,8 +348,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: firebaseUser.displayName,
         email: firebaseUser.email,
         photoURL: firebaseUser.photoURL,
-        isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL || localProfile?.isAdmin === true,
-        // Preserve existing mock profile details if they exist
+        isAdmin: firebaseUser.email === MOCK_ADMIN_EMAIL || localProfile?.isAdmin === true,
         username: localProfile?.username || null,
         role: localProfile?.role || null,
         phoneNumber: localProfile?.phoneNumber || null,
@@ -411,21 +387,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (otherProfile.username === updatedData.username) {
                 setLoading(false);
                 const errorMsg = "Username already taken. Please choose another one.";
-                // toast({ variant: "destructive", title: "Update Failed", description: errorMsg }); // Error handled by form
                 throw new Error(errorMsg);
               }
             }
           }
         }
         if (updatedData.phoneNumber && updatedData.phoneNumber !== user.phoneNumber) {
-          for (let i = 0; i < localStorage.length; i++) {
+           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('userProfile_') && key !== `userProfile_${user.id}`) {
               const otherProfile = JSON.parse(localStorage.getItem(key) || '{}') as Partial<User>;
               if (otherProfile.phoneNumber && otherProfile.phoneNumber === updatedData.phoneNumber) {
                 setLoading(false);
                 const errorMsg = "Phone number already in use. Please use a different one.";
-                // toast({ variant: "destructive", title: "Update Failed", description: errorMsg }); // Error handled by form
                 throw new Error(errorMsg);
               }
             }
@@ -435,18 +409,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const currentLocalProfile = getMockUserProfile(user.id) || {};
       const newProfileData: User = {
-        ...user, // Start with current context user state
-        ...currentLocalProfile, // Overlay with stored local profile
-        ...updatedData, // Apply updates from form
+        ...user, 
+        ...currentLocalProfile, 
+        ...updatedData, 
         id: user.id,
         email: user.email,
-        photoURL: user.photoURL, // photoURL typically not updated this way
-        isAdmin: user.isAdmin, // isAdmin cannot be changed by user via this form
+        photoURL: user.photoURL, 
+        isAdmin: user.isAdmin, 
       };
 
       if (updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
         await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
-        newProfileData.displayName = updatedData.displayName; // Ensure it's updated in our user object
+        newProfileData.displayName = updatedData.displayName; 
       }
 
       saveMockUserProfile(user.id, newProfileData);
@@ -461,7 +435,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   router.push(redirectPath);
                   localStorage.removeItem('redirectAfterLogin');
               } else {
-                  router.push('/'); // Default to home if profile complete
+                  router.push('/'); 
               }
           }
       }
@@ -470,7 +444,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error.message !== "Username already taken. Please choose another one." && error.message !== "Phone number already in use. Please use a different one.") {
           toast({ variant: "destructive", title: "Update Failed", description: error.message || "Could not update your profile." });
       }
-      throw error; // Re-throw for form to handle
+      throw error; 
     } finally {
         setLoading(false);
     }
@@ -484,7 +458,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithGoogle, loginWithGitHub,
         sendPasswordResetEmail, updateUserProfile,
         showLoginModal, setShowLoginModal, isAdmin,
-        isSocialLoginInProgress: activeSocialLoginProvider !== null,
+        isSocialLoginInProgress: activeSocialLoginProvider,
     }}>
       {children}
     </AuthContext.Provider>

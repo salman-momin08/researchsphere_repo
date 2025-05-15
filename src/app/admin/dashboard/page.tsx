@@ -4,7 +4,7 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText, Clock } from "lucide-react";
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText, Clock, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
+import { getAllPapers, updatePaperStatus } from "@/lib/paper-service"; // Now fetches from Firestore via API
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
@@ -33,7 +33,7 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        console.log("AdminDashboard: Fetching all papers from mock service.");
+        // console.log("AdminDashboard: Fetching all papers from Firestore.");
         const fetchedPapers = await getAllPapers();
 
         const now = new Date();
@@ -54,8 +54,8 @@ function AdminDashboardContent() {
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
 
       } catch (error: any) {
-        console.error("AdminDashboard: Error fetching papers from mock service:", error);
-        toast({ variant: "destructive", title: "Error", description: error.message || "Could not load papers." });
+        console.error("AdminDashboard: Error fetching papers from Firestore:", error);
+        toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
       }
@@ -90,7 +90,7 @@ function AdminDashboardContent() {
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
 
       if (paperToNotify) {
-        console.log(`SIMULATING EMAIL: An email would be sent to the user (owner of paper ID: ${paperToNotify.userId}) for paper "${paperToNotify.title}" regarding its rejection due to non-payment.`);
+        // console.log(`SIMULATING EMAIL: An email would be sent to the user (owner of paper ID: ${paperToNotify.userId}) for paper "${paperToNotify.title}" regarding its rejection due to non-payment.`);
         toast({
           title: "Email Notification (Simulated)",
           description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
@@ -117,12 +117,12 @@ function AdminDashboardContent() {
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
             Your account is not recognized as an administrator.
+            Please ensure the `isAdmin` field is correctly set to `true` (boolean) in your user's Firestore document.
             <ul className="list-disc list-inside text-left mt-2 text-sm">
-              <li>**Crucial Check:** Ensure the `isAdmin` field in your user profile (mocked via `localStorage` or by using the email `{MOCK_ADMIN_EMAIL}`) is set to `true`.</li>
-              <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
-              <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted.</li>
+                <li>If you recently logged in or your permissions were just changed, try refreshing the page.</li>
+                <li>Check the browser's developer console for logs from "[AuthContext]" which show how the `isAdmin` flag is being interpreted for your user.</li>
             </ul>
-            If the issue persists, please verify your mock admin setup or contact support.
+            If the issue persists, please verify your Firestore data or contact support.
           </AlertDescription>
         </Alert>
         <Link href="/dashboard">
@@ -131,12 +131,11 @@ function AdminDashboardContent() {
       </div>
     );
   }
-
   if (!user) {
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
             <Alert variant="default" className="max-w-md mx-auto">
-                <AlertTriangle className="h-4 w-4" />
+                <Info className="h-4 w-4" />
                 <AlertTitle>Authentication Required</AlertTitle>
                 <AlertDescription>
                     You need to be logged in as an admin to view this page.
@@ -148,6 +147,7 @@ function AdminDashboardContent() {
         </div>
      );
   }
+
 
   if (isLoadingPapers) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
