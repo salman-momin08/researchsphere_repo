@@ -3,40 +3,64 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types'; // Ensure User type is correctly imported
-import { getAllUsers } from '@/lib/user-service';
+import { getAllUsers, toggleUserAdminStatus } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Users as UsersIcon, AlertTriangle } from 'lucide-react';
-// import { Button } from '@/components/ui/button'; // For future actions
+import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
 export default function UserManagementPage() {
+  const { user: currentAdminUser } = useAuth(); // Get current admin user
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    setError(null);
+    console.log("UserManagementPage: Fetching all users...");
+    try {
+      const fetchedUsers = await getAllUsers();
+      console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service. First user (if any):`, fetchedUsers[0]);
+      setUsers(fetchedUsers);
+    } catch (err: any) {
+      console.error("UserManagementPage: Error fetching users:", err);
+      setError(err.message || "Failed to load users.");
+      toast({ variant: "destructive", title: "Error Loading Users", description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      setError(null);
-      console.log("UserManagementPage: Fetching all users...");
-      try {
-        const fetchedUsers = await getAllUsers();
-        console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service.`, fetchedUsers);
-        setUsers(fetchedUsers);
-      } catch (err: any) {
-        console.error("UserManagementPage: Error fetching users:", err);
-        setError(err.message || "Failed to load users.");
-        toast({ variant: "destructive", title: "Error Loading Users", description: err.message });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchUsers();
   }, []);
+
+  const handleToggleAdmin = async (targetUserId: string, currentIsAdmin: boolean | undefined) => {
+    if (!currentAdminUser || currentAdminUser.id === targetUserId) {
+      toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot change their own admin status through this interface." });
+      return;
+    }
+
+    const confirmAction = confirm(`Are you sure you want to ${currentIsAdmin ? 'revoke' : 'grant'} admin privileges for this user?`);
+    if (!confirmAction) return;
+
+    try {
+      await toggleUserAdminStatus(targetUserId, !!currentIsAdmin);
+      toast({ title: "Success", description: `User admin status updated.` });
+      // Re-fetch users to reflect the change
+      fetchUsers();
+    } catch (err: any) {
+      console.error("UserManagementPage: Error toggling admin status:", err);
+      toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update admin status." });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -64,7 +88,7 @@ export default function UserManagementPage() {
             <UsersIcon className="h-6 w-6 text-primary" />
             <CardTitle className="text-2xl">User Management</CardTitle>
           </div>
-          <CardDescription>View and manage all registered users on the platform.</CardDescription>
+          <CardDescription>View and manage all registered users on the platform. ({users.length} users found)</CardDescription>
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
@@ -80,7 +104,7 @@ export default function UserManagementPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Joined</TableHead>
-                    {/* <TableHead className="text-right">Actions</TableHead> */}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -96,15 +120,31 @@ export default function UserManagementPage() {
                       </TableCell>
                       <TableCell>
                         {user.isAdmin ? (
-                          <Badge variant="default">Yes</Badge>
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                            <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Yes
+                          </Badge>
                         ) : (
-                          <Badge variant="outline">No</Badge>
+                          <Badge variant="outline">
+                            <ShieldOff className="mr-1 h-3.5 w-3.5" /> No
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
-                      {/* <TableCell className="text-right">
-                        <Button variant="outline" size="sm">Edit</Button>
-                      </TableCell> */}
+                      <TableCell className="text-right">
+                        <Button
+                          variant={user.isAdmin ? "destructive" : "default"}
+                          size="sm"
+                          onClick={() => handleToggleAdmin(user.id, user.isAdmin)}
+                          disabled={currentAdminUser?.id === user.id}
+                          className="w-32"
+                        >
+                          {user.isAdmin ? (
+                            <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
+                          ) : (
+                            <><ShieldCheck className="mr-2 h-4 w-4" /> Make Admin</>
+                          )}
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

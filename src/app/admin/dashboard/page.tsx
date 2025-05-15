@@ -34,7 +34,7 @@ function AdminDashboardContent() {
       setIsLoadingPapers(true);
       try {
         console.log("AdminDashboardContent: Fetching all papers from Firestore via paper-service.");
-        const fetchedPapers = await getAllPapers();
+        const fetchedPapers = await getAllPapers(); // This should fetch from Firestore
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -89,6 +89,8 @@ function AdminDashboardContent() {
       await updatePaperStatus(paperId, 'Rejected');
       toast({title: "Paper Rejected", description: `Paper "${paperToNotify?.title || 'ID: '+paperId}" marked as rejected due to overdue payment.`});
       if (paperToNotify) {
+        // Simulate email notification
+        console.log(`SIMULATED EMAIL: User ${paperToNotify.userId} notified that paper "${paperToNotify.title}" was rejected due to non-payment.`);
         toast({
           title: "Email Notification (Simulated)",
           description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
@@ -96,7 +98,7 @@ function AdminDashboardContent() {
           duration: 7000,
         });
       }
-      fetchAndSetPapers();
+      fetchAndSetPapers(); // Refresh paper list
     } catch (error: any) {
       console.error("Failed to reject paper:", error);
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
@@ -109,10 +111,11 @@ function AdminDashboardContent() {
   }
   
   if (!isAdmin && user) { 
+     // This case should ideally be caught by ProtectedRoute in AdminLayout
      return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
-          <Shield className="h-5 w-5" /> {/* Changed Icon to Shield for thematic consistency */}
+          <Shield className="h-5 w-5" />
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
             You do not have permission to view this page.
@@ -128,6 +131,7 @@ function AdminDashboardContent() {
   }
   
   if (!user) { 
+     // This case should also be caught by ProtectedRoute in AdminLayout
      return (
         <div className="container py-8 md:py-12 px-4 text-center">
             <Alert variant="default" className="max-w-md mx-auto">

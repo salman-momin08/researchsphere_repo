@@ -13,9 +13,9 @@ import {
   where,
   Timestamp,
   serverTimestamp,
-  orderBy, // Added orderBy import
+  orderBy,
 } from "firebase/firestore";
-import { db as firestoreDb } from "@/lib/firebase"; // Use db from firebase.ts
+import { db as firestoreDb } from "@/lib/firebase";
 import type { User } from '@/types';
 
 // Helper to convert Firestore Timestamps in user data
@@ -23,7 +23,6 @@ const convertUserTimestamps = (userData: any): User => {
   const convert = (timestamp: any) => {
     if (!timestamp) return null;
     if (timestamp instanceof Timestamp) return timestamp.toDate().toISOString();
-    // Handle cases where it might already be an ISO string or a Date object from client-side mock data
     if (typeof timestamp === 'string') return timestamp;
     if (timestamp instanceof Date) return timestamp.toISOString();
     return null;
@@ -44,10 +43,8 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
   }
   const userDocRef = doc(firestoreDb, "users", userId);
   try {
-    // console.log(`User Service (getUserProfile): Fetching user profile for UID ${userId}.`);
     const userSnap = await getDoc(userDocRef);
     if (userSnap.exists()) {
-      // console.log(`User Service (getUserProfile): User profile found for ${userId}. Data:`, userSnap.data());
       return convertUserTimestamps({ id: userSnap.id, ...userSnap.data() });
     } else {
       console.warn(`User Service (getUserProfile): No user document found for UID ${userId}.`);
@@ -60,11 +57,9 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 };
 
 // Creates or updates a user profile in Firestore
-// Note: `email` is typically managed by Firebase Auth and should be consistent.
-// `isAdmin` is managed server-side or manually for security.
 export const createOrUpdateUserProfileInFirestore = async (
   uid: string,
-  data: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'isAdmin'>> & { email?: string | null, isAdmin?: boolean }
+  data: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>> & { email?: string | null }
 ): Promise<User | null> => {
   if (!firestoreDb) {
     console.error("User Service (createOrUpdateUserProfileInFirestore): Firestore DB instance is not available.");
@@ -76,39 +71,36 @@ export const createOrUpdateUserProfileInFirestore = async (
     const now = serverTimestamp();
     let profileToSave: any;
 
+    const baseProfileData = {
+      email: data.email || null,
+      displayName: data.displayName || "User",
+      photoURL: data.photoURL || null,
+      username: data.username || null,
+      role: data.role || "Author",
+      phoneNumber: data.phoneNumber || null,
+      institution: data.institution || null,
+      researcherId: data.researcherId || null,
+      isAdmin: data.isAdmin || false, // Ensure this default is considered
+      ...data, // Spread remaining data to override defaults if present
+    };
+
     if (userSnap.exists()) {
-      // Update existing document
-      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Updating existing profile for ${uid}. Data:`, data);
-      profileToSave = { ...data, updatedAt: now };
-      // Preserve existing createdAt if not provided (shouldn't be in updates)
+      profileToSave = { ...baseProfileData, updatedAt: now };
       if (userSnap.data().createdAt && !profileToSave.createdAt) {
         profileToSave.createdAt = userSnap.data().createdAt;
       }
       await updateDoc(userDocRef, profileToSave);
     } else {
-      // Create new document
-      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Creating new profile for ${uid}. Data:`, data);
       profileToSave = {
-        id: uid, // Ensure id is stored in the document
-        email: data.email || null,
-        displayName: data.displayName || "User",
-        photoURL: data.photoURL || null,
-        username: data.username || null,
-        role: data.role || "Author",
-        phoneNumber: data.phoneNumber || null,
-        institution: data.institution || null,
-        researcherId: data.researcherId || null,
-        isAdmin: data.isAdmin || false, // Default isAdmin to false for new profiles unless specified
+        id: uid,
+        ...baseProfileData,
         createdAt: now,
         updatedAt: now,
-        ...data, // Spread remaining data
       };
       await setDoc(userDocRef, profileToSave);
     }
-    // Fetch the possibly merged/updated document to return consistent data
     const updatedSnap = await getDoc(userDocRef);
     if (updatedSnap.exists()) {
-      // console.log(`User Service (createOrUpdateUserProfileInFirestore): Profile operation successful for ${uid}.`);
       return convertUserTimestamps({ id: updatedSnap.id, ...updatedSnap.data() });
     }
     return null;
@@ -125,14 +117,22 @@ export const getAllUsers = async (): Promise<User[]> => {
     console.error("User Service (getAllUsers): Firestore DB instance is not available.");
     return [];
   }
+  console.log("User Service (getAllUsers): Attempting to fetch all users from Firestore.");
   try {
     const usersRef = collection(firestoreDb, "users");
-    const q = query(usersRef, orderBy("createdAt", "desc")); // Order by creation date, for example
+    const q = query(usersRef, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
-    const users = querySnapshot.docs.map(docSnap => convertUserTimestamps({ id: docSnap.id, ...docSnap.data() }));
+    console.log(`User Service (getAllUsers): Firestore query successful. Found ${querySnapshot.docs.length} user documents.`);
+    if (querySnapshot.empty) {
+        console.warn("User Service (getAllUsers): No user documents found in the 'users' collection.");
+    }
+    const users = querySnapshot.docs.map(docSnap => {
+      // console.log(`User Service (getAllUsers): Processing user doc: ${docSnap.id}`, docSnap.data());
+      return convertUserTimestamps({ id: docSnap.id, ...docSnap.data() });
+    });
     return users;
   } catch (error) {
-    console.error("User Service (getAllUsers): Error fetching all users:", error);
+    console.error("User Service (getAllUsers): Error fetching all users from Firestore:", error);
     return [];
   }
 };
@@ -141,23 +141,22 @@ export const getAllUsers = async (): Promise<User[]> => {
 export const isUsernameTaken = async (username: string, excludeUserId?: string): Promise<boolean> => {
   if (!firestoreDb) {
     console.error("User Service (isUsernameTaken): Firestore DB instance is not available.");
-    return false; // Or throw error, depending on desired handling
+    return false;
   }
   const usersRef = collection(firestoreDb, "users");
   let q = query(usersRef, where("username", "==", username));
   try {
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) {
-      return false; // Username not taken
+      return false;
     }
-    // If excludeUserId is provided, check if the found user is different
     if (excludeUserId) {
       return querySnapshot.docs.some(doc => doc.id !== excludeUserId);
     }
-    return true; // Username taken and no exclusion
+    return true;
   } catch (error) {
     console.error("User Service (isUsernameTaken): Error checking username:", error);
-    return false; // Default to not taken on error to avoid blocking valid signups, or handle error differently
+    return false;
   }
 };
 
@@ -167,22 +166,41 @@ export const isPhoneNumberTaken = async (phoneNumber: string, excludeUserId?: st
     console.error("User Service (isPhoneNumberTaken): Firestore DB instance is not available.");
     return false;
   }
-  if (!phoneNumber) return false; // Empty phone number is not "taken"
+  if (!phoneNumber) return false;
 
   const usersRef = collection(firestoreDb, "users");
   let q = query(usersRef, where("phoneNumber", "==", phoneNumber));
   try {
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) {
-      return false; // Phone number not taken
+      return false;
     }
     if (excludeUserId) {
       return querySnapshot.docs.some(doc => doc.id !== excludeUserId);
     }
-    return true; // Phone number taken
+    return true;
   } catch (error) {
     console.error("User Service (isPhoneNumberTaken): Error checking phone number:", error);
     return false;
+  }
+};
+
+export const toggleUserAdminStatus = async (targetUserId: string, currentIsAdmin: boolean): Promise<void> => {
+  if (!firestoreDb) {
+    console.error("User Service (toggleUserAdminStatus): Firestore DB instance is not available.");
+    throw new Error("Database service unavailable.");
+  }
+  console.log(`User Service (toggleUserAdminStatus): Attempting to set admin status for user ${targetUserId} to ${!currentIsAdmin}.`);
+  const userDocRef = doc(firestoreDb, "users", targetUserId);
+  try {
+    await updateDoc(userDocRef, {
+      isAdmin: !currentIsAdmin,
+      updatedAt: serverTimestamp(),
+    });
+    console.log(`User Service (toggleUserAdminStatus): Successfully updated admin status for user ${targetUserId}.`);
+  } catch (error) {
+    console.error(`User Service (toggleUserAdminStatus): Error updating admin status for user ${targetUserId}:`, error);
+    throw new Error("Failed to update user admin status.");
   }
 };
 
