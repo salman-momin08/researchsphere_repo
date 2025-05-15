@@ -24,7 +24,7 @@ const profileUpdateSchema = z.object({
     .max(20, { message: "Username must be 4-20 characters." })
     .regex(/^[a-zA-Z0-9_]+$/, { message: "Username can only contain letters, numbers, and underscores." }),
   role: z.enum(["Author", "Reviewer"], { required_error: "Please select a role." }),
-  phoneNumber: z.string().optional().or(z.literal("")).refine(val => !val || /^\+?\d[\d\s-]{7,14}$/.test(val), { // Updated regex for more flexibility
+  phoneNumber: z.string().min(1, "Phone number is required.").regex(/^\+?\d[\d\s-]{7,14}$/, {
     message: "Invalid phone number format (e.g., +1-123-456-7890 or +91 9876543210).",
   }),
   institution: z.string().optional().or(z.literal("")).refine(val => !val || val.length >= 2, {
@@ -52,7 +52,6 @@ export default function ProfileUpdateForm() {
     defaultValues: {
       displayName: user?.displayName || "",
       username: user?.username || "",
-      // role: user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined, // Handled by Select defaultValue
       phoneNumber: user?.phoneNumber || "",
       institution: user?.institution || "",
       researcherId: user?.researcherId || "",
@@ -82,7 +81,7 @@ export default function ProfileUpdateForm() {
       setSuccessMessage("Profile updated successfully!");
       toast({ title: "Success", description: "Your profile has been updated." });
       
-      if (isCompletingProfile && data.username && data.role) {
+      if (isCompletingProfile && data.username && data.role && data.phoneNumber) {
         localStorage.removeItem('profileIncomplete');
         localStorage.removeItem('completingProfile');
         setTimeout(() => router.push('/'), 1000); 
@@ -94,7 +93,7 @@ export default function ProfileUpdateForm() {
 
       if (errorMessage !== "Username already taken. Please choose another one." &&
           errorMessage !== "Phone number already in use. Please use a different one.") {
-        toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
+        // toast({ variant: "destructive", title: "Update Failed", description: errorMessage }); // Already handled by specific error state
       }
     } finally {
       setIsSubmitting(false);
@@ -117,39 +116,39 @@ export default function ProfileUpdateForm() {
 
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Reduced space-y */}
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
       {isCompletingProfile && (
-        <Alert variant="default" className="bg-primary/10 border-primary/30 mb-4"> {/* Added mb-4 */}
+        <Alert variant="default" className="bg-primary/10 border-primary/30 mb-4">
             <Info className="h-4 w-4 text-primary" />
             <AlertTitle className="text-primary">Complete Your Profile</AlertTitle>
             <AlertDescription>
-                Welcome! Please fill in the required details (Username and Role) to complete your profile setup.
+                Welcome! Please fill in the required details (Username, Role, and Phone Number) to complete your profile setup.
             </AlertDescription>
         </Alert>
       )}
       {error && (
-        <Alert variant="destructive" className="mb-4"> {/* Added mb-4 */}
+        <Alert variant="destructive" className="mb-4">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Update Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {successMessage && !isCompletingProfile && (
-        <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 mb-4">  {/* Added mb-4 */}
+        <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 mb-4">
             <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
             <AlertTitle>Success!</AlertTitle>
             <AlertDescription className="!text-green-700 dark:!text-green-400">{successMessage}</AlertDescription>
         </Alert>
       )}
       
-      <div className="pt-2"> {/* Added pt-2 for spacing consistency */}
+      <div className="pt-2">
         <Label htmlFor="email">Email Address (Cannot be changed)</Label>
         <Input
           id="email"
           type="email"
           value={user.email || ""}
           disabled
-          className="bg-muted/50 mt-1 h-10" // Ensure consistent height
+          className="bg-muted/50 mt-1 h-10"
         />
       </div>
 
@@ -171,14 +170,14 @@ export default function ProfileUpdateForm() {
       />
       {form.formState.errors.username && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.username.message}</p>}
       
-      <div className="pt-2"> {/* Add pt-2 for consistency */}
+      <div className="pt-2">
         <Label htmlFor="role" className={form.formState.errors.role ? "text-destructive" : ""}>Role *</Label>
         <Select 
             onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", { shouldValidate: true })} 
             defaultValue={user?.role === "Author" || user?.role === "Reviewer" ? user.role : undefined}
             disabled={isSubmitting || authLoading}
         >
-          <SelectTrigger id="role" className="h-10 mt-1"> {/* Ensure consistent height and add mt-1 */}
+          <SelectTrigger id="role" className="h-10 mt-1">
             <SelectValue placeholder="Select your role" />
           </SelectTrigger>
           <SelectContent>
@@ -190,7 +189,7 @@ export default function ProfileUpdateForm() {
       </div>
 
       <AnimatedInput
-        label="Phone Number (Optional)"
+        label="Phone Number *"
         id="phoneNumber" 
         {...form.register("phoneNumber")} 
         disabled={isSubmitting || authLoading}
@@ -214,7 +213,7 @@ export default function ProfileUpdateForm() {
       {form.formState.errors.researcherId && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.researcherId.message}</p>}
 
 
-      <Button type="submit" className="w-full mt-4" disabled={isSubmitting || authLoading}> {/* Add mt-4 */}
+      <Button type="submit" className="w-full mt-4" disabled={isSubmitting || authLoading}>
         {isSubmitting ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : null}
