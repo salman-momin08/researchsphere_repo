@@ -22,12 +22,9 @@ function SearchPapersContent() {
   const [searchResults, setSearchResults] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-
-  useEffect(() => {
-    // Optional: Load all published papers initially or on empty search term
-  }, []);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -38,28 +35,34 @@ function SearchPapersContent() {
       });
       setSearchResults([]);
       setHasSearched(true);
+      setSearchError(null);
       return;
     }
     setIsLoading(true);
     setHasSearched(true);
     setSearchResults([]);
+    setSearchError(null);
+
+    console.log(`SearchPapers: Initiating search for author: "${searchTerm}"`);
 
     try {
       const publishedPapers = await getPublishedPapers();
+      console.log(`SearchPapers: Fetched ${publishedPapers.length} published papers from service.`);
+      
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      // Client-side filtering for author name (case-insensitive, partial match)
-      // This supports searching for one author even if multiple are listed.
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
+      console.log(`SearchPapers: Found ${results.length} papers matching author "${searchTerm}".`);
       setSearchResults(results);
-    } catch (error: any)
-     {
-      // console.error("SearchPapers: Error fetching/filtering papers:", error);
+    } catch (error: any) {
+      console.error("SearchPapers: Error fetching/filtering papers:", error);
+      const errorMessage = error.message || "Could not retrieve or filter papers. Please try again.";
+      setSearchError(errorMessage);
       toast({
         variant: "destructive",
         title: "Search Error",
-        description: error.message || "Could not retrieve or filter papers. Please try again.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -68,7 +71,7 @@ function SearchPapersContent() {
 
   const handleDownloadOriginalPaper = (paper: Paper) => {
     if (paper.fileUrl) {
-        // console.log("File URL:", paper.fileUrl);
+        console.log("SearchPapers: Opening original file URL:", paper.fileUrl);
         window.open(paper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {
@@ -150,7 +153,15 @@ function SearchPapersContent() {
             </div>
           )}
 
-          {!isLoading && hasSearched && searchResults.length === 0 && (
+          {!isLoading && searchError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Search Failed</AlertTitle>
+              <AlertDescription>{searchError}</AlertDescription>
+            </Alert>
+          )}
+
+          {!isLoading && !searchError && hasSearched && searchResults.length === 0 && (
             <Alert variant="default" className="bg-secondary/50">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>No Results Found</AlertTitle>
@@ -160,7 +171,7 @@ function SearchPapersContent() {
             </Alert>
           )}
 
-          {!isLoading && searchResults.length > 0 && (
+          {!isLoading && !searchError && searchResults.length > 0 && (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -200,7 +211,7 @@ function SearchPapersContent() {
               </Table>
             </div>
           )}
-           {!isLoading && !hasSearched && (
+           {!isLoading && !hasSearched && !searchError && (
             <Alert>
                 <SearchIcon className="h-4 w-4" />
                 <AlertTitle>Search Published Papers</AlertTitle>
@@ -216,6 +227,7 @@ function SearchPapersContent() {
 }
 
 export default function SearchPapersPage() {
+  // This page is now public, so no ProtectedRoute needed here
   return <SearchPapersContent />;
 }
 
