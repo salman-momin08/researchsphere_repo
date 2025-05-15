@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AnimatedInput } from "@/components/ui/AnimatedInput"; // Changed to AnimatedInput
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import Image from "next/image";
 const contactFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
-  subject: z.string().optional(),
+  subject: z.string().min(1, { message: "Subject is required." }), // Made subject mandatory
   message: z.string().min(10, { message: "Message must be at least 10 characters." }),
 });
 
@@ -42,7 +42,7 @@ const contactPersons: ContactPerson[] = [
     designation: "General Inquiries Lead",
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
-    imageUrl: "https://picsum.photos/seed/eleanor/100/100",
+    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
     dataAiHint: "support woman"
   },
   {
@@ -51,7 +51,7 @@ const contactPersons: ContactPerson[] = [
     designation: "Technical Support Head",
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
-    imageUrl: "https://picsum.photos/seed/samuelfinch/100/100",
+    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
     dataAiHint: "support man"
   },
   {
@@ -59,18 +59,16 @@ const contactPersons: ContactPerson[] = [
     name: "Ms. Clara Dubois",
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
-    // No phone
-    imageUrl: "https://picsum.photos/seed/clara/100/100",
+    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
     dataAiHint: "coordinator woman"
   },
   {
-    id: "4", // New unique ID for the contactPersons array
+    id: "4", 
     name: "Dr. Evelyn Reed",
-    designation: "Conference Chair (Key Committee Liaison)", // Combining title and indicating role
-    email: "evelyn.r.committee@researchsphere.com", // Placeholder email
-    // phone is optional and not provided here as it's not in committee data
-    imageUrl: "https://picsum.photos/seed/evelyn/100/100", // From original committee data for Dr. Evelyn Reed
-    dataAiHint: "scientist woman" // From original committee data
+    designation: "Conference Chair (Key Committee Liaison)", 
+    email: "evelyn.r.committee@researchsphere.com", 
+    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
+    dataAiHint: "scientist woman" 
   }
 ];
 
@@ -92,7 +90,7 @@ export default function ContactUsPage() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsLoading(true);
     setIsSuccess(false);
-    console.log("Contact form data:", data); // In a real app, send this data to a backend
+    console.log("Contact form data:", data); 
 
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -119,10 +117,9 @@ export default function ContactUsPage() {
           </p>
         </header>
 
-        {/* Contact Persons Section */}
         <section className="mb-12 md:mb-16">
           <h2 className="text-3xl font-semibold text-center mb-10">Meet Our Support Team</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8"> {/* Changed lg:grid-cols-3 to lg:grid-cols-4 */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactPersons.map((person) => (
               <Card key={person.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
                 <CardHeader className="items-center text-center">
@@ -164,7 +161,6 @@ export default function ContactUsPage() {
           </div>
         </section>
 
-        {/* Contact Form Section */}
         <Card className="w-full max-w-lg mx-auto shadow-xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold tracking-tight">Send Us a Message</CardTitle>
@@ -182,59 +178,54 @@ export default function ContactUsPage() {
                 </AlertDescription>
               </Alert>
             ) : (
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div>
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    placeholder="John Doe"
-                    {...form.register("fullName")}
-                    disabled={isLoading}
-                  />
-                  {form.formState.errors.fullName && (
-                    <p className="text-sm text-destructive mt-1">{form.formState.errors.fullName.message}</p>
-                  )}
-                </div>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Adjusted space-y */}
+                <AnimatedInput
+                  label="Full Name *"
+                  id="fullName"
+                  {...form.register("fullName")}
+                  disabled={isLoading}
+                />
+                {form.formState.errors.fullName && (
+                  <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.fullName.message}</p>
+                )}
 
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    {...form.register("email")}
-                    disabled={isLoading}
-                  />
-                  {form.formState.errors.email && (
-                    <p className="text-sm text-destructive mt-1">{form.formState.errors.email.message}</p>
-                  )}
-                </div>
+                <AnimatedInput
+                  label="Email Address *"
+                  id="email"
+                  type="email"
+                  {...form.register("email")}
+                  disabled={isLoading}
+                />
+                {form.formState.errors.email && (
+                  <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.email.message}</p>
+                )}
 
-                <div>
-                  <Label htmlFor="subject">Subject (Optional)</Label>
-                  <Input
-                    id="subject"
-                    placeholder="Inquiry about..."
-                    {...form.register("subject")}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="message">Message</Label>
+                <AnimatedInput
+                  label="Subject *" 
+                  id="subject"
+                  {...form.register("subject")}
+                  disabled={isLoading}
+                />
+                {form.formState.errors.subject && (
+                  <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.subject.message}</p>
+                )}
+                
+                <div className="pt-2"> {/* Added pt-2 for spacing consistency with AnimatedInput */}
+                  <Label htmlFor="message" className={form.formState.errors.message ? "text-destructive" : ""}>Message *</Label>
                   <Textarea
                     id="message"
                     placeholder="Your message here..."
                     rows={5}
                     {...form.register("message")}
                     disabled={isLoading}
+                    className="mt-1"
                   />
                   {form.formState.errors.message && (
                     <p className="text-sm text-destructive mt-1">{form.formState.errors.message.message}</p>
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full mt-4" disabled={isLoading}>
                   {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -250,4 +241,3 @@ export default function ContactUsPage() {
     </div>
   );
 }
-
