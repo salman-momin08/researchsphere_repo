@@ -7,8 +7,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import LoginModal from '@/components/auth/LoginModal';
-import React, { Suspense } from 'react'; // Import Suspense and React
-import LoadingSpinner from '@/components/shared/LoadingSpinner'; // Assuming you have a loading spinner
+import React, { Suspense } from 'react'; 
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -27,16 +27,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="antialiased flex flex-col min-h-screen">
-        <AuthProvider>
-          <Header />
-          <Suspense fallback={<div className="flex-grow flex items-center justify-center"><LoadingSpinner size={48} /></div>}>
-            <main className="flex-grow">{children}</main>
-          </Suspense>
-          <LoginModal />
-          <Footer />
-          <Toaster />
-        </AuthProvider>
+      <body>
+        <Suspense fallback={<div className="flex-grow flex items-center justify-center min-h-screen"><LoadingSpinner size={48} /></div>}>
+          <AuthProvider>
+            <div className="antialiased flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">{children}</main>
+              <LoginModal />
+              <Footer />
+              <Toaster />
+            </div>
+          </AuthProvider>
+        </Suspense>
       </body>
     </html>
   );
