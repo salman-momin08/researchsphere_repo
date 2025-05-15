@@ -4,7 +4,7 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute"; // Already wraps AdminLayout
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info } from "lucide-react"; // Renamed FileText to FileTextIcon
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info, LayoutDashboard } from "lucide-react"; // Renamed FileText to FileTextIcon, Added LayoutDashboard
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
