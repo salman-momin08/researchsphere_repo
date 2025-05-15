@@ -1,18 +1,26 @@
 
-"use client";
+"use client"; // Add this to use client-side hooks
 
 import Link from 'next/link';
 import { BookOpenText } from 'lucide-react';
+import { usePathname } from 'next/navigation'; // Import usePathname
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 export default function Footer() {
+  const pathname = usePathname();
+  const isAdminPage = pathname.startsWith('/admin');
+
   return (
-    <footer className="border-t bg-secondary/50">
+    <footer className={cn(
+      "border-t bg-secondary/50",
+      isAdminPage && "md:ml-64" // Add left margin on medium screens and up if it's an admin page
+    )}>
       <div className="container px-6 py-8 flex flex-col md:flex-row justify-between items-center">
         <div className="flex items-center gap-2 mb-4 md:mb-0">
           <BookOpenText className="h-5 w-5 text-primary" />
           <span className="text-md font-semibold">ResearchSphere</span>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground text-center md:text-left">
           &copy; {new Date().getFullYear()} ResearchSphere. All rights reserved.
         </p>
         <div className="flex space-x-4 mt-4 md:mt-0">
@@ -29,9 +37,10 @@ export default function Footer() {
 }
 
 // Create dummy pages for terms and privacy to avoid 404s for links in footer
+// These can remain Server Components if they don't use client hooks
 export function TermsPage() {
   return (
-    <div className="container py-12 px-4 md:px-6"> {/* Added padding for consistency */}
+    <div className="container py-12 px-4 md:px-6">
       <h1 className="text-3xl font-bold mb-4">Terms of Service</h1>
       <p>Placeholder for Terms of Service content. Please replace this with your actual terms.</p>
       <h2 className="text-2xl font-semibold mt-6 mb-2">1. Acceptance of Terms</h2>
@@ -50,7 +59,7 @@ export function TermsPage() {
 
 export function PrivacyPage() {
   return (
-    <div className="container py-12 px-4 md:px-6"> {/* Added padding for consistency */}
+    <div className="container py-12 px-4 md:px-6">
       <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
       <p>Placeholder for Privacy Policy content. Please replace this with your actual privacy policy.</p>
       <h2 className="text-2xl font-semibold mt-6 mb-2">1. Information We Collect</h2>
