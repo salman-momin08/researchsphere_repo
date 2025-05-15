@@ -3,46 +3,46 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service'; // Re-use the existing service
+import { getAllUsers } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldCheck, UserCheck, AlertTriangle } from 'lucide-react'; // UserCheck for admins
+import { Eye, UserCircle, AlertTriangle } from 'lucide-react'; // Eye for Reviewers
 import { toast } from '@/hooks/use-toast';
 
-export default function RegisteredAdminsPage() {
-  const [adminUsers, setAdminUsers] = useState<User[]>([]);
+export default function ReviewerManagementPage() {
+  const [reviewerUsers, setReviewerUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchAdminUsers = async () => {
+    const fetchReviewerUsers = async () => {
       setIsLoading(true);
       setError(null);
-      console.log("RegisteredAdminsPage: Fetching all users to filter for admins...");
+      console.log("ReviewerManagementPage: Fetching all users to filter for reviewers...");
       try {
         const allUsers = await getAllUsers();
-        const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
-        console.log(`RegisteredAdminsPage: Found ${filteredAdmins.length} admin users.`);
-        setAdminUsers(filteredAdmins);
+        const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
+        console.log(`ReviewerManagementPage: Found ${filteredReviewers.length} reviewer users.`);
+        setReviewerUsers(filteredReviewers);
       } catch (err: any) {
-        console.error("RegisteredAdminsPage: Error fetching users:", err);
-        setError(err.message || "Failed to load admin users.");
-        toast({ variant: "destructive", title: "Error Loading Admins", description: err.message });
+        console.error("ReviewerManagementPage: Error fetching users:", err);
+        setError(err.message || "Failed to load reviewer users.");
+        toast({ variant: "destructive", title: "Error Loading Reviewers", description: err.message });
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchAdminUsers();
+    fetchReviewerUsers();
   }, []);
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <LoadingSpinner size={32} /> <p className="ml-2">Loading registered admins...</p>
+        <LoadingSpinner size={32} /> <p className="ml-2">Loading registered reviewers...</p>
       </div>
     );
   }
@@ -62,37 +62,33 @@ export default function RegisteredAdminsPage() {
       <Card className="shadow-lg w-full"> {/* Ensure card takes full width */}
         <CardHeader>
           <div className="flex items-center gap-2">
-            <UserCheck className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl">Registered Administrators</CardTitle>
+            <Eye className="h-6 w-6 text-primary" />
+            <CardTitle className="text-2xl">Reviewer Management</CardTitle>
           </div>
-          <CardDescription>View all users with administrative privileges on the platform. ({adminUsers.length} admins found)</CardDescription>
+          <CardDescription>View all users registered with the &quot;Reviewer&quot; role. ({reviewerUsers.length} reviewers found)</CardDescription>
         </CardHeader>
         <CardContent>
-          {adminUsers.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No administrators found.</p>
+          {reviewerUsers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">No reviewers found with the &quot;Reviewer&quot; role.</p>
           ) : (
-            <div className="overflow-x-auto"> {/* Added for responsiveness */}
+            <div className="overflow-x-auto"> {/* Added for responsiveness on smaller screens */}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Display Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Username</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>Institution</TableHead>
                     <TableHead>Joined</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminUsers.map((user) => (
+                  {reviewerUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                       <TableCell>{user.email || 'N/A'}</TableCell>
                       <TableCell>{user.username || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge variant={"default"} className="bg-green-600 hover:bg-green-700">
-                           <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {user.role || 'Admin'}
-                        </Badge>
-                      </TableCell>
+                      <TableCell>{user.institution || 'N/A'}</TableCell>
                       <TableCell>{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
                     </TableRow>
                   ))}

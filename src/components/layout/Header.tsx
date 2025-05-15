@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from '@/hooks/use-auth';
-import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIconLucide, FileText as FileTextIconLucide, Phone, Shield, UserCheck } from 'lucide-react'; // Added UsersIconLucide
+import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkles, Menu, Settings, Search as SearchIcon, Users as UsersIconLucide, FileText as FileTextIconLucide, Phone, Shield, UserCheck, Eye } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -140,10 +140,15 @@ export default function Header() {
     { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
-    // Admins might still want to see contact page or templates for reference
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact Us", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
+
+  const adminSidebarLinks = [ // For mobile menu when admin is logged in
+      { href: "/admin/dashboard", label: "Dashboard Overview", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
+      { href: "/admin/users", label: "User Management", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
+      { href: "/admin/registered-admins", label: "Registered Admins", icon: <UserCheck className="mr-2 h-4 w-4" /> },
+      { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye className="mr-2 h-4 w-4" /> }, // New reviewer link
+  ];
+
 
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
@@ -166,7 +171,7 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
-            const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'));
+            const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') && !pathname.startsWith('/admin/reviewers') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'));
             
             let buttonClasses = "";
 
@@ -292,7 +297,7 @@ export default function Header() {
                       else if (link.href) router.push(link.href);
                       setIsMobileMenuOpen(false);
                     }}
-                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'))}
+                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') && !pathname.startsWith('/admin/reviewers')) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'))}
                     isAction={!!link.action}
                     icon={link.icon}
                     isAdminContext={!!(user && isAdmin)}
@@ -303,12 +308,19 @@ export default function Header() {
                 
                 {isClient && user && isAdmin && (
                   <>
-                     <NavLinkItem href="/admin/users" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/users")} icon={<UsersIconLucide className="mr-2 h-4 w-4" />} isAdminContext={true}>
-                       User Management
-                     </NavLinkItem>
-                     <NavLinkItem href="/admin/registered-admins" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/admin/registered-admins")} icon={<UserCheck className="mr-2 h-4 w-4" />} isAdminContext={true}>
-                       Registered Admins
-                     </NavLinkItem>
+                     <DropdownMenuSeparator className="my-2" />
+                     {adminSidebarLinks.map(link => (
+                         <NavLinkItem 
+                            key={link.href} 
+                            href={link.href} 
+                            onClick={() => {router.push(link.href); setIsMobileMenuOpen(false);}} 
+                            isActive={pathname.startsWith(link.href)} 
+                            icon={link.icon} 
+                            isAdminContext={true}
+                        >
+                           {link.label}
+                         </NavLinkItem>
+                     ))}
                   </>
                 )}
                 
@@ -350,4 +362,3 @@ export default function Header() {
     </header>
   );
 }
-
