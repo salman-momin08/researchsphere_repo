@@ -56,8 +56,10 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to fetch user profile from Firestore
 const fetchUserProfileFromFirestore = async (uid: string): Promise<User | null> => {
   if (!firestoreDb) {
+    // console.warn("AuthContext (fetchUserProfileFromFirestore): Firestore DB instance is not available.");
     return null;
   }
   const userDocRef = doc(firestoreDb, "users", uid);
@@ -67,7 +69,7 @@ const fetchUserProfileFromFirestore = async (uid: string): Promise<User | null> 
       const docData = userSnap.data();
       const firestoreIsAdmin = docData.isAdmin;
       // console.log(`AuthContext (fetchUserProfileFromFirestore): Raw isAdmin from Firestore for ${uid}:`, firestoreIsAdmin, `(type: ${typeof firestoreIsAdmin})`);
-      const determinedIsAdmin = firestoreIsAdmin === true; // Strict boolean check
+      const determinedIsAdmin = firestoreIsAdmin === true;
 
       return {
         id: userSnap.id,
@@ -84,60 +86,63 @@ const fetchUserProfileFromFirestore = async (uid: string): Promise<User | null> 
         updatedAt: docData.updatedAt instanceof Timestamp ? docData.updatedAt.toDate().toISOString() : docData.updatedAt,
       };
     } else {
+      // console.warn(`AuthContext (fetchUserProfileFromFirestore): No user document found for UID ${uid}. This is normal for a new user.`);
       return null;
     }
   } catch (error: any) {
+    console.error(`AuthContext (fetchUserProfileFromFirestore): Error fetching profile for UID ${uid}:`, error);
     toast({ variant: "destructive", title: "Profile Load Error", description: `Could not load your profile from Firestore: ${error.message}`, duration: 7000 });
     return null;
   }
 };
 
+// Helper to create or update user profile in Firestore
 const createOrUpdateUserProfileInFirestore = async (
   firebaseUid: string,
   firebaseUserObject: FirebaseUser,
   profileData?: Partial<SignupFormValues & { isSocialSignIn?: boolean }>
 ): Promise<User | null> => {
   if (!firestoreDb) {
+    // console.warn("AuthContext (createOrUpdateUserProfileInFirestore): Firestore DB instance is not available.");
     return null;
   }
   const userDocRef = doc(firestoreDb, "users", firebaseUid);
   try {
     const userSnap = await getDoc(userDocRef);
     const nowServerTimestamp = serverTimestamp();
-
     const isCreatorAdminByEmail = firebaseUserObject.email === ADMIN_CREATOR_EMAIL || firebaseUserObject.email === MOCK_ADMIN_EMAIL;
 
     let baseData: Partial<User> = {
-      id: firebaseUid, // ensure id is always set
+      id: firebaseUid,
       email: firebaseUserObject.email,
-      displayName: profileData?.fullName || firebaseUserObject.displayName || (profileData?.isSocialSignIn ? firebaseUserObject.email?.split('@')[0] : null) || "User",
+      displayName: profileData?.fullName || firebaseUserObject.displayName || (profileData?.isSocialSignIn && firebaseUserObject.email ? firebaseUserObject.email.split('@')[0] : null) || "User",
       photoURL: firebaseUserObject.photoURL || null,
       username: profileData?.username || null,
-      role: profileData?.role || (isCreatorAdminByEmail ? "Admin" : (profileData?.isSocialSignIn ? "Author" : null)) || "Author",
+      role: profileData?.role || (isCreatorAdminByEmail ? "Admin" : (profileData?.isSocialSignIn ? "Author" : "Author")), // Default to Author
       phoneNumber: profileData?.phoneNumber || null,
       institution: profileData?.institution || null,
       researcherId: profileData?.researcherId || null,
-      isAdmin: isCreatorAdminByEmail || false, // Default isAdmin
+      isAdmin: isCreatorAdminByEmail || false,
     };
 
-    let dataToSave: Partial<User> & { updatedAt: any; createdAt?: any };
+    let dataToSave: Partial<User> & { updatedAt: any; createdAt?: any; userId?: string; };
 
     if (userSnap.exists()) {
       const existingData = userSnap.data() as User;
       dataToSave = {
-        ...existingData, // Keep existing data
-        ...baseData,     // Override with new base data
+        ...existingData,
+        ...baseData,
         updatedAt: nowServerTimestamp,
       };
-      // Preserve isAdmin if it was already true and not being set by creator email
       if (existingData.isAdmin === true && !isCreatorAdminByEmail) {
         dataToSave.isAdmin = true;
       }
-       if (existingData.createdAt && !dataToSave.createdAt) { // Preserve original creation timestamp
-          dataToSave.createdAt = existingData.createdAt;
+      if (existingData.createdAt && !dataToSave.createdAt) {
+        dataToSave.createdAt = existingData.createdAt;
       }
     } else {
       dataToSave = {
+        userId: firebaseUid, // Ensure userId field is present for new docs
         ...baseData,
         createdAt: nowServerTimestamp,
         updatedAt: nowServerTimestamp,
@@ -146,6 +151,7 @@ const createOrUpdateUserProfileInFirestore = async (
     await setDoc(userDocRef, dataToSave, { merge: true });
     return fetchUserProfileFromFirestore(firebaseUid);
   } catch (error: any) {
+    console.error(`AuthContext (createOrUpdateUserProfileInFirestore): Error for UID ${firebaseUid}:`, error);
     toast({ variant: "destructive", title: "Profile Sync Error", description: `Could not save your profile to Firestore: ${error.message}`, duration: 7000 });
     return null;
   }
@@ -165,33 +171,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // This effect runs when Firebase Auth state might change or when navigating client-side
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !firebaseAuth) {
       setLoading(false);
       return;
+    }
+    if (!firestoreDb) {
+      // console.warn("AuthContext: Firestore DB instance is not available in useEffect. Client-side features relying on Firestore for user profiles may be limited.");
+      // setLoading(false); // still set loading false so app doesn't hang
+      // return;
     }
 
-    if (!firebaseAuth || !firestoreDb) {
-      setLoading(false);
-      return;
-    }
+    // console.log("AuthContext: Running onAuthStateChanged useEffect. Pathname:", pathname);
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser: FirebaseUser | null) => {
+      // console.log("AuthContext: onAuthStateChanged triggered. FirebaseUser:", firebaseUser ? firebaseUser.uid : null);
       if (firebaseUser) {
         let appUser = await fetchUserProfileFromFirestore(firebaseUser.uid);
 
-        if (!appUser) { // User authenticated with Firebase but no Firestore profile
+        if (!appUser) { // User authenticated with Firebase but no Firestore profile yet
+          // console.log(`AuthContext: No Firestore profile for ${firebaseUser.uid}, creating one.`);
           appUser = await createOrUpdateUserProfileInFirestore(firebaseUser.uid, firebaseUser, { isSocialSignIn: true });
-        } else { // User profile exists, ensure isAdmin logic is correct
+        } else {
+          // Profile exists, ensure isAdmin logic is correct
           const isAdminByEmail = firebaseUser.email === MOCK_ADMIN_EMAIL || firebaseUser.email === ADMIN_CREATOR_EMAIL;
           const rawIsAdminFromProfile = appUser.isAdmin;
           const finalIsAdmin = isAdminByEmail || (rawIsAdminFromProfile === true);
 
           if (appUser.isAdmin !== finalIsAdmin) {
-            appUser.isAdmin = finalIsAdmin;
+            // console.log(`AuthContext: Correcting isAdmin for ${firebaseUser.uid}. Was: ${appUser.isAdmin}, Now: ${finalIsAdmin}`);
+            appUser.isAdmin = finalIsAdmin; // Correct the local appUser object
           }
         }
 
         if (appUser) {
+          // console.log("AuthContext: Hydrated appUser:", appUser);
           setUser(appUser);
           setShowLoginModal(false);
 
@@ -207,35 +220,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const isCompletingProfilePage = pathname === '/profile/settings' && searchParamsFromHook?.get('complete') === 'true';
 
           if (!isProfileConsideredComplete && !isCompletingProfilePage) {
+            // console.log("AuthContext: Profile incomplete, redirecting to settings.");
             if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
             router.push('/profile/settings?complete=true');
           } else {
-            if (isProfileConsideredComplete && completingProfileFlag === 'true' && typeof window !== 'undefined') {
+            if (isProfileConsideredComplete && typeof window !== 'undefined' && completingProfileFlag === 'true') {
               localStorage.removeItem('completingProfile');
             }
 
+            // console.log(`AuthContext (Redirection Logic): Pathname: ${pathname}, redirectAfterLoginPath: ${redirectAfterLoginPath}, isAdmin: ${appUser.isAdmin}`);
+
             if (redirectAfterLoginPath) {
+              // console.log(`AuthContext: redirectAfterLoginPath found: ${redirectAfterLoginPath}. Redirecting.`);
               router.push(redirectAfterLoginPath);
               if (typeof window !== 'undefined') localStorage.removeItem('redirectAfterLogin');
             } else if (appUser.isAdmin) {
-              const onNonAdminEntryPoint = ['/login', '/signup', '/', '/profile/settings'].some(p => pathname.startsWith(p));
-              // Only redirect to /admin/dashboard if they are on a non-admin entry point AND not already on an admin page.
-              if (onNonAdminEntryPoint && !pathname.startsWith('/admin/')) {
+              const onNonAdminEntryPoint = ['/login', '/signup', '/', '/profile/settings'].includes(pathname) || (pathname === '/profile/settings' && isCompletingProfilePage);
+              const isAlreadyOnAdminDashboard = pathname === '/admin/dashboard';
+              const isCurrentlyOnAnyAdminPage = pathname.startsWith('/admin/');
+
+              // console.log(`AuthContext (Admin Redirection): onNonAdminEntryPoint: ${onNonAdminEntryPoint}, isAlreadyOnAdminDashboard: ${isAlreadyOnAdminDashboard}, isCurrentlyOnAnyAdminPage: ${isCurrentlyOnAnyAdminPage}`);
+
+              if (onNonAdminEntryPoint && !isAlreadyOnAdminDashboard) {
+                // Admin logged in from a non-admin page or just completed profile
+                // console.log("AuthContext: Admin on non-admin entry or finished profile, redirecting to /admin/dashboard.");
+                router.push('/admin/dashboard');
+              } else if (!isCurrentlyOnAnyAdminPage && !onNonAdminEntryPoint) {
+                // Admin is logged in, not on an admin page, and not on an entry point (e.g., manually typed a non-admin URL)
+                // console.log("AuthContext: Admin on a general non-admin page, redirecting to /admin/dashboard.");
                 router.push('/admin/dashboard');
               }
-              // If already on an admin page, or on a non-entry page, do not redirect.
+              // If isCurrentlyOnAnyAdminPage is true, AND onNonAdminEntryPoint is false, AND redirectAfterLoginPath is null, then DO NOTHING.
+              // This means the admin is navigating within admin pages.
             } else { // Not an admin
               const onAuthPage = pathname === '/login' || pathname === '/signup';
-              if ((onAuthPage || isCompletingProfilePage) && pathname !== '/') {
-                 router.push('/');
+              if ((onAuthPage || (pathname === '/profile/settings' && isCompletingProfilePage)) && pathname !== '/') {
+                // console.log("AuthContext: Non-admin finished auth/profile, redirecting to /.");
+                router.push('/');
               }
             }
           }
-        } else { // Failed to fetch/create appUser from Firestore
-          if (firebaseAuth) await signOut(firebaseAuth);
+        } else {
+          // console.error("AuthContext: Failed to fetch or create user profile in Firestore after Firebase auth. Logging out.");
+          if (firebaseAuth) await signOut(firebaseAuth); 
           setUser(null);
         }
-      } else { // firebaseUser is null (not logged in or logged out)
+      } else { // firebaseUser is null
+        // console.log("AuthContext: No Firebase user. Setting appUser to null.");
         setUser(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('redirectAfterLogin');
@@ -247,9 +278,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => {
+      // console.log("AuthContext: Unsubscribing from onAuthStateChanged.");
       unsubscribe();
     };
-  }, [pathname, router, searchParamsFromHook]); // Dependency on pathname and router will cause re-run on navigation
+  }, [pathname, router, searchParamsFromHook]);
 
 
   const login = async (identifier: string, pass: string) => {
@@ -262,6 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let emailToLogin = identifier;
 
     if (!identifier.includes('@')) {
+      // console.log(`AuthContext (login): Identifier '${identifier}' treated as username. Looking up email in Firestore...`);
       const usersRef = collection(firestoreDb, "users");
       const q = query(usersRef, where("username", "==", identifier));
       try {
@@ -270,26 +303,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userDoc = querySnapshot.docs[0].data();
           if (userDoc.email) {
             emailToLogin = userDoc.email;
+            // console.log(`AuthContext (login): Found email '${emailToLogin}' for username '${identifier}'.`);
           } else {
             setLoading(false);
             const errorMsg = `User profile incomplete for username '${identifier}'. Cannot resolve email.`;
+            // console.error("AuthContext (login):", errorMsg);
             toast({ variant: "destructive", title: "Login Failed", description: errorMsg });
             throw new Error(errorMsg);
           }
         } else {
           setLoading(false);
           const errorMsg = `User not found with username '${identifier}'.`;
-          toast({ variant: "destructive", title: "Login Failed", description: errorMsg });
-          throw new Error(errorMsg);
+          // console.warn("AuthContext (login):", errorMsg);
+          toast({ variant: "destructive", title: "Login Failed", description: "Invalid email/username or password." });
+          throw new Error("Invalid email/username or password.");
         }
       } catch (dbError: any) {
         setLoading(false);
         const errorMsg = `Error during username lookup: ${dbError.message}.`;
+        // console.error("AuthContext (login):", errorMsg, dbError);
         toast({ variant: "destructive", title: "Login Failed", description: errorMsg });
         throw new Error(errorMsg);
       }
     }
-
+    // console.log(`AuthContext (login): Calling Firebase signInWithEmailAndPassword with resolved email: '${emailToLogin}'`);
     try {
       await signInWithEmailAndPassword(firebaseAuth, emailToLogin, pass);
       // onAuthStateChanged will handle setting user and redirecting
@@ -315,6 +352,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             errorMessage = firebaseError.message || errorMessage;
         }
       }
+      // console.error("AuthContext (login): Firebase login error:", errorMessage, firebaseError);
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
       throw new Error(errorMessage);
     }
@@ -339,12 +377,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(errorMsg);
       }
     }
-    if (data.phoneNumber) {
+     if (data.phoneNumber) { // Check only if phone number is provided
         const qPhone = query(usersRef, where("phoneNumber", "==", data.phoneNumber));
         const phoneSnap = await getDocs(qPhone);
         if (!phoneSnap.empty) {
             setLoading(false);
-            const errorMsg = "Phone number is already in use. Please use a different one.";
+            const errorMsg = "Phone number already in use. Please use a different one.";
             toast({ variant: "destructive", title: "Signup Failed", description: errorMsg });
             throw new Error(errorMsg);
         }
@@ -370,10 +408,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (firebaseUser) {
       try {
         await updateFirebaseProfile(firebaseUser, { displayName: data.fullName });
-        // onAuthStateChanged will handle Firestore profile creation and redirect
+        await createOrUpdateUserProfileInFirestore(firebaseUser.uid, firebaseUser, data);
+        // onAuthStateChanged will pick up the new user from Firebase Auth
+        // and then fetch/confirm the Firestore profile, then redirect.
       } catch (profileError: any) {
-        // This specific error toast is fine here as it's post-Firebase Auth user creation
-        toast({ variant: "destructive", title: "Signup Incomplete", description: `Account created, but initial profile setup had an issue: ${profileError.message}. Please try updating your profile.`, duration: 10000 });
+        // console.error("AuthContext (signup): Error setting up Firestore profile or Firebase profile display name:", profileError);
+        toast({ variant: "destructive", title: "Signup Incomplete", description: `Account created, but profile setup had an issue: ${profileError.message}. Please try updating your profile.`, duration: 10000 });
+        // Still let onAuthStateChanged handle the user state
       }
     }
   };
@@ -387,7 +428,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       toast({variant: "destructive", title: "Logout Failed", description: error.message || "Could not log out."});
     } finally {
-      setLoading(false); // Ensure loading is set to false even if signOut itself doesn't trigger onAuthStateChanged immediately
+      setLoading(false);
     }
   };
 
@@ -404,11 +445,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
           toastTitle = `${providerName} Sign-In Cancelled`;
-          toastMessage = `The ${providerName} sign-in popup was closed. Please ensure popups are allowed and try again.`;
+          toastMessage = `The ${providerName} sign-in popup was closed before completing. Please ensure popups are allowed and try again. If the issue persists, your browser might be blocking them or there could be a network interruption.`;
            toast({
             title: toastTitle,
             description: toastMessage,
-            duration: 7000,
+            duration: 15000, 
           });
           return;
         case 'auth/account-exists-with-different-credential':
@@ -438,12 +479,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setActiveSocialLoginProvider(providerName);
     try {
-      await signInWithPopup(firebaseAuth, providerInstance);
-      // onAuthStateChanged will handle setting user and redirecting
+      const result = await signInWithPopup(firebaseAuth, providerInstance);
+      // onAuthStateChanged will handle creating/fetching Firestore profile for result.user
+      // and then redirecting appropriately.
     } catch (error) {
       handleSocialLoginError(error, providerName);
     }
-    // setActiveSocialLoginProvider(null) is handled by onAuthStateChanged finally block
+    // setActiveSocialLoginProvider(null) is now handled in the main onAuthStateChanged finally block
   };
 
   const loginWithGoogle = () => processSocialLogin(googleAuthCredentialProvider, "google");
@@ -465,6 +507,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocRef = doc(firestoreDb, "users", user.id);
       const usersRef = collection(firestoreDb, "users");
 
+      // Username Uniqueness Check
       if (updatedData.username && updatedData.username !== user.username) {
         const qUsername = query(usersRef, where("username", "==", updatedData.username));
         const usernameSnap = await getDocs(qUsername);
@@ -474,39 +517,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           throw new Error("Username already taken. Please choose another one.");
         }
       }
-      if (updatedData.phoneNumber && updatedData.phoneNumber !== user.phoneNumber) {
-        if(updatedData.phoneNumber.trim() !== "") { // Only check if phone number is provided and changed
-            const qPhone = query(usersRef, where("phoneNumber", "==", updatedData.phoneNumber));
-            const phoneSnap = await getDocs(qPhone);
-            const conflictingUser = phoneSnap.docs.find(docSnap => docSnap.id !== user.id);
-            if (conflictingUser) {
-                setLoading(false);
-                throw new Error("Phone number already in use. Please use a different one.");
-            }
+      // Phone Number Uniqueness Check (only if provided and changed)
+      if (updatedData.phoneNumber && updatedData.phoneNumber.trim() !== "" && updatedData.phoneNumber !== user.phoneNumber) {
+        const qPhone = query(usersRef, where("phoneNumber", "==", updatedData.phoneNumber));
+        const phoneSnap = await getDocs(qPhone);
+        const conflictingUser = phoneSnap.docs.find(docSnap => docSnap.id !== user.id);
+        if (conflictingUser) {
+          setLoading(false);
+          throw new Error("Phone number already in use. Please use a different one.");
         }
       }
 
-      const updatePayloadFS: Partial<User> & {updatedAt: any} = { ...updatedData, updatedAt: serverTimestamp() };
-      delete (updatePayloadFS as any).isAdmin; // Ensure isAdmin cannot be updated this way
 
-      // Update Firebase Auth profile if displayName or photoURL changed
+      const updatePayloadFS: Partial<User> & {updatedAt: any} = { ...updatedData, updatedAt: serverTimestamp() };
+      delete (updatePayloadFS as any).isAdmin;
+
       if (updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
         await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
       }
-      // Note: photoURL updates are not part of the current form, but if they were:
-      // if (updatedData.photoURL !== undefined && updatedData.photoURL !== firebaseAuth.currentUser.photoURL) {
-      //   await updateFirebaseProfile(firebaseAuth.currentUser, { photoURL: updatedData.photoURL });
-      // }
-
+      if (updatedData.photoURL !== undefined && updatedData.photoURL !== firebaseAuth.currentUser.photoURL) {
+         await updateFirebaseProfile(firebaseAuth.currentUser, { photoURL: updatedData.photoURL });
+      }
 
       await updateDoc(userDocRef, updatePayloadFS);
       const updatedUserFromDb = await fetchUserProfileFromFirestore(user.id);
 
       if (updatedUserFromDb) {
-        setUser(updatedUserFromDb); // Update context state
-
-         // Handle post-profile completion redirect if applicable
-         if (typeof window !== 'undefined') {
+        setUser(updatedUserFromDb);
+        if (typeof window !== 'undefined') {
           const completingProfileFlag = localStorage.getItem('completingProfile') === 'true';
           if (completingProfileFlag) {
             const isProfileNowComplete = updatedUserFromDb.username && updatedUserFromDb.role && updatedUserFromDb.phoneNumber;
@@ -516,7 +554,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (redirectPath && redirectPath !== pathname && redirectPath !== '/profile/settings') {
                   router.push(redirectPath);
                   localStorage.removeItem('redirectAfterLogin');
-              } else if (pathname.startsWith('/profile/settings')) { // If they were on profile settings page for completion
+              } else if (pathname.startsWith('/profile/settings')) {
                   const defaultRedirect = updatedUserFromDb.isAdmin ? '/admin/dashboard' : '/';
                   router.push(defaultRedirect);
               }
@@ -528,8 +566,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("Profile updated in Firestore, but failed to reload latest data into context.");
       }
     } catch(error: any) {
+      // console.error("AuthContext (updateUserProfile): Error updating profile:", error);
       toast({ variant: "destructive", title: "Update Failed", description: error.message || "Could not update your profile."});
-      throw error; // Re-throw for the form to catch
+      throw error;
     } finally {
         setLoading(false);
     }
@@ -549,5 +588,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-    
