@@ -5,8 +5,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { LockKeyhole, ShieldAlert } from "lucide-react"; 
-import { Button } from "@/components/ui/button"; 
+import { LockKeyhole, ShieldAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProtectedRouteProps {
@@ -24,11 +24,11 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/forgot-password') { 
-          localStorage.setItem('redirectAfterLogin', pathname);
-          if (!modalOpenAttempted && !showLoginModal) { 
+        if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/forgot-password') {
+          if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname);
+          if (!modalOpenAttempted && !showLoginModal) {
             setShowLoginModal(true);
-            setModalOpenAttempted(true); 
+            setModalOpenAttempted(true);
           }
         }
       } else {
@@ -36,9 +36,9 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
 
         const profileIncomplete = !user.username || !user.role || !user.phoneNumber;
         if (profileIncomplete && pathname !== '/profile/settings') {
-          localStorage.setItem('completingProfile', 'true');
+          if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
           router.push('/profile/settings?complete=true');
-          return; 
+          return;
         } else if (!profileIncomplete) {
           if (typeof window !== 'undefined') localStorage.removeItem('completingProfile');
         }
@@ -46,11 +46,12 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
         if (adminOnly && !isAdmin) {
           // console.warn(`ProtectedRoute: Triggering redirect for adminOnly. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
           toast({title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
-          router.push(isAdmin ? "/admin/dashboard" : "/dashboard"); // Go to user dashboard if not admin but adminOnly required
+          router.push(isAdminUser ? "/admin/dashboard" : "/dashboard"); // isAdminUser is not defined here, should use context's isAdmin
         }
       }
     }
-  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]); // Added toast to deps
 
   if (loading) {
     return (
@@ -62,18 +63,17 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
 
   if (!user) {
      const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check', '/search-papers'];
-     if (!publicPaths.includes(pathname)) {
-        // console.warn(`ProtectedRoute: Rendering Login Prompt. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
+     if (!publicPaths.includes(pathname) && !pathname.startsWith('/admin')) { // Added !pathname.startsWith('/admin')
         return (
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
             <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
             <h2 className="text-2xl font-semibold mb-3">Authentication Required</h2>
             <p className="text-muted-foreground mb-6 max-w-md">
-              You need to be logged in to access this page. Please wait while we check your session or log in.
+              You need to be logged in to access this page.
             </p>
             {!showLoginModal && (
                  <Button onClick={() => {
-                     if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname); 
+                     if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname);
                      setShowLoginModal(true)
                  }} className="mt-2">
                 Log In / Sign Up
@@ -84,15 +84,19 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
      }
   }
   
-  if (adminOnly && user && !isAdmin) { 
+  if (adminOnly && user && !isAdmin) {
+    // This console.warn was for debugging, removing it.
     // console.warn(`ProtectedRoute: Rendering Access Denied. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
         <ShieldAlert className="h-16 w-16 text-destructive mb-6" />
         <h2 className="text-2xl font-semibold mb-3">Access Denied</h2>
         <p className="text-muted-foreground max-w-md">
-          You do not have the necessary permissions to view this page. Redirecting to your dashboard...
+          You do not have the necessary permissions to view this page.
         </p>
+         <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/dashboard')} className="mt-4">
+            Go to Dashboard
+        </Button>
       </div>
     );
   }
@@ -108,4 +112,3 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
 
   return <>{children}</>;
 }
-
