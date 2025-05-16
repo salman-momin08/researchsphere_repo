@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -31,19 +32,16 @@ export default function LoginModal() {
         </DialogHeader>
         <div className="space-y-4 px-2 py-4">
           <LoginForm />
-          {/* The LoginForm now contains the forgot password link, 
-              so we might not need an additional one here unless desired for specific placement.
-              For now, relying on the one inside LoginForm.
-          */}
-          {/* <div className="text-sm text-right mt-2">
+          
+          <div className="text-sm text-right mt-2">
             <Link 
               href="/forgot-password" 
-              className="font-medium text-primary hover:underline"
-              onClick={() => setShowLoginModal(false)}
+              className="font-medium text-primary hover:underline px-1"
+              onClick={() => setShowLoginModal(false)} // Close modal before navigating
             >
               Forgot password?
             </Link>
-          </div> */}
+          </div>
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <Separator />
@@ -72,3 +70,4 @@ export default function LoginModal() {
     </Dialog>
   );
 }
+

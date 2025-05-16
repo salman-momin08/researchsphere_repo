@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-// useRouter no longer needed here as AuthContext handles redirection
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Loader2 } from "lucide-react";
@@ -62,9 +61,9 @@ const signupSchema = z.object({
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupForm() {
-  const { signup, loading: authLoading } = useAuth(); // Use authLoading from context
+  const { signup, loading: authLoading } = useAuth(); 
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state for form
+  const [isSubmitting, setIsSubmitting] = useState(false); 
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -77,6 +76,7 @@ export default function SignupForm() {
       confirmPassword: "",
       phoneNumber: "",
       institution: "",
+      role: undefined, // Ensure role is initially undefined to show placeholder
       researcherId: "",
       termsAccepted: false,
     },
@@ -87,19 +87,17 @@ export default function SignupForm() {
     setError(null);
     try {
       await signup(data);
-      toast({ title: "Signup Successful", description: "Welcome to ResearchSphere! Please complete your profile if prompted." });
-      // Redirection is handled by AuthContext after successful signup and profile creation
-      form.reset(); // Reset form on success
+      // Success toast handled by AuthContext or onAuthStateChanged logic
+      form.reset(); 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      // Toast is now handled by AuthContext for signup errors to avoid duplication
-      // Only show local error alert
+      // Error toast is handled by AuthContext
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const currentIsLoading = isSubmitting || authLoading;
 
   return (
@@ -138,8 +136,12 @@ export default function SignupForm() {
 
       <div className="pt-2">
         <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Role *</Label>
-        <Select onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer")} disabled={currentIsLoading}>
-          <SelectTrigger id="role" className="h-10">
+        <Select 
+            onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", {shouldValidate: true})} 
+            value={form.watch("role")}
+            disabled={currentIsLoading}
+        >
+          <SelectTrigger id="role" className="h-10 mt-1">
             <SelectValue placeholder="Select your role" />
           </SelectTrigger>
           <SelectContent>
@@ -163,7 +165,7 @@ export default function SignupForm() {
         />
         <Label htmlFor="termsAccepted" className={cn("text-sm font-normal", form.formState.errors.termsAccepted && "text-destructive")}>
           I accept the{" "}
-          <Link href="/terms" target="_blank" className="underline text-primary hover:text-primary/80">
+          <Link href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80">
             Terms and Conditions
           </Link> *
         </Label>
@@ -177,3 +179,4 @@ export default function SignupForm() {
     </form>
   );
 }
+

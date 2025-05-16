@@ -1,10 +1,10 @@
 
-"use client"; // Add this to use client-side hooks
+"use client"; 
 
 import Link from 'next/link';
 import { BookOpenText } from 'lucide-react';
-import { usePathname } from 'next/navigation'; // Import usePathname
-import { cn } from '@/lib/utils'; // Import cn for conditional classes
+import { usePathname } from 'next/navigation'; 
+import { cn } from '@/lib/utils'; 
 
 export default function Footer() {
   const pathname = usePathname();
@@ -13,9 +13,9 @@ export default function Footer() {
   return (
     <footer className={cn(
       "border-t bg-secondary/50",
-      isAdminPage && "md:ml-64" // Add left margin on medium screens and up if it's an admin page
+      isAdminPage && "md:ml-64" 
     )}>
-      <div className="container px-6 py-8 flex flex-col md:flex-row justify-between items-center">
+      <div className="container px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row justify-between items-center">
         <div className="flex items-center gap-2 mb-4 md:mb-0">
           <BookOpenText className="h-5 w-5 text-primary" />
           <span className="text-md font-semibold">ResearchSphere</span>
@@ -24,10 +24,10 @@ export default function Footer() {
           &copy; {new Date().getFullYear()} ResearchSphere. All rights reserved.
         </p>
         <div className="flex space-x-4 mt-4 md:mt-0">
-          <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary">
+          <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">
             Terms of Service
           </Link>
-          <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary">
+          <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">
             Privacy Policy
           </Link>
         </div>
@@ -36,8 +36,6 @@ export default function Footer() {
   );
 }
 
-// Create dummy pages for terms and privacy to avoid 404s for links in footer
-// These can remain Server Components if they don't use client hooks
 export function TermsPage() {
   return (
     <div className="container py-12 px-4 md:px-6">
@@ -75,3 +73,4 @@ export function PrivacyPage() {
     </div>
   );
 }
+
