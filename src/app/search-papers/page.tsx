@@ -43,20 +43,17 @@ function SearchPapersContent() {
     setSearchResults([]);
     setSearchError(null);
 
-    console.log(`SearchPapers: Initiating search for author: "${searchTerm}"`);
 
     try {
       const publishedPapers = await getPublishedPapers();
-      console.log(`SearchPapers: Fetched ${publishedPapers.length} published papers from service.`);
       
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      // Client-side filtering for author name (case-insensitive, partial match on any author)
       const results = publishedPapers.filter(paper =>
         paper.authors.some(author => author.toLowerCase().includes(lowerCaseSearchTerm))
       );
-      console.log(`SearchPapers: Found ${results.length} papers matching author "${searchTerm}".`);
       setSearchResults(results);
     } catch (error: any) {
-      console.error("SearchPapers: Error fetching/filtering papers:", error);
       const errorMessage = error.message || "Could not retrieve or filter papers. Please try again.";
       setSearchError(errorMessage);
       toast({
@@ -69,9 +66,9 @@ function SearchPapersContent() {
     }
   };
 
-  const handleDownloadOriginalPaper = (paper: Paper) => {
+  const handleDownloadOriginalFile = (paper: Paper) => {
     if (paper.fileUrl) {
-        console.log("SearchPapers: Opening original file URL:", paper.fileUrl);
+        console.log("File URL:", paper.fileUrl);
         window.open(paper.fileUrl, '_blank');
         toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
     } else {
@@ -92,10 +89,7 @@ function SearchPapersContent() {
     content += `Status: ${paper.status}\n`;
     content += `Upload Date: ${paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}\n\n`;
     content += `Abstract:\n${paper.abstract}\n\n`;
-    content += `Original File Name: ${paper.fileName || 'Not available'}\n`;
-    content += `File URL: ${paper.fileUrl || 'Not available'}\n`;
-
-
+    
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -198,7 +192,7 @@ function SearchPapersContent() {
                         <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
                           <Eye className="h-4 w-4" />
                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalPaper(paper)} title="Download Original File">
+                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalFile(paper)} title="Download Original File">
                           <Download className="h-4 w-4" />
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details">
