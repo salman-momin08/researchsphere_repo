@@ -18,8 +18,8 @@ interface CommitteeMember {
   imageUrl?: string;
   dataAiHint?: string;
   bio?: string;
-  achievements?: string[]; 
-  email?: string; 
+  achievements?: string[];
+  email?: string;
 }
 
 const committeeMembers: CommitteeMember[] = [
@@ -28,7 +28,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Evelyn Reed",
     title: "Conference Chair",
     affiliation: "Institute of Advanced Technology",
-    imageUrl: "https://placehold.co/100x100.png",
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "scientist woman",
     bio: "Dr. Reed is a leading expert in artificial intelligence and its applications in scientific research. She has published numerous papers and chaired several international conferences.",
     achievements: [
@@ -44,7 +44,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Samuel Green",
     title: "Program Chair",
     affiliation: "University of Global Studies",
-    imageUrl: "https://placehold.co/100x100.png",
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "professor man",
     bio: "Professor Green's research focuses on sustainable development and global collaboration in academia. He is passionate about fostering interdisciplinary research.",
     achievements: [
@@ -59,8 +59,8 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Olivia Chen",
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
-    imageUrl: "https://placehold.co/100x100.png",
-    dataAiHint: "researcher woman",
+    imageUrl: "https://placehold.co/128x128.png",
+    dataAiHint: "researcher woman tech",
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
       "Lead organizer for the TPC of three major AI conferences.",
@@ -74,6 +74,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Marcus Bellwether",
     title: "Publications Chair",
     affiliation: "Veridian Dynamics Publishing",
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "editor man",
     bio: "Dr. Bellwether has overseen the publication process for numerous high-impact journals and conference proceedings.",
     achievements: [
@@ -88,7 +89,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Anya Sharma",
     title: "Workshop Coordinator",
     affiliation: "Center for Collaborative Research",
-    imageUrl: "https://placehold.co/100x100.png",
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "academic woman",
     bio: "Professor Sharma excels at organizing engaging and productive workshops that bridge the gap between theory and practice.",
     achievements: [
@@ -103,8 +104,8 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Kenji Tanaka",
     title: "International Liaison",
     affiliation: "Global Research Network",
-    imageUrl: "https://placehold.co/100x100.png",
-    dataAiHint: "professional man",
+    imageUrl: "https://placehold.co/128x128.png",
+    dataAiHint: "professional man asia",
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
       "Established partnerships with over 25 international institutions.",
@@ -161,7 +162,7 @@ function CommitteeMemberModal({ isOpen, onOpenChange, member }: CommitteeMemberM
             </div>
           </div>
         </DialogHeader>
-        
+
         <Separator className="my-4" />
 
         <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
@@ -220,19 +221,19 @@ export default function KeyCommitteePage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {committeeMembers.map((member) => (
-              <Card 
-                key={member.id} 
+              <Card
+                key={member.id}
                 className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col cursor-pointer group"
                 onClick={() => handleCardClick(member)}
               >
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-24 w-24 mb-4 border-2 border-primary group-hover:border-primary/70 transition-colors">
                     {member.imageUrl ? (
-                    <Image 
-                      src={member.imageUrl} 
-                      alt={member.name} 
-                      width={100} 
-                      height={100} 
+                    <Image
+                      src={member.imageUrl}
+                      alt={member.name}
+                      width={100}
+                      height={100}
                       className="aspect-square object-cover"
                       data-ai-hint={member.dataAiHint || "professional portrait"}
                     />

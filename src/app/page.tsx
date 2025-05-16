@@ -198,12 +198,12 @@ export default function HomePage() {
       <section className="py-20 md:py-32 bg-secondary">
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
           <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12 rounded-lg shadow-md overflow-hidden">
-            <Image 
-              src="https://placehold.co/1200x400.png" 
-              alt="A diverse group of researchers collaborating in a modern laboratory setting, symbolizing academic paper publication and innovation." 
+            <Image
+              src="https://placehold.co/1200x400.png"
+              alt="A diverse group of researchers collaborating in a modern laboratory setting, symbolizing academic paper publication and innovation."
               fill
-              className="object-cover" 
-              data-ai-hint="academic research" 
+              className="object-cover"
+              data-ai-hint="research collaboration"
               sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
             />
           </div>

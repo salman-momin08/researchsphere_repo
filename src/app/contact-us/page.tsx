@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { AnimatedInput } from "@/components/ui/AnimatedInput"; 
+import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +42,7 @@ const contactPersons: ContactPerson[] = [
     designation: "General Inquiries Lead",
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
-    imageUrl: "https://placehold.co/100x100.png", 
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "support woman"
   },
   {
@@ -51,24 +51,24 @@ const contactPersons: ContactPerson[] = [
     designation: "Technical Support Head",
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
-    imageUrl: "https://placehold.co/100x100.png", 
-    dataAiHint: "support man"
+    imageUrl: "https://placehold.co/128x128.png",
+    dataAiHint: "support man tech"
   },
   {
     id: "3",
     name: "Ms. Clara Dubois",
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
-    imageUrl: "https://placehold.co/100x100.png", 
+    imageUrl: "https://placehold.co/128x128.png",
     dataAiHint: "coordinator woman"
   },
   {
-    id: "4", 
-    name: "Dr. Evelyn Reed",
-    designation: "Conference Chair (Key Committee Liaison)", 
-    email: "evelyn.r.committee@researchsphere.com", 
-    imageUrl: "https://placehold.co/100x100.png", 
-    dataAiHint: "scientist woman" 
+    id: "4",
+    name: "Dr. Evelyn Reed", // From Key Committee
+    designation: "Conference Chair (Key Committee Liaison)",
+    email: "evelyn.reed@researchsphere.com", // Using a similar domain for consistency
+    imageUrl: "https://placehold.co/128x128.png",
+    dataAiHint: "scientist woman"
   }
 ];
 
@@ -90,7 +90,6 @@ export default function ContactUsPage() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsLoading(true);
     setIsSuccess(false);
-    // console.log("Contact form data:", data); 
 
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -125,11 +124,11 @@ export default function ContactUsPage() {
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
                     {person.imageUrl ? (
-                      <Image 
-                        src={person.imageUrl} 
-                        alt={person.name} 
-                        width={100} 
-                        height={100} 
+                      <Image
+                        src={person.imageUrl}
+                        alt={person.name}
+                        width={100}
+                        height={100}
                         className="aspect-square object-cover"
                         data-ai-hint={person.dataAiHint || "professional portrait"}
                       />
@@ -178,7 +177,7 @@ export default function ContactUsPage() {
                 </AlertDescription>
               </Alert>
             ) : (
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> 
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
                 <AnimatedInput
                   label="Full Name *"
                   id="fullName"
@@ -201,7 +200,7 @@ export default function ContactUsPage() {
                 )}
 
                 <AnimatedInput
-                  label="Subject *" 
+                  label="Subject *"
                   id="subject"
                   {...form.register("subject")}
                   disabled={isLoading}
@@ -209,8 +208,8 @@ export default function ContactUsPage() {
                 {form.formState.errors.subject && (
                   <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.subject.message}</p>
                 )}
-                
-                <div className="pt-2"> 
+
+                <div className="pt-2">
                   <Label htmlFor="message" className={form.formState.errors.message ? "text-destructive" : ""}>Message *</Label>
                   <Textarea
                     id="message"
