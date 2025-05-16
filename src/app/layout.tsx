@@ -6,16 +6,8 @@ import { AuthProvider } from '@/context/auth-context';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
-// import LoginModal from '@/components/auth/LoginModal'; // Will be dynamically imported
 import React, { Suspense } from 'react'; 
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import dynamic from 'next/dynamic';
-
-const LoginModal = dynamic(() => import('@/components/auth/LoginModal'), {
-  ssr: false, // Modals are often client-side only
-  loading: () => <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"><LoadingSpinner size={32} /></div>,
-});
-
+import ClientSideComponents from '@/components/layout/ClientSideComponents'; // Import the new wrapper
 
 const inter = Inter({
   variable: '--font-inter',
@@ -35,12 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <Suspense fallback={<div className="flex-grow flex items-center justify-center min-h-screen"><LoadingSpinner size={48} /></div>}>
+        <Suspense fallback={<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}>Loading application...</div>}>
           <AuthProvider>
             <div className="antialiased flex flex-col min-h-screen">
               <Header />
               <main className="flex-grow">{children}</main>
-              <LoginModal />
+              <ClientSideComponents /> {/* Use the wrapper component here */}
               <Footer />
               <Toaster />
             </div>
