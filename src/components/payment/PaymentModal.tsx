@@ -50,6 +50,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             setPaymentMethod("card");
         }
     } else {
+        // Reset all state when modal closes, regardless of current step
         setPaymentStep("form");
         setIsProcessing(false);
         setCardNumber("");
@@ -58,16 +59,18 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         setUpiId("");
         setPaymentMethod("card");
     }
-  }, [isOpen, paymentStep]);
+  }, [isOpen, paymentStep]); // Added paymentStep
 
+  // Effect to reset to form step if the paper prop changes while modal is open
   useEffect(() => {
     if(isOpen) {
-        setPaymentStep("form");
+        setPaymentStep("form"); // Reset to form if paper changes (e.g. user opens modal for another paper)
     }
   }, [paper, isOpen]);
 
 
   const handleDialogClose = () => {
+    // This ensures states are reset when dialog is closed via X button or overlay click
     setPaymentStep("form");
     setIsProcessing(false);
     setCardNumber("");
@@ -98,30 +101,33 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         return;
       }
     } else if (paymentMethod === "upi") {
-      if (!upiId.trim() && !confirm("Proceed with mock UPI payment without entering UPI ID (simulating QR scan)?")) {
-        return;
-      }
-       if (upiId.trim() && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
+      // For UPI, allow proceeding without UPI ID to simulate QR scan flow.
+      // If UPI ID is entered, validate it.
+      if (upiId.trim() && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
          toast({ variant: "destructive", title: "Invalid UPI ID", description: "Please enter a valid UPI ID (e.g., yourname@bank)." });
         return;
       }
     }
 
     setIsProcessing(true);
+    // Simulate payment processing
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
 
+      // Call the onPaymentSuccess callback, passing the paper ID if available
       if (paper && paper.id) {
         onPaymentSuccess(paper.id);
       } else {
+        // Fallback if paper or paper.id is somehow null, though it shouldn't be in this flow
         onPaymentSuccess();
       }
-      setPaymentStep("success");
+      setPaymentStep("success"); // Move to success step
     } catch (error) {
       console.error("Payment processing error:", error);
       toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
+      // Do not close modal on failure, let user retry or cancel
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); // Ensure processing state is reset
     }
   };
 
@@ -195,7 +201,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-white inline-block">
                        <Image
-                        src="https://placehold.co/120x120/e2e8f0/e2e8f0.png?text=_" // Placeholder for QR
+                        src="https://placehold.co/120x120/e2e8f0/e2e8f0.png?text=_" 
                         alt="Scan QR Code for UPI Payment"
                         width={120}
                         height={120}
@@ -234,6 +240,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </DialogFooter>
           </>
         ) : (
+            // Fallback for unexpected paymentStep value, though should not be reached
             <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
                 <LoadingSpinner size={32} />
                 <p className="mt-3 text-muted-foreground">Loading payment details...</p>
