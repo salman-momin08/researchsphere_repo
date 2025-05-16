@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Shield, LayoutDashboard } from 'lucide-react'; // Added Shield & LayoutDashboard
+import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Shield, LayoutDashboard } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -26,7 +26,7 @@ import CountdownTimer from '@/components/shared/CountdownTimer';
 
 function PaperDetailsContent() {
   const params = useParams();
-  const searchParams = useSearchParams();
+  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict with window.URLSearchParams
   const router = useRouter();
   const { user, isAdmin } = useAuth();
 
@@ -83,10 +83,10 @@ function PaperDetailsContent() {
 
   useEffect(() => {
     const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
-    if (searchParams.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && paymentDueDateValid && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
+    if (searchParamsHook.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && paymentDueDateValid && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
       setIsPaymentModalOpen(true);
     }
-  }, [searchParams, currentPaper, isPaperOverdue, user, isAdmin]);
+  }, [searchParamsHook, currentPaper, isPaperOverdue, user, isAdmin]);
 
   const handlePaymentSuccess = async (paperIdToUpdate?: string) => {
     const targetPaperId = paperIdToUpdate || currentPaper?.id;
@@ -114,8 +114,8 @@ function PaperDetailsContent() {
       await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
-        title: "Feedback Submitted",
-        description: "Your feedback has been saved. In a full production system, an email notification would be sent to the author. (Email sending is simulated in this version).",
+        title: "Feedback Submitted Successfully",
+        description: `Your feedback for "${currentPaper.title}" has been saved. The author would typically be notified by email (this is simulated).`,
         duration: 7000
       });
       setAdminFeedbackText(""); // Clear feedback box
@@ -154,7 +154,7 @@ function PaperDetailsContent() {
     try {
       const result = await plagiarismCheck({
         documentUrl: currentPaper.fileUrl,
-        fileName: currentPaper.fileName
+        fileName: currentPaper.fileName || undefined
       });
       await updatePaperData(currentPaper.id, {
         plagiarismScore: result.plagiarismScore,
@@ -489,6 +489,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-
-
-    
