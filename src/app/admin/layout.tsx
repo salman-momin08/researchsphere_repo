@@ -25,10 +25,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      {/* Changed min-h-screen to flex-1 to allow it to grow within RootLayout's main.flex-grow */}
-      <div className="flex flex-1 bg-secondary/30"> 
-        <aside className="w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-16"> {/* Sidebar, fixed, pt-16 to be below header */}
-          <div className="flex items-center gap-2 mb-6 px-2 mt-4"> {/* Added mt-4 to push content below header area within sidebar */}
+      <div className="flex flex-1 bg-secondary/30"> {/* Changed min-h-screen to flex-1 */}
+        <aside className="hidden md:flex w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-16 flex-col"> {/* Sidebar, hidden on mobile, md:flex, flex-col */}
+          <div className="flex items-center gap-2 mb-6 px-2 mt-4">
             <Shield className="h-7 w-7 text-primary" />
             <h2 className="text-xl font-semibold tracking-tight">Admin Panel</h2>
           </div>
@@ -52,7 +51,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
         </aside>
         {/* Main content area for admin pages */}
-        <main className="flex-1 flex flex-col ml-64 mt-16"> {/* ml-64 for sidebar, mt-16 for header, flex flex-col */}
+        <main className="flex-1 flex flex-col md:ml-64 mt-16"> {/* ml-64 only on md and up, mt-16 for header, flex flex-col */}
           <div className="flex-grow p-6 md:p-8"> {/* Inner div that grows */}
             {children}
           </div>

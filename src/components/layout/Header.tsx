@@ -35,16 +35,16 @@ const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdmi
   icon?: React.ReactNode,
   isAdminContext?: boolean
 }) => {
-  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-base font-medium";
+  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-base font-medium rounded-md"; // Added rounded-md
   let activeStyleClasses = "";
   let hoverStyleClasses = "";
 
-  if (isAdminContext) {
+  if (isAdminContext) { // For admin links in header or mobile sheet
     activeStyleClasses = isActive ? "bg-primary text-primary-foreground" : "text-foreground";
     hoverStyleClasses = isActive ? "hover:bg-primary/90" : "hover:bg-accent hover:text-accent-foreground";
-  } else { // Non-admin users or general links
+  } else { // Non-admin users or general links in mobile sheet
     activeStyleClasses = isActive ? "bg-secondary text-primary" : "text-foreground";
-    hoverStyleClasses = isActive ? "hover:bg-secondary/80" : "hover:bg-secondary hover:text-primary";
+    hoverStyleClasses = isActive ? "hover:bg-secondary/80" : (isAction ? "hover:bg-primary/10" : "hover:bg-secondary hover:text-primary");
   }
 
   const combinedClasses = cn(baseClasses, activeStyleClasses, hoverStyleClasses);
@@ -121,8 +121,8 @@ export default function Header() {
     { href: "/registration", label: "Registration", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
 
   const userNavLinks = [
@@ -130,23 +130,23 @@ export default function Header() {
     { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
     { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud className="mr-2 h-4 w-4" />, href: "/submit" },
     { href: "/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles className="mr-2 h-4 w-4" /> },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide className="mr-2 h-4 w-4" /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
     { href: "/contact-us", label: "Contact", icon: <Phone className="mr-2 h-4 w-4" /> },
   ];
-  
+
   const adminNavLinks = [
     { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield className="mr-2 h-4 w-4" /> },
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon className="mr-2 h-4 w-4" /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
   ];
 
-  const adminSidebarLinks = [ // For mobile menu when admin is logged in
+  const adminSidebarLinks = [
       { href: "/admin/dashboard", label: "Dashboard Overview", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
       { href: "/admin/users", label: "User Management", icon: <UsersIconLucide className="mr-2 h-4 w-4" /> },
       { href: "/admin/registered-admins", label: "Registered Admins", icon: <UserCheck className="mr-2 h-4 w-4" /> },
-      { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye className="mr-2 h-4 w-4" /> }, // New reviewer link
+      { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye className="mr-2 h-4 w-4" /> },
   ];
 
 
@@ -171,8 +171,12 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
-            const isActive = pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') && !pathname.startsWith('/admin/reviewers') ) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'));
-            
+            // For Admin Panel link, it's active if any /admin path is active
+            // For other links, it's an exact match or startsWith for non-root paths
+            const isActive = (link.href === "/admin/dashboard" && isViewingAdminSection) ||
+                             (link.href !== "/admin/dashboard" && pathname === link.href) ||
+                             (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== "/admin/dashboard");
+
             let buttonClasses = "";
 
             if (user && isAdmin) {
@@ -182,7 +186,7 @@ export default function Header() {
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-foreground hover:bg-accent hover:text-accent-foreground"
               );
-            } else { 
+            } else {
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center",
                 isActive
@@ -288,42 +292,50 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1">
-                {isClient && currentNavLinks.map(link => (
-                  <NavLinkItem
-                    key={link.href || link.label}
-                    href={link.href}
-                    onClick={() => {
-                      if (link.action) link.action();
-                      else if (link.href) router.push(link.href);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    isActive={pathname === link.href || (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== '/admin/dashboard' && !pathname.startsWith('/admin/users') && !pathname.startsWith('/admin/registered-admins') && !pathname.startsWith('/admin/reviewers')) || (link.href === '/admin/dashboard' && pathname.startsWith('/admin'))}
-                    isAction={!!link.action}
-                    icon={link.icon}
-                    isAdminContext={!!(user && isAdmin)}
-                  >
-                    {link.label}
-                  </NavLinkItem>
-                ))}
-                
+                {isClient && currentNavLinks.map(link => {
+                   const isActive = (link.href === "/admin/dashboard" && isViewingAdminSection) ||
+                                    (link.href !== "/admin/dashboard" && pathname === link.href) ||
+                                    (link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== "/admin/dashboard");
+                  return (
+                    <NavLinkItem
+                      key={link.href || link.label}
+                      href={link.href}
+                      onClick={() => {
+                        if (link.action) link.action();
+                        else if (link.href) router.push(link.href);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      isActive={isActive}
+                      isAction={!!link.action}
+                      icon={link.icon}
+                      isAdminContext={!!(user && isAdmin)}
+                    >
+                      {link.label}
+                    </NavLinkItem>
+                  );
+                })}
+
                 {isClient && user && isAdmin && (
                   <>
                      <DropdownMenuSeparator className="my-2" />
-                     {adminSidebarLinks.map(link => (
-                         <NavLinkItem 
-                            key={link.href} 
-                            href={link.href} 
-                            onClick={() => {router.push(link.href); setIsMobileMenuOpen(false);}} 
-                            isActive={pathname.startsWith(link.href)} 
-                            icon={link.icon} 
-                            isAdminContext={true}
-                        >
-                           {link.label}
-                         </NavLinkItem>
-                     ))}
+                     {adminSidebarLinks.map(link => {
+                         const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname.startsWith(link.href));
+                         return (
+                             <NavLinkItem
+                                key={link.href}
+                                href={link.href}
+                                onClick={() => {router.push(link.href); setIsMobileMenuOpen(false);}}
+                                isActive={isActive}
+                                icon={link.icon}
+                                isAdminContext={true}
+                            >
+                               {link.label}
+                             </NavLinkItem>
+                         );
+                     })}
                   </>
                 )}
-                
+
                 <DropdownMenuSeparator className="my-2" />
                 {isClient && user ? (
                   <>
