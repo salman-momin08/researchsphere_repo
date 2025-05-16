@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building, UserCircle, Mail, Star, Briefcase } from "lucide-react";
 import Image from "next/image";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import dynamic from 'next/dynamic';
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
 interface CommitteeMember {
   id: string;
@@ -122,7 +124,7 @@ interface CommitteeMemberModalProps {
   member: CommitteeMember | null;
 }
 
-function CommitteeMemberModal({ isOpen, onOpenChange, member }: CommitteeMemberModalProps) {
+const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: CommitteeMemberModalProps) => {
   if (!member) return null;
 
   return (
@@ -187,13 +189,20 @@ function CommitteeMemberModal({ isOpen, onOpenChange, member }: CommitteeMemberM
             </div>
           )}
         </div>
-         <Button onClick={() => onOpenChange(false)} className="mt-4 w-full sm:w-auto sm:ml-auto" variant="outline">
+        <DialogFooter className="mt-4">
+         <Button onClick={() => onOpenChange(false)} className="w-full sm:w-auto" variant="outline">
             Close
         </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+const CommitteeMemberModal = dynamic(() => Promise.resolve(CommitteeMemberModalComponent), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"><LoadingSpinner size={32} /></div>,
+});
 
 
 export default function KeyCommitteePage() {
@@ -262,7 +271,7 @@ export default function KeyCommitteePage() {
           </div>
         </div>
       </div>
-      <CommitteeMemberModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} member={selectedMember} />
+      {isModalOpen && selectedMember && <CommitteeMemberModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} member={selectedMember} />}
     </>
   );
 }

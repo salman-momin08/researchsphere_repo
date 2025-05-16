@@ -11,11 +11,10 @@ interface AnimatedInputProps extends InputProps {
   containerClassName?: string;
 }
 
-const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
+const AnimatedInput = React.memo(React.forwardRef<HTMLInputElement, AnimatedInputProps>(
   ({ className, type, label, id, containerClassName, value: propValue, defaultValue, onChange, onFocus, onBlur, ...props }, ref) => {
     const internalId = id || React.useId();
     
-    // Initialize hasValue based on whether propValue (controlled) or defaultValue (uncontrolled) has an initial truthy value.
     const [hasValue, setHasValue] = React.useState(!!(propValue !== undefined ? propValue : defaultValue));
     const [isFocused, setIsFocused] = React.useState(false);
 
@@ -35,23 +34,17 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
 
     const handleBlurEvent = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
-      // When blurring, the source of truth for emptiness is the current value of the input element itself.
       setHasValue(!!e.target.value); 
       if (onBlur) {
         onBlur(e);
       }
     };
 
-    // Effect to sync hasValue with propValue for controlled components
-    // This is important if the value is changed programmatically from outside (e.g., form.reset())
     React.useEffect(() => {
-      // console.log(`AnimatedInput (${label}): propValue changed to:`, propValue); // Temporary debug log
-      if (propValue !== undefined) { // Ensures this runs for controlled components
-        const newHasValue = !!propValue;
-        // console.log(`AnimatedInput (${label}): setting hasValue to:`, newHasValue); // Temporary debug log
-        setHasValue(newHasValue);
+      if (propValue !== undefined) { 
+        setHasValue(!!propValue);
       }
-    }, [propValue, label]); // Added label to dep array for debugging only, can be removed.
+    }, [propValue]);
 
 
     const isLabelFloating = isFocused || hasValue;
@@ -90,7 +83,7 @@ const AnimatedInput = React.forwardRef<HTMLInputElement, AnimatedInputProps>(
       </div>
     );
   }
-);
+));
 AnimatedInput.displayName = "AnimatedInput";
 
 export { AnimatedInput };
