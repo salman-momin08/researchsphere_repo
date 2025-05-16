@@ -18,8 +18,8 @@ interface CommitteeMember {
   imageUrl?: string;
   dataAiHint?: string;
   bio?: string;
-  achievements?: string[]; // New field for detailed achievements/experience
-  email?: string; // Optional email for committee member
+  achievements?: string[]; 
+  email?: string; 
 }
 
 const committeeMembers: CommitteeMember[] = [
@@ -28,7 +28,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Evelyn Reed",
     title: "Conference Chair",
     affiliation: "Institute of Advanced Technology",
-    imageUrl: "https://picsum.photos/seed/evelyn/100/100",
+    imageUrl: "https://placehold.co/100x100.png",
     dataAiHint: "scientist woman",
     bio: "Dr. Reed is a leading expert in artificial intelligence and its applications in scientific research. She has published numerous papers and chaired several international conferences.",
     achievements: [
@@ -44,7 +44,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Samuel Green",
     title: "Program Chair",
     affiliation: "University of Global Studies",
-    imageUrl: "https://picsum.photos/seed/samuel/100/100",
+    imageUrl: "https://placehold.co/100x100.png",
     dataAiHint: "professor man",
     bio: "Professor Green's research focuses on sustainable development and global collaboration in academia. He is passionate about fostering interdisciplinary research.",
     achievements: [
@@ -59,7 +59,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Olivia Chen",
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
-    imageUrl: "https://picsum.photos/seed/olivia/100/100",
+    imageUrl: "https://placehold.co/100x100.png",
     dataAiHint: "researcher woman",
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
@@ -74,7 +74,6 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Marcus Bellwether",
     title: "Publications Chair",
     affiliation: "Veridian Dynamics Publishing",
-    // No image, will use fallback
     dataAiHint: "editor man",
     bio: "Dr. Bellwether has overseen the publication process for numerous high-impact journals and conference proceedings.",
     achievements: [
@@ -89,7 +88,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Anya Sharma",
     title: "Workshop Coordinator",
     affiliation: "Center for Collaborative Research",
-    imageUrl: "https://picsum.photos/seed/anya/100/100",
+    imageUrl: "https://placehold.co/100x100.png",
     dataAiHint: "academic woman",
     bio: "Professor Sharma excels at organizing engaging and productive workshops that bridge the gap between theory and practice.",
     achievements: [
@@ -104,7 +103,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Kenji Tanaka",
     title: "International Liaison",
     affiliation: "Global Research Network",
-    imageUrl: "https://picsum.photos/seed/kenji/100/100",
+    imageUrl: "https://placehold.co/100x100.png",
     dataAiHint: "professional man",
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
@@ -138,7 +137,7 @@ function CommitteeMemberModal({ isOpen, onOpenChange, member }: CommitteeMemberM
                   width={112}
                   height={112}
                   className="aspect-square object-cover"
-                  data-ai-hint={member.dataAiHint}
+                  data-ai-hint={member.dataAiHint || "professional portrait"}
                 />
               ) : (
                 <AvatarFallback className="text-4xl bg-muted">
@@ -208,7 +207,7 @@ export default function KeyCommitteePage() {
   return (
     <>
       <div className="bg-secondary">
-        <div className="container py-12 md:py-20">
+        <div className="container mx-auto py-12 md:py-20 px-4 sm:px-6 lg:px-8">
           <header className="text-center mb-12 md:mb-16">
             <Briefcase size={64} strokeWidth={1.5} className="mx-auto mb-6 text-primary" />
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
@@ -235,7 +234,7 @@ export default function KeyCommitteePage() {
                       width={100} 
                       height={100} 
                       className="aspect-square object-cover"
-                      data-ai-hint={member.dataAiHint}
+                      data-ai-hint={member.dataAiHint || "professional portrait"}
                     />
                     ) : (
                     <AvatarFallback className="text-3xl bg-muted">

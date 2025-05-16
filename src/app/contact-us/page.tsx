@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { AnimatedInput } from "@/components/ui/AnimatedInput"; // Changed to AnimatedInput
+import { AnimatedInput } from "@/components/ui/AnimatedInput"; 
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import Image from "next/image";
 const contactFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
-  subject: z.string().min(1, { message: "Subject is required." }), // Made subject mandatory
+  subject: z.string().min(1, { message: "Subject is required." }),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }),
 });
 
@@ -42,7 +42,7 @@ const contactPersons: ContactPerson[] = [
     designation: "General Inquiries Lead",
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
-    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
+    imageUrl: "https://placehold.co/100x100.png", 
     dataAiHint: "support woman"
   },
   {
@@ -51,7 +51,7 @@ const contactPersons: ContactPerson[] = [
     designation: "Technical Support Head",
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
-    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
+    imageUrl: "https://placehold.co/100x100.png", 
     dataAiHint: "support man"
   },
   {
@@ -59,7 +59,7 @@ const contactPersons: ContactPerson[] = [
     name: "Ms. Clara Dubois",
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
-    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
+    imageUrl: "https://placehold.co/100x100.png", 
     dataAiHint: "coordinator woman"
   },
   {
@@ -67,7 +67,7 @@ const contactPersons: ContactPerson[] = [
     name: "Dr. Evelyn Reed",
     designation: "Conference Chair (Key Committee Liaison)", 
     email: "evelyn.r.committee@researchsphere.com", 
-    imageUrl: "https://placehold.co/100x100.png", // Updated to placehold.co
+    imageUrl: "https://placehold.co/100x100.png", 
     dataAiHint: "scientist woman" 
   }
 ];
@@ -90,7 +90,7 @@ export default function ContactUsPage() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsLoading(true);
     setIsSuccess(false);
-    console.log("Contact form data:", data); 
+    // console.log("Contact form data:", data); 
 
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -105,7 +105,7 @@ export default function ContactUsPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] bg-secondary py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-8rem)] bg-secondary py-12 md:py-20 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
         <header className="text-center mb-12 md:mb-16">
             <Mail size={64} strokeWidth={1.5} className="mx-auto mb-6 text-primary" />
@@ -118,7 +118,7 @@ export default function ContactUsPage() {
         </header>
 
         <section className="mb-12 md:mb-16">
-          <h2 className="text-3xl font-semibold text-center mb-10">Meet Our Support Team</h2>
+          <h2 className="text-3xl md:text-4xl font-semibold text-center mb-10">Meet Our Support Team</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactPersons.map((person) => (
               <Card key={person.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
@@ -131,7 +131,7 @@ export default function ContactUsPage() {
                         width={100} 
                         height={100} 
                         className="aspect-square object-cover"
-                        data-ai-hint={person.dataAiHint}
+                        data-ai-hint={person.dataAiHint || "professional portrait"}
                       />
                     ) : (
                       <AvatarFallback className="text-3xl bg-muted">
@@ -178,7 +178,7 @@ export default function ContactUsPage() {
                 </AlertDescription>
               </Alert>
             ) : (
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> {/* Adjusted space-y */}
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2"> 
                 <AnimatedInput
                   label="Full Name *"
                   id="fullName"
@@ -210,7 +210,7 @@ export default function ContactUsPage() {
                   <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.subject.message}</p>
                 )}
                 
-                <div className="pt-2"> {/* Added pt-2 for spacing consistency with AnimatedInput */}
+                <div className="pt-2"> 
                   <Label htmlFor="message" className={form.formState.errors.message ? "text-destructive" : ""}>Message *</Label>
                   <Textarea
                     id="message"

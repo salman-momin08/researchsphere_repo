@@ -20,11 +20,10 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 
-// Function to simulate reading file content (replace with actual parsers in a real app)
+
 async function readFileContentSimulated(file: File): Promise<string> {
   return new Promise((resolve) => {
     setTimeout(() => {
-      // Simulate some content based on file type for variety
       let simulatedContent = `\n\n[Simulated content of ${file.name}. File type: ${file.type}.`;
       if (file.type === "application/pdf") {
         simulatedContent += " This appears to be a PDF document. It might contain complex layouts, figures, and references.]\n\n";
@@ -34,7 +33,7 @@ async function readFileContentSimulated(file: File): Promise<string> {
         simulatedContent += " This is a generic file. Content extraction would depend on its specific format.]\n\n";
       }
       resolve(simulatedContent);
-    }, 500); // Simulate async reading
+    }, 500); 
   });
 }
 
@@ -46,7 +45,7 @@ const preCheckSchema = z.object({
     .optional()
     .refine(files => {
       if (typeof window === 'undefined' || !files || !(files instanceof FileList) || files.length === 0) return true;
-      return files[0].size <= 5 * 1024 * 1024; // 5MB
+      return files[0].size <= 5 * 1024 * 1024; 
     }, "File size must be less than 5MB.")
     .refine(files => {
       if (typeof window === 'undefined' || !files || !(files instanceof FileList) || files.length === 0) return true;
@@ -103,7 +102,7 @@ function AiPreCheckContent() {
       try {
         fileContentForAnalysis = await readFileContentSimulated(fileToUpload);
       } catch (readError) {
-        console.error("File reading error:", readError);
+        // console.error("File reading error:", readError);
         const errorMessage = readError instanceof Error ? readError.message : "Could not read file content.";
         setAiError(`File processing error: ${errorMessage}`);
         toast({variant: "destructive", title: "File Error", description: errorMessage});
@@ -120,10 +119,18 @@ function AiPreCheckContent() {
     }
 
     let contentToAnalyze = `Paper Title: ${data.title}`;
+    let plagiarismInputUrl: string | undefined = undefined;
+
     if (data.paperText) {
         contentToAnalyze += `\n\nAbstract/Provided Text:\n${data.paperText}`;
     }
-    if (fileContentForAnalysis) {
+    if (fileToUpload) {
+        // For plagiarism check, we'll use a mock URL or simulate content if a real URL isn't directly useful to the flow
+        // This is a placeholder as the actual file content reading is simulated above.
+        // In a real scenario with file processing, you'd pass a real accessible URL or the extracted text.
+        plagiarismInputUrl = `file://${fileToUpload.name}`; // Mock URL for the flow
+
+        // Add simulated file content to acceptance probability check
         contentToAnalyze += `\n\n--- Start of Uploaded File Content (Simulated) ---\n${fileContentForAnalysis}\n--- End of Uploaded File Content (Simulated) ---`;
     }
     
@@ -135,7 +142,10 @@ function AiPreCheckContent() {
     }
 
     try {
-      const plagiarism = await plagiarismCheck({ documentText: contentToAnalyze });
+      const plagiarism = await plagiarismCheck({ 
+        documentUrl: plagiarismInputUrl || "data:text/plain;base64," + btoa(contentToAnalyze), // Use data URI for text if no file
+        fileName: fileToUpload?.name
+      });
       setPlagiarismResult(plagiarism);
       toast({title: "Plagiarism Check Complete"});
 
@@ -144,7 +154,7 @@ function AiPreCheckContent() {
       toast({title: "Acceptance Probability Check Complete"});
 
     } catch (error) {
-      console.error("AI Pre-check error:", error);
+      // console.error("AI Pre-check error:", error);
       const errorMessage = error instanceof Error ? error.message : "An error occurred during AI analysis.";
       setAiError(errorMessage);
       toast({variant: "destructive", title: "AI Analysis Failed", description: errorMessage});
@@ -205,7 +215,7 @@ function AiPreCheckContent() {
   };
 
   return (
-    <div className="container py-8 md:py-12 px-4">
+    <div className="container py-8 md:py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-3xl mx-auto shadow-xl">
         <CardHeader className="text-center">
           <Sparkles className="mx-auto h-12 w-12 text-primary mb-2" />

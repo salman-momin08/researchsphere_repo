@@ -27,7 +27,7 @@ interface PaymentModalProps {
   onPaymentSuccess: (paperId?: string) => void;
 }
 
-const SUBMISSION_FEE = 499.00; // Updated to INR
+const SUBMISSION_FEE = 499.00; 
 type PaymentMethod = "card" | "upi";
 
 export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuccess }: PaymentModalProps) {
@@ -50,7 +50,6 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             setPaymentMethod("card");
         }
     } else {
-        // Reset all state when modal closes, regardless of current step
         setPaymentStep("form");
         setIsProcessing(false);
         setCardNumber("");
@@ -59,18 +58,16 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         setUpiId("");
         setPaymentMethod("card");
     }
-  }, [isOpen, paymentStep]); // Added paymentStep
+  }, [isOpen, paymentStep]); 
 
-  // Effect to reset to form step if the paper prop changes while modal is open
   useEffect(() => {
     if(isOpen) {
-        setPaymentStep("form"); // Reset to form if paper changes (e.g. user opens modal for another paper)
+        setPaymentStep("form"); 
     }
   }, [paper, isOpen]);
 
 
   const handleDialogClose = () => {
-    // This ensures states are reset when dialog is closed via X button or overlay click
     setPaymentStep("form");
     setIsProcessing(false);
     setCardNumber("");
@@ -101,8 +98,6 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         return;
       }
     } else if (paymentMethod === "upi") {
-      // For UPI, allow proceeding without UPI ID to simulate QR scan flow.
-      // If UPI ID is entered, validate it.
       if (upiId.trim() && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
          toast({ variant: "destructive", title: "Invalid UPI ID", description: "Please enter a valid UPI ID (e.g., yourname@bank)." });
         return;
@@ -110,24 +105,20 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
     }
 
     setIsProcessing(true);
-    // Simulate payment processing
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
 
-      // Call the onPaymentSuccess callback, passing the paper ID if available
       if (paper && paper.id) {
         onPaymentSuccess(paper.id);
       } else {
-        // Fallback if paper or paper.id is somehow null, though it shouldn't be in this flow
         onPaymentSuccess();
       }
-      setPaymentStep("success"); // Move to success step
+      setPaymentStep("success"); 
     } catch (error) {
-      console.error("Payment processing error:", error);
+      // console.error("Payment processing error:", error);
       toast({ variant: "destructive", title: "Payment Failed", description: "An unexpected error occurred during payment processing." });
-      // Do not close modal on failure, let user retry or cancel
     } finally {
-      setIsProcessing(false); // Ensure processing state is reset
+      setIsProcessing(false); 
     }
   };
 
@@ -201,12 +192,12 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-white inline-block">
                        <Image
-                        src="https://placehold.co/120x120/e2e8f0/e2e8f0.png?text=_" 
+                        src="https://placehold.co/120x120.png" 
                         alt="Scan QR Code for UPI Payment"
                         width={120}
                         height={120}
                         className="rounded"
-                        data-ai-hint="qr code payment"
+                        data-ai-hint="qr code"
                       />
                     </div>
                      <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>
@@ -240,7 +231,6 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
             </DialogFooter>
           </>
         ) : (
-            // Fallback for unexpected paymentStep value, though should not be reached
             <div className="py-10 flex flex-col items-center justify-center min-h-[200px]">
                 <LoadingSpinner size={32} />
                 <p className="mt-3 text-muted-foreground">Loading payment details...</p>

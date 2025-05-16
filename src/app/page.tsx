@@ -89,7 +89,7 @@ export default function HomePage() {
     if (user) {
       router.push('/submit');
     } else {
-      localStorage.setItem('redirectAfterLogin', '/submit'); // Set redirect path
+      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/submit');
       setShowLoginModal(true);
     }
   };
@@ -98,7 +98,7 @@ export default function HomePage() {
     <>
       {/* Hero Section */}
       <section className="py-20 md:py-32 bg-secondary">
-        <div className="container mx-auto text-center px-4">
+        <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
             Welcome to <span className="text-primary">ResearchSphere</span>
           </h1>
@@ -118,7 +118,7 @@ export default function HomePage() {
 
       {/* Features Section */}
       <section id="features" className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             Platform <span className="text-primary">Features</span>
           </h2>
@@ -140,7 +140,7 @@ export default function HomePage() {
 
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-secondary">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             How It <span className="text-primary">Works</span>
           </h2>
@@ -166,7 +166,7 @@ export default function HomePage() {
 
       {/* Guidelines Section */}
       <section id="guidelines" className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             Platform <span className="text-primary">Guidelines</span>
           </h2>
@@ -196,15 +196,15 @@ export default function HomePage() {
 
       {/* Call to Action Section */}
       <section className="py-20 md:py-32 bg-secondary">
-        <div className="container mx-auto text-center px-4">
-          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12">
+        <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
+          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12 rounded-lg shadow-md overflow-hidden">
             <Image 
-              src="https://picsum.photos/1200/400?random=2" 
-              alt="Academic paper publication process" 
+              src="https://placehold.co/1200x400.png" 
+              alt="A diverse group of researchers collaborating in a modern laboratory setting, symbolizing academic paper publication and innovation." 
               fill
-              className="rounded-lg shadow-md object-cover" 
-              data-ai-hint="academic publishing" 
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover" 
+              data-ai-hint="academic research" 
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
             />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
@@ -221,4 +221,3 @@ export default function HomePage() {
     </>
   );
 }
-

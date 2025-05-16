@@ -1,11 +1,11 @@
 
-"use client"; // Required for useAuth hook
+"use client"; 
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, FileText, Award, ShieldCheck, Building, Users, Landmark, Copy } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth"; // Import useAuth
+import { useAuth } from "@/hooks/use-auth"; 
 import { toast } from "@/hooks/use-toast";
 
 interface SubmissionOption {
@@ -57,7 +57,7 @@ const submissionOptions: SubmissionOption[] = [
       "Enhanced AI Analysis Credits",
     ],
     cta: "Subscribe Now (Details Below)",
-    href: "#subscription-details", // Link to details section
+    href: "#subscription-details", 
     icon: <Award className="h-8 w-8 mb-2 text-primary" />,
     isSubscription: true,
     bankDetails: {
@@ -105,14 +105,14 @@ const benefits = [
 ]
 
 export default function RegistrationPricingPage() {
-  const { user } = useAuth(); // Get user state
+  const { user } = useAuth(); 
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text).then(() => {
       toast({ title: "Copied to Clipboard", description: `${fieldName} copied successfully.` });
     }).catch(err => {
       toast({ variant: "destructive", title: "Copy Failed", description: `Could not copy ${fieldName}.` });
-      console.error('Failed to copy text: ', err);
+      // console.error('Failed to copy text: ', err);
     });
   };
 
@@ -184,7 +184,7 @@ export default function RegistrationPricingPage() {
                 </CardContent>
                 <div className="p-6 pt-4 mt-auto">
                   <Link href={option.href} passHref>
-                    <Button className="w-full" size="lg" onClick={option.isSubscription ? (e) => {e.preventDefault(); document.getElementById('subscription-details')?.scrollIntoView({behavior: 'smooth'});} : undefined}>
+                    <Button className="w-full" size="lg" onClick={option.isSubscription ? (e) => {e.preventDefault(); const element = document.getElementById('subscription-details'); if (element) element.scrollIntoView({behavior: 'smooth'});} : undefined}>
                       {option.cta}
                     </Button>
                   </Link>
@@ -207,7 +207,7 @@ export default function RegistrationPricingPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {Object.entries(submissionOptions.find(opt => opt.isSubscription)!.bankDetails!).map(([key, value]) => {
+                {Object.entries(submissionOptions.find(opt => opt.isSubscription && opt.bankDetails)!).map(([key, value]) => {
                   if (!value) return null;
                   const displayKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                   return (
@@ -215,7 +215,7 @@ export default function RegistrationPricingPage() {
                       <span className="font-medium text-muted-foreground">{displayKey}:</span>
                       <div className="flex items-center gap-2">
                         <span className="text-foreground">{value}</span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyToClipboard(value, displayKey)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyToClipboard(value.toString(), displayKey)}>
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>
@@ -245,4 +245,3 @@ export default function RegistrationPricingPage() {
     </div>
   );
 }
-
