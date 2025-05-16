@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { LockKeyhole, ShieldAlert } from "lucide-react"; 
 import { Button } from "@/components/ui/button"; 
-import { useToast } from "@/hooks/use-toast"; // Correct import path
+import { useToast } from "@/hooks/use-toast";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,14 +19,11 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   const router = useRouter();
   const pathname = usePathname();
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
-  const { toast } = useToast(); // Initialize toast here
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Only proceed with checks if Firebase Auth is no longer loading
     if (!loading) {
       if (!user) {
-        // User not logged in
-        // Avoid redirect loops for public auth pages
         if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/forgot-password') { 
           localStorage.setItem('redirectAfterLogin', pathname);
           if (!modalOpenAttempted && !showLoginModal) { 
@@ -35,29 +32,26 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
           }
         }
       } else {
-        // User is logged in
-        setModalOpenAttempted(false); // Reset flag if user becomes available
+        setModalOpenAttempted(false);
 
-        // Check for profile completion
-        // This check should only happen if the user object is confirmed
-        const profileIncomplete = !user.username || !user.role || !user.phoneNumber; // Added phoneNumber
+        const profileIncomplete = !user.username || !user.role || !user.phoneNumber;
         if (profileIncomplete && pathname !== '/profile/settings') {
-          localStorage.setItem('profileIncomplete', 'true'); // Ensure flag is set if navigating away
+          localStorage.setItem('completingProfile', 'true');
           router.push('/profile/settings?complete=true');
           return; 
         } else if (!profileIncomplete) {
-          localStorage.removeItem('profileIncomplete');
+          if (typeof window !== 'undefined') localStorage.removeItem('completingProfile');
         }
         
         if (adminOnly && !isAdmin) {
+          // console.warn(`ProtectedRoute: Triggering redirect for adminOnly. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
           toast({title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
-          router.push("/dashboard"); 
+          router.push(isAdmin ? "/admin/dashboard" : "/dashboard"); // Go to user dashboard if not admin but adminOnly required
         }
       }
     }
-  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]); // Added toast to dependency array
+  }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]);
 
-  // Show loading spinner while Firebase Auth is initializing
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -66,13 +60,10 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
     );
   }
 
-  // If still loading (though above check should catch it) or no user and it's a protected route:
-  // (Additional check to ensure children don't render if user becomes null after initial load for some reason)
   if (!user) {
-    // For truly public pages, they should not be wrapped by ProtectedRoute or should have a different handling.
-    // This fallback is for pages that *are* protected.
-     const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check', '/search-papers']; // Added /search-papers
+     const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/ai-pre-check', '/search-papers'];
      if (!publicPaths.includes(pathname)) {
+        // console.warn(`ProtectedRoute: Rendering Login Prompt. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
         return (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
             <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
@@ -82,7 +73,7 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
             </p>
             {!showLoginModal && (
                  <Button onClick={() => {
-                     localStorage.setItem('redirectAfterLogin', pathname); 
+                     if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname); 
                      setShowLoginModal(true)
                  }} className="mt-2">
                 Log In / Sign Up
@@ -93,8 +84,8 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
      }
   }
   
-  // Admin-only check after confirming user is logged in
   if (adminOnly && user && !isAdmin) { 
+    // console.warn(`ProtectedRoute: Rendering Access Denied. Pathname: ${pathname}, Loading: ${loading}, User: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4"> 
         <ShieldAlert className="h-16 w-16 text-destructive mb-6" />
@@ -106,7 +97,6 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
     );
   }
   
-  // Profile completion check after confirming user is logged in
   if (user && (!user.username || !user.role || !user.phoneNumber) && pathname !== '/profile/settings') {
       return (
            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -116,6 +106,6 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
       );
   }
 
-  // If all checks pass, render children
   return <>{children}</>;
 }
+
