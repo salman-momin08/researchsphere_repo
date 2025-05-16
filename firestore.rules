@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -6,75 +5,51 @@ service cloud.firestore {
 
     // Helper functions
     function isAdmin() {
-      // Check if the requesting user is authenticated and their document in /users has isAdmin == true
-      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      // Ensure the user document exists and isAdmin is explicitly true
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-
-    function isPaperOwner() {
-      // Check if the requesting user is authenticated and their UID matches the userId field in the paper resource
-      return request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Users Collection
     match /users/{userId} {
-      // 1. Authenticated users can read their own profile.
-      // 2. Admins can read any user profile.
+      // Authenticated users can read their own profile. Admins can read any.
       allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      
-      // Any authenticated user can list limited user data (e.g., for username/phone uniqueness checks by client).
-      // Be cautious with list operations; ensure client-side queries are specific or add more query constraints here if needed.
+
+      // Authenticated users can query the users collection (e.g., for username/phone uniqueness checks during profile update).
       allow list: if request.auth != null;
 
-      // Authenticated users can create their own profile document during signup.
-      // The userId in the document must match their auth uid.
+      // Authenticated users can create their own profile document.
+      // The userId field in the document must match their auth uid.
       allow create: if request.auth != null && request.auth.uid == userId &&
                        request.resource.data.userId == request.auth.uid;
 
       // Authenticated users can update their own profile.
-      // They cannot change their isAdmin status directly.
-      // An admin can update another user's isAdmin status (but not their own via this direct user-path rule).
-      allow update: if request.auth != null && (
-                      // Scenario 1: User updating their own profile (cannot change their own isAdmin field or add it if it doesn't exist and is true)
-                      (request.auth.uid == userId &&
-                        (!('isAdmin' in request.resource.data && request.resource.data.isAdmin != resource.data.isAdmin) && // Can't change existing isAdmin
-                         !(!('isAdmin' in resource.data) && 'isAdmin' in request.resource.data && request.resource.data.isAdmin == true)) // Can't add isAdmin:true if it doesn't exist
-                      ) ||
-                      // Scenario 2: Admin updating another user's 'isAdmin' field (or other fields)
-                      (isAdmin() && request.auth.uid != userId) ||
-                      // Scenario 3: Admin updating their own profile fields (but not their own isAdmin field in a way that changes its value or sets it to true if not present)
-                      (isAdmin() && request.auth.uid == userId &&
-                        (!('isAdmin' in request.resource.data && request.resource.data.isAdmin != resource.data.isAdmin) &&
-                         !(!('isAdmin' in resource.data) && 'isAdmin' in request.resource.data && request.resource.data.isAdmin == true))
-                      )
-                    );
+      // They cannot change their isAdmin status themselves.
+      allow update: if request.auth != null && request.auth.uid == userId &&
+                       (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin);
     }
 
     // Papers Collection
     match /papers/{paperId} {
       // Read operations (get)
-      allow get: if request.auth != null &&
-                    (isAdmin() || // Admins can get any paper
-                     (resource.data.userId == request.auth.uid) || // Owner can get their paper
-                     (resource.data.status == 'Published')       // Any authenticated user can get published papers
-                    );
+      allow get: if (request.auth != null && resource.data.userId == request.auth.uid) || // Owner
+                     isAdmin() || // Admin
+                     (resource.data.status == 'Published'); // Allow anyone (even unauthenticated) to read published papers if desired, or request.auth != null for authenticated only
 
       // List operations
-      // This rule allows:
-      // 1. Admins to list all papers (client query typically has no or broad filters).
-      // 2. Authenticated users to list papers they own (client query uses `where('userId', '==', auth.uid)`).
-      // 3. Authenticated users to list papers that are 'Published' (client query uses `where('status', '==', 'Published')`).
-      allow list: if request.auth != null &&
-                     (isAdmin() || 
-                      (resource.data.userId == request.auth.uid) || 
-                      (resource.data.status == 'Published')
-                     );
+      // Admins can list all.
+      // Users can list their own papers (client query must filter by userId).
+      // Anyone (even unauthenticated, or request.auth != null for authenticated) can list published papers (client query must filter by status == 'Published').
+      allow list: if isAdmin() ||
+                     (request.auth != null && request.query.resource.data.userId == request.auth.uid) || // User listing their own
+                     (request.query.resource.data.status == 'Published'); // Listing published
 
       // Create operations
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
       // Update and Delete operations
-      allow update, delete: if request.auth != null && (isPaperOwner() || isAdmin());
+      allow update, delete: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
     }
   }
 }
