@@ -27,14 +27,19 @@ for (const key in requiredClientConfigs) {
   if (!requiredClientConfigs[key]) {
     allClientConfigsPresent = false;
     missingConfigKey = key;
-    if (typeof window !== 'undefined' && !(window as any).__firebaseConfigErrorShownClient) {
-      console.error(`CRITICAL CLIENT SDK SETUP ERROR: Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your environment variables. Firebase services will be unavailable.`);
-      (window as any).__firebaseConfigErrorShownClient = true;
-    } else if (typeof window === 'undefined' && !(global as any).__firebaseConfigErrorShownServerBuild) {
-      console.error(`CRITICAL CLIENT SDK SETUP ERROR (Build/Server Context): Firebase CLIENT SDK configuration variable ${key} is missing. Firebase services will be unavailable.`);
-      (global as any).__firebaseConfigErrorShownServerBuild = true;
+    // Log error only once per context (client/server)
+    if (typeof window !== 'undefined') { // Client-side
+      if (!(window as any).__firebaseConfigErrorShownClient) {
+        console.error(`CRITICAL CLIENT SDK SETUP ERROR: Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your environment variables (e.g., .env.local and Vercel project settings). Firebase services will be unavailable.`);
+        (window as any).__firebaseConfigErrorShownClient = true;
+      }
+    } else { // Server-side (build time or SSR)
+       if (!(global as any).__firebaseConfigErrorShownServerBuild) {
+        console.error(`CRITICAL CLIENT SDK SETUP ERROR (Build/Server Context): Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your Vercel project environment variables. Firebase services will be unavailable.`);
+        (global as any).__firebaseConfigErrorShownServerBuild = true;
+      }
     }
-    break;
+    break; 
   }
 }
 
@@ -58,8 +63,8 @@ if (appFirebaseConfig) {
     try {
       app = initializeApp(appFirebaseConfig);
     } catch (e: any) {
-      console.error("Firebase Client SDK: initializeApp() FAILED.", e.message, e.code, e);
-      app = null; // Ensure app is null if init fails
+      console.error("Firebase Client SDK: initializeApp() FAILED.", e.message, e.code);
+      app = null; 
     }
   } else {
     app = getApp();
@@ -69,23 +74,20 @@ if (appFirebaseConfig) {
     try {
       auth = getAuth(app);
       db = getFirestore(app);
-      // console.info("Firebase Client SDK: Auth and Firestore initialized successfully with Project ID:", appFirebaseConfig.projectId);
     } catch (e: any) {
-      console.error("Firebase Client SDK: Failed to get Auth/Firestore instance from initialized app.", e.message, e.code, e);
+      console.error("Firebase Client SDK: Failed to get Auth/Firestore instance from initialized app.", e.message, e.code);
       auth = null;
       db = null;
     }
   }
 } else {
-  if (!missingConfigKey && typeof window !== 'undefined' && !(window as any).__firebaseGenericConfigError) {
-    // This case is less likely if the loop above catches the first missing key.
-    console.error("Firebase Client SDK: Initialization SKIPPED due to missing configuration variables. Full config object could not be constructed.");
-    (window as any).__firebaseGenericConfigError = true;
-  } else if (!missingConfigKey && typeof window === 'undefined' && !(global as any).__firebaseGenericConfigErrorServer) {
-    console.error("Firebase Client SDK (Build/Server Context): Initialization SKIPPED due to missing configuration variables.");
-    (global as any).__firebaseGenericConfigErrorServer = true;
+  if (!missingConfigKey && typeof window === 'undefined' && !(global as any).__firebaseGenericConfigErrorServer) {
+      // This means allClientConfigsPresent was false but the loop didn't set missingConfigKey (shouldn't happen often)
+      console.error("Firebase Client SDK (Build/Server Context): Initialization SKIPPED due to missing configuration variables. Full config object could not be constructed.");
+      (global as any).__firebaseGenericConfigErrorServer = true;
   }
-  // If missingConfigKey is set, the more specific error is already logged.
+  // If missingConfigKey is set, the specific error is already logged.
+  // The `auth` and `db` will remain `null`.
 }
 
 const googleAuthCredentialProvider = new GoogleAuthProvider();
