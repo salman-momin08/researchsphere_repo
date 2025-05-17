@@ -6,9 +6,9 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { LockKeyhole, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast"; // Ensure toast is imported
+import { AUTHOR_PROFILE_SETTINGS_PATH } from "@/context/auth-context"; // Import constant
 
-const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -20,45 +20,39 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
   const router = useRouter();
   const pathname = usePathname();
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
-  const { toast } = useToast();
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) return; // Wait until auth state is determined
 
     const isAuthPage = ['/login', '/signup', '/forgot-password'].includes(pathname);
     const isPublicPage = [
       '/', '/terms', '/privacy', '/contact-us',
       '/key-committee', '/sample-templates', '/registration', '/search-papers'
-    ].includes(pathname) || pathname.startsWith('/papers/');
+    ].includes(pathname) || pathname.startsWith('/papers/'); // Published papers are public
 
     if (!user) {
-      if (!isAuthPage && !isPublicPage) {
+      // User is not logged in
+      if (!isAuthPage && !isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH) {
+         // If trying to access a protected page (and not profile settings specifically)
         if (typeof window !== "undefined") {
           localStorage.setItem("redirectAfterLogin", pathname);
         }
-
         if (!showLoginModal && !modalOpenAttempted) {
           setShowLoginModal(true);
           setModalOpenAttempted(true);
         }
       } else {
-        setModalOpenAttempted(false);
+        setModalOpenAttempted(false); // Reset if on public/auth page
       }
-      return;
+      return; // Exit early if no user
     }
 
-    setModalOpenAttempted(false);
+    // User is logged in
+    setModalOpenAttempted(false); // Reset modal attempt flag
 
-    const isProfileComplete = !!(user.username && user.role && user.phoneNumber);
-
-    if (
-      !isProfileComplete &&
-      pathname !== AUTHOR_PROFILE_SETTINGS_PATH &&
-      !pathname.startsWith(`${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`)
-    ) {
-      // Do nothing: AuthContext will redirect to profile completion page.
-      return;
-    }
+    // Profile completion check is now primarily handled by AuthContext redirection logic
+    // ProtectedRoute mainly ensures role-based access (adminOnly)
 
     if (adminOnly && !isAdmin) {
       toast({
@@ -66,11 +60,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
         description: "You do not have permission to view this page.",
         variant: "destructive",
       });
+      // Redirect to their appropriate dashboard
       router.push(user.role === "Reviewer" ? "/reviewer/dashboard" : "/author/dashboard");
     }
-  }, [user, loading, pathname, isAdmin, adminOnly, showLoginModal, modalOpenAttempted, setShowLoginModal, toast, router]);
 
-  // Initial loading screen
+  }, [user, loading, pathname, isAdmin, adminOnly, showLoginModal, setShowLoginModal, toast, router, modalOpenAttempted]);
+
+
+  // Initial loading screen while auth state is being determined
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -79,33 +76,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     );
   }
 
-  const isProtectedPath = pathname.startsWith('/author/') || pathname.startsWith('/reviewer/') || (adminOnly && pathname.startsWith('/admin/'));
+  const isUserArea = pathname.startsWith('/author/') || pathname.startsWith('/reviewer/');
+  const isAdminArea = adminOnly && pathname.startsWith('/admin/');
 
-  if (!user && isProtectedPath) {
+  // If no user, and trying to access a protected area (excluding profile settings which handles its own initial state)
+  if (!user && (isUserArea || isAdminArea) && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
+    // AuthContext's useEffect will handle showing the login modal
+    // This part of ProtectedRoute primarily ensures children aren't rendered prematurely
+    // or shows a loading state if modal logic is slightly delayed by context updates.
     if (!showLoginModal && !modalOpenAttempted) {
-      return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-          <LoadingSpinner size={48} />
-          <p className="ml-2">Loading authentication...</p>
-        </div>
-      );
+       return (
+         <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+           <LoadingSpinner size={48} />
+           <p className="ml-2">Checking authentication...</p>
+         </div>
+       );
     }
-
-    if (pathname === AUTHOR_PROFILE_SETTINGS_PATH && !showLoginModal) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
-          <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
-          <h2 className="text-2xl font-semibold mb-3">Authentication Required</h2>
-          <p className="text-muted-foreground mb-6 max-w-md">
-            You need to be logged in to access this page.
-          </p>
-        </div>
-      );
-    }
-
-    return null;
+    return null; // AuthContext will show LoginModal
   }
 
+
+  // If trying to access adminOnly page without admin rights
   if (adminOnly && user && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
@@ -123,21 +114,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
       </div>
     );
   }
-
-  if (
-    user &&
-    (!user.username || !user.role || !user.phoneNumber) &&
-    pathname !== AUTHOR_PROFILE_SETTINGS_PATH &&
-    !pathname.startsWith(`${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`)
-  ) {
-    return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-        <LoadingSpinner size={48} />
-        <p className="ml-2">Checking profile status...</p>
-      </div>
-    );
-  }
-
+  
+  // If user exists and all checks pass (or AuthContext is handling profile completion redirect)
   return <>{children}</>;
 };
 
