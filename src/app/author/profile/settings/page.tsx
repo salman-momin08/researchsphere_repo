@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { UserCog } from "lucide-react";
 import { useSearchParams } from "next/navigation"; 
 
-function ProfileSettingsContent() {
+// Renamed function for clarity if it was conflicting, ensuring default export
+function AuthorProfileSettingsPageContent() {
   const searchParams = useSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
@@ -36,7 +37,7 @@ function ProfileSettingsContent() {
 export default function AuthorProfileSettingsPage() {
   return (
     <ProtectedRoute>
-      <ProfileSettingsContent />
+      <AuthorProfileSettingsPageContent />
     </ProtectedRoute>
   );
 }
