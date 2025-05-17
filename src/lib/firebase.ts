@@ -3,7 +3,6 @@ import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions 
 import { getAuth, GoogleAuthProvider, GithubAuthProvider, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
-// Read environment variables
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
 const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -11,48 +10,32 @@ const firebaseStorageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 const firebaseMessagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 
-const requiredClientConfigs: { [key: string]: string | undefined } = {
-  NEXT_PUBLIC_FIREBASE_API_KEY: firebaseApiKey,
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: firebaseAuthDomain,
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: firebaseProjectId,
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: firebaseStorageBucket,
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: firebaseMessagingSenderId,
-  NEXT_PUBLIC_FIREBASE_APP_ID: firebaseAppId,
-};
+let appFirebaseConfig: FirebaseOptions | null = null;
 
-let allClientConfigsPresent = true;
-let missingConfigKey: string | null = null;
-
-for (const key in requiredClientConfigs) {
-  if (!requiredClientConfigs[key]) {
-    allClientConfigsPresent = false;
-    missingConfigKey = key;
-    // Log error only once per context (client/server)
-    if (typeof window !== 'undefined') { // Client-side
-      if (!(window as any).__firebaseConfigErrorShownClient) {
-        console.error(`CRITICAL CLIENT SDK SETUP ERROR: Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your environment variables (e.g., .env.local and Vercel project settings). Firebase services will be unavailable.`);
-        (window as any).__firebaseConfigErrorShownClient = true;
-      }
-    } else { // Server-side (build time or SSR)
-       if (!(global as any).__firebaseConfigErrorShownServerBuild) {
-        console.error(`CRITICAL CLIENT SDK SETUP ERROR (Build/Server Context): Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your Vercel project environment variables. Firebase services will be unavailable.`);
-        (global as any).__firebaseConfigErrorShownServerBuild = true;
-      }
-    }
-    break; 
-  }
+if (
+  firebaseApiKey &&
+  firebaseAuthDomain &&
+  firebaseProjectId &&
+  firebaseStorageBucket &&
+  firebaseMessagingSenderId &&
+  firebaseAppId
+) {
+  appFirebaseConfig = {
+    apiKey: firebaseApiKey,
+    authDomain: firebaseAuthDomain,
+    projectId: firebaseProjectId,
+    storageBucket: firebaseStorageBucket,
+    messagingSenderId: firebaseMessagingSenderId,
+    appId: firebaseAppId,
+  };
+} else {
+  console.error(
+    "CRITICAL CLIENT SDK SETUP ERROR: One or more Firebase environment variables (NEXT_PUBLIC_FIREBASE_...) are missing. " +
+    "Please ensure they are set in your .env.local file (for local development) " +
+    "AND in your Vercel project environment variables (for deployment). " +
+    "Firebase services will be unavailable."
+  );
 }
-
-const appFirebaseConfig: FirebaseOptions | null = allClientConfigsPresent
-  ? {
-      apiKey: firebaseApiKey!,
-      authDomain: firebaseAuthDomain!,
-      projectId: firebaseProjectId!,
-      storageBucket: firebaseStorageBucket!,
-      messagingSenderId: firebaseMessagingSenderId!,
-      appId: firebaseAppId!,
-    }
-  : null;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -63,8 +46,8 @@ if (appFirebaseConfig) {
     try {
       app = initializeApp(appFirebaseConfig);
     } catch (e: any) {
-      console.error("Firebase Client SDK: initializeApp() FAILED.", e.message, e.code);
-      app = null; 
+      console.error("Firebase Client SDK: initializeApp() FAILED.", e.message, e.code, "Config used:", appFirebaseConfig);
+      app = null;
     }
   } else {
     app = getApp();
@@ -73,21 +56,19 @@ if (appFirebaseConfig) {
   if (app) {
     try {
       auth = getAuth(app);
+    } catch (e: any) {
+      console.error("Firebase Client SDK: getAuth() FAILED.", e.message, e.code);
+      auth = null;
+    }
+    try {
       db = getFirestore(app);
     } catch (e: any) {
-      console.error("Firebase Client SDK: Failed to get Auth/Firestore instance from initialized app.", e.message, e.code);
-      auth = null;
+      console.error("Firebase Client SDK: getFirestore() FAILED.", e.message, e.code);
       db = null;
     }
   }
 } else {
-  if (!missingConfigKey && typeof window === 'undefined' && !(global as any).__firebaseGenericConfigErrorServer) {
-      // This means allClientConfigsPresent was false but the loop didn't set missingConfigKey (shouldn't happen often)
-      console.error("Firebase Client SDK (Build/Server Context): Initialization SKIPPED due to missing configuration variables. Full config object could not be constructed.");
-      (global as any).__firebaseGenericConfigErrorServer = true;
-  }
-  // If missingConfigKey is set, the specific error is already logged.
-  // The `auth` and `db` will remain `null`.
+  // This case is handled by the AuthContext to show an error message.
 }
 
 const googleAuthCredentialProvider = new GoogleAuthProvider();

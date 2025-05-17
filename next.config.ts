@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      { // Added for Cloudinary
+      {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
         port: '',
@@ -58,6 +58,7 @@ const nextConfig: NextConfig = {
         'node:http2': false,
         'node:dns': false,
         'node:perf_hooks': false,
+        '@opentelemetry/exporter-jaeger': false, // Added to attempt to resolve Jaeger build warnings
       };
     }
     return config;

@@ -8,7 +8,8 @@ import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import React, { Suspense } from 'react';
 import ClientSideComponents from '@/components/layout/ClientSideComponents';
-import GlobalErrorBoundary from '@/components/shared/GlobalErrorBoundary'; // Import the Error Boundary
+import GlobalErrorBoundary from '@/components/shared/GlobalErrorBoundary';
+import LoadingSpinner from '@/components/shared/LoadingSpinner'; // Added for Suspense fallback
 
 const inter = Inter({
   variable: '--font-inter',
@@ -28,8 +29,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <GlobalErrorBoundary> {/* Wrap with Error Boundary */}
-          <Suspense fallback={<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}>Loading application...</div>}>
+        <GlobalErrorBoundary>
+          <Suspense fallback={<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}><LoadingSpinner size={48} /><p className="ml-3">Loading application...</p></div>}>
             <AuthProvider>
               <div className="antialiased flex flex-col min-h-screen">
                 <Header />

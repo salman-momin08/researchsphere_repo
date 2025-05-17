@@ -1,30 +1,33 @@
 
-'use server'; // Keep this if your AI flows are server actions
+'use server';
 
 import { genkit, GenkitError, type ModelArgument } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-import { z } from 'zod'; // Assuming z is used by your flows, keep if needed
+import { z } from 'zod';
 
 let aiInstance: any;
+const isGenkitInitialized = false; // Track initialization
 
 try {
-  // Ensure GOOGLE_API_KEY or GEMINI_API_KEY (depending on googleAI plugin needs for specific models or Vertex AI)
-  // is available in the server environment (e.g., Vercel serverless functions).
+  // Check for server-side API keys (GOOGLE_API_KEY or GEMINI_API_KEY for googleAI plugin)
   // These are NOT prefixed with NEXT_PUBLIC_.
   if (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
     aiInstance = genkit({
       plugins: [googleAI()],
     });
-    // console.info("Genkit AI initialized successfully with provided API key.");
+    // console.info("Genkit AI: Initialized successfully with provided API key.");
   } else {
     // Attempt to initialize with Application Default Credentials (ADC) if GOOGLE_APPLICATION_CREDENTIALS is set,
     // or if the environment (like Google Cloud Run/Functions) provides them automatically.
     // If no specific keys are found, googleAI() might still work with free-tier models or ADC.
-    // console.warn("Genkit AI: GOOGLE_API_KEY or GEMINI_API_KEY is not set. Attempting to initialize googleAI() plugin, which may rely on Application Default Credentials or free tier access.");
+    // console.warn(
+    //   "Genkit AI: GOOGLE_API_KEY or GEMINI_API_KEY is not set. Attempting to initialize googleAI() plugin, " +
+    //   "which may rely on Application Default Credentials or free tier access if available in the environment."
+    // );
     aiInstance = genkit({
       plugins: [googleAI()],
     });
-    // console.info("Genkit AI initialized (potentially using ADC or free tier for googleAI).");
+    // console.info("Genkit AI: Initialized (potentially using ADC or free tier for googleAI).");
   }
 } catch (error: any) {
   console.error(
@@ -36,17 +39,17 @@ try {
   // Provide a stub that allows the app to load but AI features will fail.
   aiInstance = {
     defineFlow: (config: any, handler: any) => {
-      console.warn(`Genkit AI STUB (init error): defineFlow called for ${config.name}. AI not initialized.`);
+      // console.warn(`Genkit AI STUB (init error): defineFlow called for ${config.name}. AI not initialized.`);
       return async (input: any) => {
         throw new GenkitError({
           source: 'genkit-stub',
           status: 'UNAVAILABLE',
-          message: `AI service (Genkit) failed to initialize. Flow '${config.name}' cannot run. Check server logs for Genkit/GoogleAI configuration issues, especially server-side API keys.`,
+          message: `AI service (Genkit) failed to initialize due to configuration issues (e.g., missing server-side API key). Flow '${config.name}' cannot run. Check server logs.`,
         });
       };
     },
     definePrompt: (config: any) => {
-      console.warn(`Genkit AI STUB (init error): definePrompt called for ${config.name}. AI not initialized.`);
+      // console.warn(`Genkit AI STUB (init error): definePrompt called for ${config.name}. AI not initialized.`);
       return async (input: any) => {
         throw new GenkitError({
           source: 'genkit-stub',
@@ -56,25 +59,26 @@ try {
       };
     },
     generate: async (options: ModelArgument) => {
-      console.error("Genkit AI STUB (init error): generate called. AI not initialized. Options:", options.prompt);
+      // console.error("Genkit AI STUB (init error): generate called. AI not initialized. Prompt:", options.prompt);
       throw new GenkitError({
         source: 'genkit-stub',
         status: 'UNAVAILABLE',
-        message: `AI service (Genkit) failed to initialize. Generation for prompt '${options.prompt}' cannot run.`,
+        message: `AI service (Genkit) failed to initialize. Generation cannot run.`,
       });
     },
     defineSchema: (name: string, schema: any) => {
-        console.warn(`Genkit AI STUB (init error): defineSchema called for ${name}. AI not initialized.`);
-        return schema;
+        // console.warn(`Genkit AI STUB (init error): defineSchema called for ${name}. AI not initialized.`);
+        return schema; // Return the schema itself so type inference doesn't break
     },
     embed: async (options: any) => {
-        console.warn(`Genkit AI STUB (init error): embed called. AI not initialized.`);
+        // console.warn(`Genkit AI STUB (init error): embed called. AI not initialized.`);
         throw new GenkitError({
           source: 'genkit-stub',
           status: 'UNAVAILABLE',
           message: `AI service (Genkit) failed to initialize. Embedding cannot run.`,
         });
     }
+    // Add stubs for other Genkit functions your app might use if initialization fails.
   };
 }
 
