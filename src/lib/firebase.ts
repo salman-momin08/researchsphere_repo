@@ -21,22 +21,23 @@ const requiredClientConfigs: { [key: string]: string | undefined } = {
 };
 
 let allClientConfigsPresent = true;
+let missingConfigKey: string | null = null;
+
 for (const key in requiredClientConfigs) {
-  if (!requiredClientConfigs[key]) { // Checks for falsy values (e.g., undefined, empty string)
+  if (!requiredClientConfigs[key]) {
     allClientConfigsPresent = false;
+    missingConfigKey = key;
     if (typeof window !== 'undefined' && !(window as any).__firebaseConfigErrorShownClient) {
-      console.error(`CRITICAL CLIENT SDK SETUP ERROR: Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your .env.local file and the development server has been restarted. Firebase services will be unavailable.`);
-      (window as any).__firebaseConfigErrorShownClient = true; // Show only once per client session
-    } else if (typeof window === 'undefined' && !(global as any).__firebaseConfigErrorShownServer) {
-      // This log might appear during build if env vars are missing in the build environment
+      console.error(`CRITICAL CLIENT SDK SETUP ERROR: Firebase CLIENT SDK configuration variable ${key} is missing. Please ensure it is set in your environment variables. Firebase services will be unavailable.`);
+      (window as any).__firebaseConfigErrorShownClient = true;
+    } else if (typeof window === 'undefined' && !(global as any).__firebaseConfigErrorShownServerBuild) {
       console.error(`CRITICAL CLIENT SDK SETUP ERROR (Build/Server Context): Firebase CLIENT SDK configuration variable ${key} is missing. Firebase services will be unavailable.`);
-      (global as any).__firebaseConfigErrorShownServer = true; // Show only once per server/build process
+      (global as any).__firebaseConfigErrorShownServerBuild = true;
     }
     break;
   }
 }
 
-// Construct the config object only if all variables are present
 const appFirebaseConfig: FirebaseOptions | null = allClientConfigsPresent
   ? {
       apiKey: firebaseApiKey!,
@@ -56,23 +57,19 @@ if (appFirebaseConfig) {
   if (!getApps().length) {
     try {
       app = initializeApp(appFirebaseConfig);
-      // console.info("Firebase Client SDK: Initialized successfully with Project ID:", appFirebaseConfig.projectId);
     } catch (e: any) {
-      let detailedErrorMessage = "Firebase Client SDK: Initialization FAILED (initializeApp call).";
-      if (e && e.message) detailedErrorMessage += ` Message: ${e.message}.`;
-      if (e && e.code) detailedErrorMessage += ` Code: ${e.code}.`;
-      console.error(detailedErrorMessage, e); // Log the full error object
+      console.error("Firebase Client SDK: initializeApp() FAILED.", e.message, e.code, e);
       app = null; // Ensure app is null if init fails
     }
   } else {
     app = getApp();
-    // console.info("Firebase Client SDK: Re-using existing Firebase app instance.");
   }
 
   if (app) {
     try {
       auth = getAuth(app);
       db = getFirestore(app);
+      // console.info("Firebase Client SDK: Auth and Firestore initialized successfully with Project ID:", appFirebaseConfig.projectId);
     } catch (e: any) {
       console.error("Firebase Client SDK: Failed to get Auth/Firestore instance from initialized app.", e.message, e.code, e);
       auth = null;
@@ -80,12 +77,18 @@ if (appFirebaseConfig) {
     }
   }
 } else {
-  // This message is now logged when allClientConfigsPresent is false
-  // console.error("Firebase Client SDK: Initialization SKIPPED due to missing configuration variables. Firebase services will not be available.");
+  if (!missingConfigKey && typeof window !== 'undefined' && !(window as any).__firebaseGenericConfigError) {
+    // This case is less likely if the loop above catches the first missing key.
+    console.error("Firebase Client SDK: Initialization SKIPPED due to missing configuration variables. Full config object could not be constructed.");
+    (window as any).__firebaseGenericConfigError = true;
+  } else if (!missingConfigKey && typeof window === 'undefined' && !(global as any).__firebaseGenericConfigErrorServer) {
+    console.error("Firebase Client SDK (Build/Server Context): Initialization SKIPPED due to missing configuration variables.");
+    (global as any).__firebaseGenericConfigErrorServer = true;
+  }
+  // If missingConfigKey is set, the more specific error is already logged.
 }
 
 const googleAuthCredentialProvider = new GoogleAuthProvider();
 const githubAuthCredentialProvider = new GithubAuthProvider();
 
 export { auth, db, googleAuthCredentialProvider, githubAuthCredentialProvider };
-// Removed the default export: export default appFirebaseConfig;
