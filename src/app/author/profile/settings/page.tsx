@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { UserCog } from "lucide-react";
 import { useSearchParams } from "next/navigation"; 
 
-// Renamed function for clarity if it was conflicting, ensuring default export
+// Renamed default export for clarity and to ensure Next.js picks it up correctly
 function AuthorProfileSettingsPageContent() {
   const searchParams = useSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
