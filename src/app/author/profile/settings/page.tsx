@@ -1,9 +1,9 @@
 
 "use client";
 
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import ProfileUpdateForm from "@/components/profile/ProfileUpdateForm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
 import { useSearchParams } from "next/navigation"; 
 
