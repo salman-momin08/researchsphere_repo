@@ -87,9 +87,9 @@ export default function HomePage() {
 
   const handleSubmitPaperClick = () => {
     if (user) {
-      router.push('/submit');
+      router.push('/user/submit');
     } else {
-      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/submit');
+      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/user/submit');
       setShowLoginModal(true);
     }
   };
@@ -97,15 +97,15 @@ export default function HomePage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="py-20 md:py-32 bg-secondary">
+      <section className="py-12 md:py-20 bg-secondary">
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
             Welcome to <span className="text-primary">ResearchSphere</span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             The premier platform for students and researchers to upload, manage, and enhance their academic papers with cutting-edge AI evaluation tools.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-10">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
             <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
               <UploadCloud className="mr-2 h-5 w-5" /> Submit Your Paper
             </Button>
@@ -119,7 +119,7 @@ export default function HomePage() {
       {/* Features Section */}
       <section id="features" className="py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
             Platform <span className="text-primary">Features</span>
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -141,7 +141,7 @@ export default function HomePage() {
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-secondary">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
             How It <span className="text-primary">Works</span>
           </h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
@@ -167,7 +167,7 @@ export default function HomePage() {
       {/* Guidelines Section */}
       <section id="guidelines" className="py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
             Platform <span className="text-primary">Guidelines</span>
           </h2>
           <div className="max-w-3xl mx-auto">
@@ -195,9 +195,9 @@ export default function HomePage() {
       </section>
 
       {/* Call to Action Section */}
-      <section className="py-20 md:py-32 bg-secondary">
+      <section className="py-12 md:py-20 bg-secondary">
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-12 rounded-lg shadow-md overflow-hidden">
+          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-8 rounded-lg shadow-md overflow-hidden">
             <Image
               src="https://placehold.co/1200x400.png"
               alt="A diverse group of researchers collaborating in a modern laboratory setting, symbolizing academic paper publication and innovation."
@@ -210,7 +210,7 @@ export default function HomePage() {
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Ready to Elevate Your Research?
           </h2>
-          <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
+          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Join ResearchSphere today and take the first step towards publishing your impactful work.
           </p>
           <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
