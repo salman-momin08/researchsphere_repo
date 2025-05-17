@@ -7,55 +7,62 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { LockKeyhole, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast"; // Keep this import
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   adminOnly?: boolean;
 }
 
+const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings'; // Ensure this matches context
+
 export default function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
   const { user, loading, isAdmin, showLoginModal, setShowLoginModal } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
-  const { toast } = useToast();
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/search-papers'];
-        const isAdminPath = pathname.startsWith('/admin');
-        const isUserPath = pathname.startsWith('/user');
+    if (loading) {
+      return; // Wait until loading is false
+    }
 
-        if (!publicPaths.includes(pathname) && !isAdminPath && !isUserPath && pathname !== '/papers/[id]') { // Allow /papers/[id] initially, as its content can be public
-             // Let specific /papers/[id] logic handle auth if needed
-        } else if ((isAdminPath || isUserPath) && !publicPaths.includes(pathname) && !showLoginModal && !modalOpenAttempted) {
-           if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname);
-           setShowLoginModal(true);
-           setModalOpenAttempted(true);
-        }
-      } else { // User is logged in
-        setModalOpenAttempted(false); // Reset attempt flag
+    // console.warn(`ProtectedRoute: Path: ${pathname}, Loading: ${loading}, UserID: ${user?.id}, IsAdmin: ${isAdmin}, AdminOnly: ${adminOnly}`);
 
-        const isProfileComplete = !!(user.username && user.role && user.phoneNumber);
-        const isProfileSettingsPage = pathname === '/user/profile/settings';
-        
-        if (!isProfileComplete && !isProfileSettingsPage) {
-          if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
-          router.push('/user/profile/settings?complete=true');
-          return;
-        } else if (isProfileComplete && isProfileSettingsPage && (typeof window !== 'undefined' && localStorage.getItem('completingProfile') === 'true')) {
-          // This case is now primarily handled by AuthContext's redirection after profile update
+    if (!user) { // User is not logged in
+      const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+      const isPublicPage = ['/', '/terms', '/privacy', '/contact-us', '/key-committee', '/sample-templates', '/registration', '/search-papers'].includes(pathname);
+      
+      if (!isAuthPage && !isPublicPage && !pathname.startsWith('/papers/')) { // /papers/[id] might have public logic
+        // console.warn(`ProtectedRoute: User not logged in, attempting to access protected route ${pathname}. Setting redirect and showing modal.`);
+        if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname);
+        if (!showLoginModal && !modalOpenAttempted) {
+            setShowLoginModal(true);
+            setModalOpenAttempted(true);
         }
-        
-        if (adminOnly && !isAdmin) {
-          toast({title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
-          router.push(user ? "/user/dashboard" : "/"); // Redirect non-admin to user dashboard or home
-        }
+      } else {
+        setModalOpenAttempted(false); // Reset if on public/auth page
+      }
+    } else { // User IS logged in
+      setModalOpenAttempted(false); // Reset attempt flag
+      const isProfileComplete = !!(user.username && user.role && user.phoneNumber);
+
+      if (!isProfileComplete && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?complete=true')) {
+        // console.warn(`ProtectedRoute: User ${user.id} profile incomplete. Redirecting to ${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true from ${pathname}`);
+        if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
+        router.push(`${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`);
+        return;
+      }
+      
+      if (adminOnly && !isAdmin) {
+        // console.warn(`ProtectedRoute: Non-admin user ${user.id} attempting to access admin-only route ${pathname}. Redirecting.`);
+        toast({title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
+        router.push(user.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard');
       }
     }
   }, [user, loading, isAdmin, adminOnly, router, pathname, setShowLoginModal, modalOpenAttempted, showLoginModal, toast]);
+
 
   if (loading) {
     return (
@@ -65,9 +72,10 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
     );
   }
 
-  // If user is not logged in and trying to access a protected route (handled by useEffect setting modal)
-  if (!user && (pathname.startsWith('/user/') || (adminOnly && pathname.startsWith('/admin/')))) {
-     if (!showLoginModal && !modalOpenAttempted) { // Double check to prevent flash if modal is already opening
+  // If user is not logged in and trying to access a protected route (that isn't an auth page itself)
+  const isExplicitlyProtected = pathname.startsWith('/author/') || pathname.startsWith('/reviewer/') || (adminOnly && pathname.startsWith('/admin/'));
+  if (!user && isExplicitlyProtected) {
+     if (!showLoginModal && !modalOpenAttempted) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <LoadingSpinner size={48} />
@@ -75,9 +83,6 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
             </div>
         );
      }
-     // If modal is expected to be open, render children (which might be null or the modal itself if part of children)
-     // Or, render a generic loading/placeholder until modal logic fully takes over.
-     // This return is to prevent rendering protected content while modal is supposed to be up or user is null.
      return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
             <LockKeyhole className="h-16 w-16 text-muted-foreground mb-6" />
@@ -88,7 +93,8 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
              {!showLoginModal && (
                  <Button onClick={() => {
                      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', pathname);
-                     setShowLoginModal(true)
+                     setShowLoginModal(true);
+                     setModalOpenAttempted(true); // Set flag when button is clicked
                  }} className="mt-2">
                 Log In / Sign Up
               </Button>
@@ -105,14 +111,17 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
         <p className="text-muted-foreground max-w-md">
           You do not have the necessary permissions to view this page.
         </p>
-         <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard')} className="mt-4">
+         <Button onClick={() => router.push(user.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard')} className="mt-4">
             Go to Your Dashboard
         </Button>
       </div>
     );
   }
   
-  if (user && (!user.username || !user.role || !user.phoneNumber) && pathname !== '/user/profile/settings') {
+  // If profile is incomplete and user is not already on the profile settings page.
+  // This check is also in AuthContext, but ProtectedRoute acts as a safeguard for its children.
+  if (user && (!user.username || !user.role || !user.phoneNumber) && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?complete=true')) {
+      // console.warn(`ProtectedRoute (Render Fallback): User ${user.id} profile incomplete on path ${pathname}. Showing loading/redirecting message.`);
       return (
            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
              <LoadingSpinner size={48} />
