@@ -25,10 +25,8 @@ export default function UserManagementPage() {
     setError(null);
     try {
       const fetchedUsers = await getAllUsers();
-      // console.log(`UserManagementPage: Fetched ${fetchedUsers.length} users from service.`);
       setUsers(fetchedUsers);
     } catch (err: any) {
-      console.error("UserManagementPage: Error fetching users:", err);
       setError(err.message || "Failed to load users.");
       toast({ variant: "destructive", title: "Error Loading Users", description: err.message });
     } finally {
@@ -54,7 +52,6 @@ export default function UserManagementPage() {
       toast({ title: "Success", description: `User admin status updated.` });
       fetchUsers(); // Refresh the list
     } catch (err: any) {
-      // console.error("UserManagementPage: Error toggling admin status:", err);
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update admin status." });
     }
   };
@@ -154,4 +151,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-

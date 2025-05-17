@@ -13,13 +13,24 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 import { auth, db as firestoreDb } from "@/lib/firebase";
 import type { Paper, PaperStatus } from '@/types';
 
+// Helper to convert Firestore Timestamps in paper data
 const convertPaperTimestamps = (paperData: any): Paper => {
-  const convert = (timestamp: any) =>
-    timestamp instanceof Timestamp ? timestamp.toDate().toISOString() : (timestamp || null);
+  const convert = (timestamp: any) => {
+    if (!timestamp) return null;
+    if (timestamp instanceof Timestamp) return timestamp.toDate().toISOString();
+    if (typeof timestamp === 'string') {
+      if (!isNaN(new Date(timestamp).getTime())) return new Date(timestamp).toISOString();
+    }
+    if (typeof timestamp === 'object' && timestamp._seconds && typeof timestamp._seconds === 'number') {
+      return new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1000000).toISOString();
+    }
+    return String(timestamp); // Fallback
+  };
 
   return {
     ...paperData,
@@ -36,8 +47,8 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
   if (!cloudName || !uploadPreset) {
-    const errorMsg = "Cloudinary configuration (cloud name or upload preset) is missing in environment variables. Please check NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.";
-    console.error("Paper Service (uploadToCloudinary):", errorMsg);
+    const errorMsg = "Cloudinary configuration (cloud name or upload preset) is missing. Please check environment variables.";
+    console.error("Paper Service (uploadToCloudinary):", errorMsg); // Critical for developers
     throw new Error(errorMsg);
   }
   
@@ -54,8 +65,9 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Paper Service (uploadToCloudinary): Cloudinary upload failed:", data.error?.message || response.statusText);
-      throw new Error(data.error?.message || "Cloudinary upload failed.");
+      const cloudinaryErrorMsg = data.error?.message || `Cloudinary upload failed with status ${response.status}.`;
+      console.error("Paper Service (uploadToCloudinary): Cloudinary upload failed:", cloudinaryErrorMsg); // Critical for developers
+      throw new Error(cloudinaryErrorMsg);
     }
     
     return {
@@ -65,18 +77,18 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
       format: data.format,
       resource_type: data.resource_type
     };
-  } catch (error) {
-    console.error("Paper Service (uploadToCloudinary): Error during Cloudinary upload:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Paper Service (uploadToCloudinary): Error during Cloudinary upload:", error.message, error); // Critical for developers
+    throw error; // Re-throw to be caught by calling function
   }
 };
 
 
 export const addPaper = async (
   paperData: Omit<Paper, 'id' | 'uploadDate' | 'status' | 'userId' | 'fileUrl' | 'fileName' | 'lastUpdatedAt'> & { paymentOption: "payNow" | "payLater" },
-  fileToUpload: File | null,
+  fileToUpload: File | null, // Required for new submissions
   userIdClient: string,
-  existingPaperId?: string
+  existingPaperId?: string // For updating an existing paper (e.g., after PayNow)
 ): Promise<Paper> => {
   if (!auth.currentUser) {
     throw new Error("User not authenticated. Cannot submit paper.");
@@ -88,34 +100,35 @@ export const addPaper = async (
   if (!firestoreDb) {
     throw new Error("Database service not available. Please try again later.");
   }
+
   const now = new Date();
   let status: PaperStatus = 'Submitted';
-  let paymentDueDate: Date | null = null;
-  let paidAt: Date | null = null;
+  let paymentDueDate: Date | Timestamp | null = null;
+  let paidAt: Date | Timestamp | null = null;
   let submissionDate: Date | Timestamp | null = null;
 
-  let cloudinaryFileUrl: string | undefined = undefined;
-  let originalFileName: string | undefined = undefined;
+  let cloudinaryFileUrl: string | null = null;
+  let originalFileName: string | null = null;
 
   if (existingPaperId) {
+    // This is an update flow, likely after "Pay Now" success
     const paperDocRef = doc(firestoreDb, "papers", existingPaperId);
     const paperSnap = await getDoc(paperDocRef);
     if (!paperSnap.exists()) {
       throw new Error("Original paper not found for update.");
     }
     const existingPaperData = paperSnap.data();
-    cloudinaryFileUrl = existingPaperData.fileUrl; 
-    originalFileName = existingPaperData.fileName;
+    cloudinaryFileUrl = existingPaperData.fileUrl || null;
+    originalFileName = existingPaperData.fileName || null;
 
-    if (paperData.paymentOption === 'payNow') { 
-      status = 'Submitted';
-      paidAt = now;
-      submissionDate = Timestamp.fromDate(now);
-      paymentDueDate = null;
-    } else {
-      status = existingPaperData.status;
-    }
+    // This flow is typically when paymentOption was 'payNow' and payment succeeded
+    status = 'Submitted';
+    paidAt = Timestamp.fromDate(now);
+    submissionDate = Timestamp.fromDate(now);
+    paymentDueDate = null;
+
   } else {
+    // This is a new paper submission
     if (!fileToUpload) {
       throw new Error("File is required for new paper submission.");
     }
@@ -127,18 +140,22 @@ export const addPaper = async (
     cloudinaryFileUrl = cloudinaryResult.secure_url;
     originalFileName = cloudinaryResult.original_filename || fileToUpload.name || 'uploaded_paper_file';
 
-
     if (paperData.paymentOption === 'payLater') {
       status = 'Payment Pending';
       const dueDate = new Date(now.getTime() + 2 * 60 * 60 * 1000); 
-      paymentDueDate = dueDate;
+      paymentDueDate = Timestamp.fromDate(dueDate);
       submissionDate = null;
       paidAt = null;
-    } else { 
-      status = 'Submitted';
-      paidAt = now;
-      submissionDate = Timestamp.fromDate(now);
-      paymentDueDate = null;
+    } else { // 'payNow' for a new paper (this path is now split, initial create then update)
+             // This case for brand new + payNow means it's likely being created with "Payment Pending" initially
+             // then updated after successful payment modal.
+             // For direct submission with "Pay Now", it would set status to Submitted.
+             // To handle the two-step "Pay Now" (create then pay then update):
+      status = 'Payment Pending'; // Create as pending, then update after payment
+      const dueDate = new Date(now.getTime() + 2 * 60 * 60 * 1000); // Set a due date even for pay now initial record
+      paymentDueDate = Timestamp.fromDate(dueDate);
+      submissionDate = null;
+      paidAt = null;
     }
   }
 
@@ -150,29 +167,27 @@ export const addPaper = async (
     keywords: paperData.keywords,
     fileName: originalFileName || null,
     fileUrl: cloudinaryFileUrl || null,
-    uploadDate: existingPaperId && (await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.uploadDate instanceof Timestamp ? 
-                ((await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.uploadDate as Timestamp).toDate().toISOString() : 
-                Timestamp.fromDate(now).toDate().toISOString(),
+    uploadDate: existingPaperId ? 
+                  (await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.uploadDate : // Keep original uploadDate
+                  Timestamp.fromDate(now).toDate().toISOString(), // New paper uploadDate
     status: status,
     paymentOption: paperData.paymentOption,
-    paymentDueDate: paymentDueDate ? paymentDueDate.toISOString() : null,
-    paidAt: paidAt ? paidAt.toISOString() : null,
-    submissionDate: submissionDate instanceof Timestamp ? submissionDate.toDate().toISOString() : (submissionDate instanceof Date ? submissionDate.toISOString() : null),
+    paymentDueDate: paymentDueDate instanceof Timestamp ? paymentDueDate.toDate().toISOString() : null,
+    paidAt: paidAt instanceof Timestamp ? paidAt.toDate().toISOString() : null,
+    submissionDate: submissionDate instanceof Timestamp ? submissionDate.toDate().toISOString() : null,
     plagiarismScore: null, 
-    acceptanceProbability: null, 
-    ...(existingPaperId && {
-      plagiarismReport: (await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.plagiarismReport || null,
-      acceptanceReport: (await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.acceptanceReport || null,
-      adminFeedback: (await getDoc(doc(firestoreDb, "papers", existingPaperId))).data()?.adminFeedback || null,
-    })
+    acceptanceProbability: null,
+    plagiarismReport: null,
+    acceptanceReport: null,
+    adminFeedback: null,
   };
 
   if (existingPaperId) {
     const updatePayload: any = {
       status,
-      paidAt: paidAt ? Timestamp.fromDate(paidAt) : null,
-      submissionDate: submissionDate ? (submissionDate instanceof Date ? Timestamp.fromDate(submissionDate) : submissionDate) : null,
-      paymentDueDate: paymentDueDate ? Timestamp.fromDate(paymentDueDate) : null, 
+      paidAt: paidAt instanceof Date ? Timestamp.fromDate(paidAt) : paidAt, // Ensure it's Timestamp or null
+      submissionDate: submissionDate instanceof Date ? Timestamp.fromDate(submissionDate) : submissionDate,
+      paymentDueDate: null, // Clear due date after payment
       lastUpdatedAt: serverTimestamp(),
     };
     const paperDocRef = doc(firestoreDb, "papers", existingPaperId);
@@ -185,7 +200,7 @@ export const addPaper = async (
   } else {
     const paperDocForFirestore = {
       ...paperDocData,
-      uploadDate: Timestamp.fromDate(new Date(paperDocData.uploadDate as string)),
+      uploadDate: paperDocData.uploadDate ? Timestamp.fromDate(new Date(paperDocData.uploadDate)) : serverTimestamp(),
       submissionDate: paperDocData.submissionDate ? Timestamp.fromDate(new Date(paperDocData.submissionDate)) : null,
       paidAt: paperDocData.paidAt ? Timestamp.fromDate(new Date(paperDocData.paidAt)) : null,
       paymentDueDate: paperDocData.paymentDueDate ? Timestamp.fromDate(new Date(paperDocData.paymentDueDate)) : null,
@@ -226,7 +241,7 @@ export const getUserPapers = async (userId: string): Promise<Paper[]> => {
     const papers = querySnapshot.docs.map(docSnap => convertPaperTimestamps({ id: docSnap.id, ...docSnap.data() }));
     return papers;
   } catch (error: any) {
-    console.error(`Paper Service (getUserPapers): Error fetching papers for user ${userId}:`, error);
+    console.error(`Paper Service (getUserPapers): Error fetching papers for user ${userId}:`, error.message, error.code); // Keep for dev
     throw error; 
   }
 };
@@ -296,4 +311,3 @@ export const getPublishedPapers = async (): Promise<Paper[]> => {
   const papers = querySnapshot.docs.map(docSnap => convertPaperTimestamps({ id: docSnap.id, ...docSnap.data() }));
   return papers;
 };
-

@@ -26,7 +26,6 @@ export default function RegisteredAdminsPage() {
         const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
         setAdminUsers(filteredAdmins);
       } catch (err: any) {
-        // console.error("RegisteredAdminsPage: Error fetching users:", err);
         setError(err.message || "Failed to load admin users.");
         toast({ variant: "destructive", title: "Error Loading Admins", description: err.message });
       } finally {
@@ -103,4 +102,3 @@ export default function RegisteredAdminsPage() {
     </div>
   );
 }
-

@@ -32,7 +32,7 @@ function AdminDashboardContent() {
     if (!authLoading && user && isAdmin) {
       setIsLoadingPapers(true);
       try {
-        const fetchedPapers = await getAllPapers(); // Fetch from Firestore
+        const fetchedPapers = await getAllPapers();
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -50,7 +50,6 @@ function AdminDashboardContent() {
 
         setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
       } catch (error: any) {
-        // console.error("AdminDashboard: Error fetching papers from Firestore:", error);
         toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
       } finally {
         setIsLoadingPapers(false);
@@ -109,12 +108,10 @@ function AdminDashboardContent() {
           <Shield className="h-5 w-5" />
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
-            You do not have permission to view this page.
-            Your `isAdmin` flag in AuthContext is `false`. 
-            Please ensure your user profile in Firestore has `isAdmin: true` (boolean) if you are an administrator.
+            You do not have permission to view this page. Please ensure your user profile has `isAdmin: true` set in Firestore if you are an administrator.
           </AlertDescription>
         </Alert>
-        <Link href="/dashboard">
+        <Link href="/user/dashboard">
           <Button className="mt-6">Go to User Dashboard</Button>
         </Link>
       </div>
@@ -264,4 +261,3 @@ function AdminDashboardContent() {
 export default function AdminDashboardPage() {
   return <AdminDashboardContent />;
 }
-

@@ -26,7 +26,6 @@ export default function ReviewerManagementPage() {
         const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
         setReviewerUsers(filteredReviewers);
       } catch (err: any) {
-        // console.error("ReviewerManagementPage: Error fetching users:", err);
         setError(err.message || "Failed to load reviewer users.");
         toast({ variant: "destructive", title: "Error Loading Reviewers", description: err.message });
       } finally {
@@ -99,4 +98,3 @@ export default function ReviewerManagementPage() {
     </div>
   );
 }
-
