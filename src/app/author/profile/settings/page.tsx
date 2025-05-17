@@ -5,11 +5,11 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation"; // Ensure this is imported
 
 // This is the main content of the page
 function AuthorProfileSettingsPageContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // Needs to be called within a Client Component
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (

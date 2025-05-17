@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -6,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { LockKeyhole, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast"; // Ensure toast is imported
+import { useToast } from "@/hooks/use-toast";
 import { AUTHOR_PROFILE_SETTINGS_PATH } from "@/context/auth-context"; // Import constant
 
 
@@ -20,21 +21,19 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
   const router = useRouter();
   const pathname = usePathname();
   const [modalOpenAttempted, setModalOpenAttempted] = useState(false);
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (loading) return; // Wait until auth state is determined
+    if (loading) return; 
 
     const isAuthPage = ['/login', '/signup', '/forgot-password'].includes(pathname);
     const isPublicPage = [
       '/', '/terms', '/privacy', '/contact-us',
       '/key-committee', '/sample-templates', '/registration', '/search-papers'
-    ].includes(pathname) || pathname.startsWith('/papers/'); // Published papers are public
+    ].includes(pathname) || pathname.startsWith('/papers/'); 
 
     if (!user) {
-      // User is not logged in
-      if (!isAuthPage && !isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH) {
-         // If trying to access a protected page (and not profile settings specifically)
+      if (!isAuthPage && !isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
         if (typeof window !== "undefined") {
           localStorage.setItem("redirectAfterLogin", pathname);
         }
@@ -43,16 +42,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
           setModalOpenAttempted(true);
         }
       } else {
-        setModalOpenAttempted(false); // Reset if on public/auth page
+        setModalOpenAttempted(false);
       }
-      return; // Exit early if no user
+      return; 
     }
 
     // User is logged in
-    setModalOpenAttempted(false); // Reset modal attempt flag
+    setModalOpenAttempted(false); 
 
-    // Profile completion check is now primarily handled by AuthContext redirection logic
-    // ProtectedRoute mainly ensures role-based access (adminOnly)
+    // AuthContext now handles profile completion redirect primarily.
+    // This component focuses on auth status and adminOnly role.
 
     if (adminOnly && !isAdmin) {
       toast({
@@ -60,14 +59,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
         description: "You do not have permission to view this page.",
         variant: "destructive",
       });
-      // Redirect to their appropriate dashboard
       router.push(user.role === "Reviewer" ? "/reviewer/dashboard" : "/author/dashboard");
     }
 
-  }, [user, loading, pathname, isAdmin, adminOnly, showLoginModal, setShowLoginModal, toast, router, modalOpenAttempted]);
+  }, [user, loading, isAdmin, adminOnly, pathname, router, showLoginModal, setShowLoginModal, toast, modalOpenAttempted]);
 
 
-  // Initial loading screen while auth state is being determined
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -79,24 +76,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
   const isUserArea = pathname.startsWith('/author/') || pathname.startsWith('/reviewer/');
   const isAdminArea = adminOnly && pathname.startsWith('/admin/');
 
-  // If no user, and trying to access a protected area (excluding profile settings which handles its own initial state)
+  // If AuthContext hasn't initialized user yet, but it's a protected route, show loading or let AuthContext handle modal.
   if (!user && (isUserArea || isAdminArea) && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
-    // AuthContext's useEffect will handle showing the login modal
-    // This part of ProtectedRoute primarily ensures children aren't rendered prematurely
-    // or shows a loading state if modal logic is slightly delayed by context updates.
-    if (!showLoginModal && !modalOpenAttempted) {
+    if (!showLoginModal && !modalOpenAttempted) { // Avoid flashing if modal is about to show
        return (
          <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
            <LoadingSpinner size={48} />
-           <p className="ml-2">Checking authentication...</p>
          </div>
        );
     }
-    return null; // AuthContext will show LoginModal
+    return null; // AuthContext will show LoginModal if needed
   }
 
-
-  // If trying to access adminOnly page without admin rights
   if (adminOnly && user && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center p-4">
@@ -115,7 +106,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     );
   }
   
-  // If user exists and all checks pass (or AuthContext is handling profile completion redirect)
   return <>{children}</>;
 };
 
