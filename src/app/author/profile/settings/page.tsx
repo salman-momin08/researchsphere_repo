@@ -1,13 +1,13 @@
-
+// app/author/profile/settings/page.tsx
 "use client";
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams } from "next/navigation"; 
+import { useSearchParams } from "next/navigation";
 
-// Renamed default export for clarity and to ensure Next.js picks it up correctly
+// This is the main content of the page
 function AuthorProfileSettingsPageContent() {
   const searchParams = useSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
@@ -34,6 +34,7 @@ function AuthorProfileSettingsPageContent() {
   );
 }
 
+// Wrapping the page with route protection
 export default function AuthorProfileSettingsPage() {
   return (
     <ProtectedRoute>
