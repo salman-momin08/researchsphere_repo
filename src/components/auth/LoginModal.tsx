@@ -31,17 +31,19 @@ export default function LoginModal() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 px-2 py-4">
-          <LoginForm />
+          <LoginForm onForgotPasswordClick={() => setShowLoginModal(false)} />
           
-          <div className="text-sm text-right mt-2">
+          {/* Removed the redundant "Forgot password?" link from here */}
+          {/* <div className="text-sm text-right mt-2">
             <Link 
               href="/forgot-password" 
               className="font-medium text-primary hover:underline px-1"
-              onClick={() => setShowLoginModal(false)} // Close modal before navigating
+              onClick={() => setShowLoginModal(false)}
             >
               Forgot password?
             </Link>
-          </div>
+          </div> */}
+
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <Separator />
@@ -70,4 +72,3 @@ export default function LoginModal() {
     </Dialog>
   );
 }
-

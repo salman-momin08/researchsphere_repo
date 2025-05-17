@@ -8,7 +8,6 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
-// import { toast } from "@/hooks/use-toast"; // Toast for errors handled by AuthContext
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -20,10 +19,14 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginForm() {
-  const { login, loading: authLoading } = useAuth(); 
+interface LoginFormProps {
+  onForgotPasswordClick?: () => void;
+}
+
+export default function LoginForm({ onForgotPasswordClick }: LoginFormProps) {
+  const { login, loading: authLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -38,17 +41,15 @@ export default function LoginForm() {
     setError(null);
     try {
       await login(data.identifier, data.password);
-      // Success toast is handled by AuthContext or onAuthStateChanged logic
-      form.reset(); 
+      form.reset();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      // Error toast is handled by AuthContext
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   const currentIsLoading = isSubmitting || authLoading;
 
   return (
@@ -70,7 +71,7 @@ export default function LoginForm() {
       {form.formState.errors.identifier && (
         <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.identifier.message}</p>
       )}
-      
+
       <AnimatedInput
         id="password"
         label="Password *"
@@ -83,6 +84,11 @@ export default function LoginForm() {
         <Link
           href="/forgot-password"
           className="text-sm font-medium text-primary hover:underline px-1"
+          onClick={() => {
+            if (onForgotPasswordClick) {
+              onForgotPasswordClick();
+            }
+          }}
         >
           Forgot password?
         </Link>
@@ -90,7 +96,7 @@ export default function LoginForm() {
       {form.formState.errors.password && (
         <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>
       )}
-      
+
       <Button type="submit" className="w-full mt-4" disabled={currentIsLoading}>
         {currentIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {currentIsLoading ? "Logging in..." : "Log In"}
@@ -98,4 +104,3 @@ export default function LoginForm() {
     </form>
   );
 }
-
