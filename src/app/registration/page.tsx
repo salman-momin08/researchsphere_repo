@@ -41,7 +41,7 @@ const submissionOptions: SubmissionOption[] = [
       "Secure Online Payment",
     ],
     cta: "Submit Your Paper",
-    href: "/submit",
+    href: "/user/submit", // Updated path
     icon: <FileText className="h-8 w-8 mb-2 text-primary" />
   },
   {
@@ -108,6 +108,10 @@ export default function RegistrationPricingPage() {
   const { user } = useAuth(); 
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
+    if (!text) { // Prevent copying if text is null/undefined
+        toast({ variant: "destructive", title: "Copy Failed", description: `${fieldName} has no value to copy.` });
+        return;
+    }
     navigator.clipboard.writeText(text).then(() => {
       toast({ title: "Copied to Clipboard", description: `${fieldName} copied successfully.` });
     }).catch(err => {
@@ -207,15 +211,15 @@ export default function RegistrationPricingPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {Object.entries(submissionOptions.find(opt => opt.isSubscription && opt.bankDetails)!).map(([key, value]) => {
-                  if (!value) return null;
+                {Object.entries(submissionOptions.find(opt => opt.isSubscription && opt.bankDetails)!.bankDetails!).map(([key, value]) => {
+                  if (value === undefined || value === null) return null; // Skip rendering if value is null or undefined
                   const displayKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                   return (
                     <div key={key} className="flex justify-between items-center p-2 border-b last:border-b-0">
                       <span className="font-medium text-muted-foreground">{displayKey}:</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-foreground">{value}</span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyToClipboard(value.toString(), displayKey)}>
+                        <span className="text-foreground">{String(value)}</span> {/* Ensure value is rendered as a string */}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyToClipboard(String(value), displayKey)}>
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>
@@ -245,3 +249,4 @@ export default function RegistrationPricingPage() {
     </div>
   );
 }
+
