@@ -76,7 +76,7 @@ export default function SignupForm() {
       confirmPassword: "",
       phoneNumber: "",
       institution: "",
-      role: undefined, // Ensure role is initially undefined to show placeholder
+      role: undefined,
       researcherId: "",
       termsAccepted: false,
     },
@@ -87,12 +87,10 @@ export default function SignupForm() {
     setError(null);
     try {
       await signup(data);
-      // Success toast handled by AuthContext or onAuthStateChanged logic
       form.reset(); 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
-      // Error toast is handled by AuthContext
     } finally {
       setIsSubmitting(false);
     }
@@ -159,7 +157,7 @@ export default function SignupForm() {
         <Checkbox
             id="termsAccepted"
             checked={form.watch("termsAccepted")}
-            onCheckedChange={(checked) => form.setValue("termsAccepted", Boolean(checked))}
+            onCheckedChange={(checked) => form.setValue("termsAccepted", Boolean(checked), { shouldValidate: true })}
             disabled={currentIsLoading}
             aria-invalid={!!form.formState.errors.termsAccepted}
         />
@@ -179,4 +177,3 @@ export default function SignupForm() {
     </form>
   );
 }
-

@@ -80,6 +80,9 @@ export default function LoginForm({ onForgotPasswordClick }: LoginFormProps) {
         disabled={currentIsLoading}
         autoComplete="current-password"
       />
+       {form.formState.errors.password && (
+        <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>
+      )}
       <div className="text-right mt-1">
         <Link
           href="/forgot-password"
@@ -93,9 +96,7 @@ export default function LoginForm({ onForgotPasswordClick }: LoginFormProps) {
           Forgot password?
         </Link>
       </div>
-      {form.formState.errors.password && (
-        <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>
-      )}
+     
 
       <Button type="submit" className="w-full mt-4" disabled={currentIsLoading}>
         {currentIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
