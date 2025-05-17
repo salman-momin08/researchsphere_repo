@@ -3,7 +3,7 @@
 
 import type { User } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, Dispatch, SetStateAction, useContext } from 'react';
-import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation'; // Renamed to avoid conflict
 import {
   auth as firebaseAuth,
   db as firestoreDb,
@@ -36,7 +36,7 @@ import { toast } from '@/hooks/use-toast';
 import type { SignupFormValues } from '@/components/auth/SignupForm';
 
 const ADMIN_CREATOR_EMAIL = 'admin-creator@researchsphere.com';
-const MOCK_ADMIN_EMAIL = 'admin@example.com';
+const MOCK_ADMIN_EMAIL = 'admin@example.com'; // For easy admin testing
 
 interface AuthContextType {
   user: User | null;
@@ -56,42 +56,41 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to convert Firestore Timestamps or string dates to ISO strings
 const convertTimestampToISO = (timestamp: any): string | null => {
   if (!timestamp) return null;
   if (timestamp instanceof Timestamp) return timestamp.toDate().toISOString();
-  if (typeof timestamp === 'string') {
+  if (typeof timestamp === 'string') { // If it's already an ISO string or similar
     if (!isNaN(new Date(timestamp).getTime())) return new Date(timestamp).toISOString();
   }
-  if (typeof timestamp === 'object' && timestamp._seconds && typeof timestamp._seconds === 'number') {
+  if (typeof timestamp === 'object' && timestamp._seconds && typeof timestamp._seconds === 'number') { // Handle Firebase's internal Timestamp-like objects if they appear
     return new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1000000).toISOString();
   }
-  return String(timestamp); // Fallback for already converted or other types
+  return String(timestamp); // Fallback
 };
 
-// Fetches or creates a user profile in Firestore
+
 const ensureFirestoreUserProfile = async (
   uid: string,
   firebaseUser: FirebaseUser,
   profileDataFromSignup?: Partial<SignupFormValues> & { isSocialSignIn?: boolean }
 ): Promise<User | null> => {
   if (!firestoreDb) {
-    toast({ variant: "destructive", title: "Critical Error", description: "Database service not configured.", duration: 10000 });
+    toast({ variant: "destructive", title: "Critical Error", description: "Database service not configured for profile management.", duration: 10000 });
     return null;
   }
-
   const userDocRef = doc(firestoreDb, "users", uid);
 
   try {
     const userSnap = await getDoc(userDocRef);
     const isCreatorAdminEmail = firebaseUser.email === ADMIN_CREATOR_EMAIL;
     const isMockAdminEmail = firebaseUser.email === MOCK_ADMIN_EMAIL;
-
     let dataToSave: Partial<User> & { updatedAt: any; createdAt?: any; id?: string; userId?: string; };
 
     if (userSnap.exists()) {
       const existingData = userSnap.data() as User;
       dataToSave = {
-        // Prioritize existing Firestore data for fields that are part of profile completion
+        // Prioritize existing Firestore data for core profile fields that might be completed later
         username: existingData.username !== undefined ? existingData.username : (profileDataFromSignup?.username || null),
         role: existingData.role !== undefined ? existingData.role : (profileDataFromSignup?.role || (isCreatorAdminEmail || isMockAdminEmail ? "Admin" : "Author")),
         phoneNumber: existingData.phoneNumber !== undefined ? existingData.phoneNumber : (profileDataFromSignup?.phoneNumber || null),
@@ -108,8 +107,8 @@ const ensureFirestoreUserProfile = async (
         
         updatedAt: serverTimestamp(),
         createdAt: existingData.createdAt ? (existingData.createdAt instanceof Timestamp ? existingData.createdAt : Timestamp.fromDate(new Date(existingData.createdAt as string))) : serverTimestamp(),
-        userId: uid, // ensure userId is present
-        id: uid, // ensure id is present
+        userId: uid,
+        id: uid,
       };
     } else {
       // New user document
@@ -120,11 +119,11 @@ const ensureFirestoreUserProfile = async (
         email: firebaseUser.email,
         displayName: profileDataFromSignup?.fullName || firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "User"),
         photoURL: firebaseUser.photoURL || null,
-        username: profileDataFromSignup?.username || null, // Explicitly null if not provided
-        role: profileDataFromSignup?.role || defaultRole,     // Explicitly null if not provided or default
-        phoneNumber: profileDataFromSignup?.phoneNumber || null, // Explicitly null if not provided
-        institution: profileDataFromSignup?.institution || null, // Explicitly null if not provided
-        researcherId: profileDataFromSignup?.researcherId || null, // Explicitly null if not provided
+        username: profileDataFromSignup?.username || null,
+        role: profileDataFromSignup?.role || defaultRole,
+        phoneNumber: profileDataFromSignup?.phoneNumber || null,
+        institution: profileDataFromSignup?.institution || null,
+        researcherId: profileDataFromSignup?.researcherId || null,
         isAdmin: isCreatorAdminEmail || isMockAdminEmail,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -136,8 +135,8 @@ const ensureFirestoreUserProfile = async (
       if (dataToSave[key] === undefined) {
         (dataToSave as any)[key] = null;
       }
-      if (key !== 'isAdmin' && dataToSave[key] === "") {
-        if (['username', 'phoneNumber', 'institution', 'researcherId', 'photoURL', 'displayName'].includes(key)) {
+      if (key !== 'isAdmin' && dataToSave[key] === "") { // Don't nullify isAdmin if it's explicitly false
+        if (['username', 'phoneNumber', 'institution', 'researcherId', 'photoURL', 'displayName', 'role'].includes(key)) {
           (dataToSave as any)[key] = null;
         }
       }
@@ -170,13 +169,13 @@ const ensureFirestoreUserProfile = async (
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start as true
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [activeSocialLoginProvider, setActiveSocialLoginProvider] = useState<null | 'google' | 'github'>(null);
   
   const router = useRouter();
   const pathname = usePathname();
-  const searchParamsFromHook = useNextSearchParams(); 
+  const searchParamsFromHook = useNextSearchParams(); // Call hook at top level
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -184,11 +183,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!isMounted || !firebaseAuth) {
-      setLoading(false);
-      return;
-    }
-    if (!firestoreDb) {
+    if (!isMounted) return; // Only run effect logic once mounted
+
+    if (!firebaseAuth || !firestoreDb) {
       setLoading(false);
       return;
     }
@@ -204,7 +201,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(appUser);
           const determinedIsAdmin = appUser.isAdmin === true;
           setIsAdminUser(determinedIsAdmin);
-          setShowLoginModal(false);
+          setShowLoginModal(false); // Close login modal if open
 
           let isProfileComplete = !!(appUser.username && appUser.role && appUser.phoneNumber);
           let redirectAfterLoginPath: string | null = null;
@@ -215,7 +212,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             completingProfileStorageFlag = localStorage.getItem('completingProfile');
           }
           const completingProfileQueryFlag = searchParamsFromHook?.get('complete') === 'true';
-          
+
           if (!isProfileComplete && pathname !== '/user/profile/settings') {
             if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
             router.push('/user/profile/settings?complete=true');
@@ -226,7 +223,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             const targetPath = redirectAfterLoginPath || (determinedIsAdmin ? '/admin/dashboard' : '/user/dashboard');
             if (pathname !== targetPath) router.push(targetPath);
-
           } else if (redirectAfterLoginPath) {
             if (typeof window !== 'undefined') localStorage.removeItem('redirectAfterLogin');
             if (pathname !== redirectAfterLoginPath) router.push(redirectAfterLoginPath);
@@ -279,8 +275,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (userDoc.email) {
             emailToLogin = userDoc.email;
           } else {
-            throw new Error(`User profile incomplete for username '${identifier}'. Cannot resolve email.`);
+            setLoading(false);
+            const errorMsg = `User profile incomplete for username '${identifier}'. Cannot resolve email for login.`;
+            toast({ variant: "destructive", title: "Login Failed", description: errorMsg });
+            throw new Error(errorMsg);
           }
+        } else {
+          setLoading(false);
+          const errorMsg = `No user found with username '${identifier}'.`;
+          toast({ variant: "destructive", title: "Login Failed", description: errorMsg });
+          throw new Error(errorMsg);
         }
       } catch (dbError: any) {
         setLoading(false);
@@ -326,9 +330,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setLoading(true);
     setActiveSocialLoginProvider(null);
-    
-    // Username and phone number uniqueness checks removed from here; handled in updateUserProfile or by Firestore rules if strict.
-    // Firebase Auth handles email uniqueness.
+
+    // Check username uniqueness
+    const usersRef = collection(firestoreDb, "users");
+    const usernameQuery = query(usersRef, where("username", "==", data.username));
+    const usernameSnap = await getDocs(usernameQuery);
+    if (!usernameSnap.empty) {
+      setLoading(false);
+      toast({ variant: "destructive", title: "Signup Failed", description: "Username already taken. Please choose another one." });
+      throw new Error("Username already taken. Please choose another one.");
+    }
+
+    // Check phone number uniqueness
+    if (data.phoneNumber && data.phoneNumber.trim() !== "") {
+      const phoneQuery = query(usersRef, where("phoneNumber", "==", data.phoneNumber));
+      const phoneSnap = await getDocs(phoneQuery);
+      if (!phoneSnap.empty) {
+        setLoading(false);
+        toast({ variant: "destructive", title: "Signup Failed", description: "Phone number already in use. Please use a different one." });
+        throw new Error("Phone number already in use. Please use a different one.");
+      }
+    }
 
     let firebaseUserInstance: FirebaseUser;
     try {
@@ -348,20 +370,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (firebaseUserInstance) {
       try {
-        // Update Firebase Auth profile (displayName)
         if (data.fullName && data.fullName !== firebaseUserInstance.displayName) {
             await updateFirebaseProfile(firebaseUserInstance, { displayName: data.fullName });
         }
-        // Ensure Firestore profile is created with all details from signup form
         const appUser = await ensureFirestoreUserProfile(firebaseUserInstance.uid, firebaseUserInstance, data);
         if (!appUser) throw new Error("Failed to create Firestore profile after signup.");
-        
-        // onAuthStateChanged will now handle setting user state and redirection
         toast({ title: "Signup Successful!", description: "Welcome to ResearchSphere." });
-
+        // onAuthStateChanged will handle setting user state and redirection
       } catch (profileError: any) {
         setLoading(false); 
         toast({ variant: "destructive", title: "Signup Incomplete", description: `Account created, but profile setup failed: ${profileError.message}. Please try logging in or updating your profile.`, duration: 10000 });
+         throw profileError;
       }
     }
   };
@@ -442,9 +461,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error(errorMsg);
     }
     setLoading(true);
+    let optimisticallyUpdatedUser = { ...user, ...updatedData } as User; // For immediate UI update
 
     try {
-      // Client-side uniqueness checks before attempting Firestore update
+      // Uniqueness checks
       if (updatedData.username && updatedData.username.trim() !== "" && updatedData.username !== user.username) {
         const usersRef = collection(firestoreDb, "users");
         const q = query(usersRef, where("username", "==", updatedData.username));
@@ -462,7 +482,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Update Firebase Auth profile (displayName only, photoURL if we had a way to upload it)
+      // Update Firebase Auth profile (displayName only)
       if (firebaseAuth.currentUser && updatedData.displayName && updatedData.displayName !== firebaseAuth.currentUser.displayName) {
           await updateFirebaseProfile(firebaseAuth.currentUser, { displayName: updatedData.displayName });
       }
@@ -470,27 +490,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocRef = doc(firestoreDb, "users", user.id);
       const updatePayloadFS: any = { updatedAt: serverTimestamp() };
 
-      // Prepare payload for Firestore, ensuring empty strings become null
       (Object.keys(updatedData) as Array<keyof typeof updatedData>).forEach(key => {
-          if (updatedData[key] !== undefined && user[key as keyof User] !== updatedData[key]) {
+          if (updatedData[key] !== undefined && user[key as keyof User] !== updatedData[key]) { // Only include changed fields
               updatePayloadFS[key] = updatedData[key] === "" ? null : updatedData[key];
           }
       });
       
-      if (Object.keys(updatePayloadFS).length > 1) { // Only update if there's more than just the timestamp
+      if (Object.keys(updatePayloadFS).length > 1) {
         await updateDoc(userDocRef, updatePayloadFS);
+      } else {
+        // No actual changes to Firestore document other than potentially timestamp,
+        // but we still want to update local state if displayName changed in Auth
       }
       
-      // Optimistically update local state
-      const optimisticallyUpdatedUser = {
-        ...user, // Current user state
-        ...updatedData, // Apply changes
+      // Optimistically update local state for immediate UI feedback
+      optimisticallyUpdatedUser = {
+        ...user,
+        ...updatedData, // Apply valid changes
         updatedAt: new Date().toISOString(), // Simulate timestamp update
-        // Ensure isAdmin isn't accidentally changed client-side
-        isAdmin: user.isAdmin,
+        isAdmin: user.isAdmin, // Preserve admin status
       } as User;
 
-      // Ensure all optional fields are at least null if empty in updatedData
       (Object.keys(optimisticallyUpdatedUser) as Array<keyof User>).forEach(key => {
         if (optimisticallyUpdatedUser[key] === "") {
           if (['username', 'phoneNumber', 'institution', 'researcherId', 'photoURL', 'displayName'].includes(key)) {
@@ -504,14 +524,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       toast({ title: "Success", description: "Your profile has been updated." });
 
-      // Re-fetch from Firestore to get server-confirmed data and ensure consistency
-      // This is important for server-generated timestamps.
+      // Re-fetch from Firestore to get server-confirmed data
       const updatedUserFromDb = await ensureFirestoreUserProfile(user.id, firebaseAuth.currentUser, {});
       if (updatedUserFromDb) {
         setUser(updatedUserFromDb);
         setIsAdminUser(updatedUserFromDb.isAdmin === true);
+        optimisticallyUpdatedUser = updatedUserFromDb; // Ensure this is the final one for return
       }
-
 
       const isProfileNowComplete = !!(optimisticallyUpdatedUser.username && optimisticallyUpdatedUser.role && optimisticallyUpdatedUser.phoneNumber);
       if (isProfileNowComplete && typeof window !== 'undefined' && localStorage.getItem('completingProfile') === 'true') {
@@ -521,10 +540,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const targetPath = redirectPath || (optimisticallyUpdatedUser.isAdmin ? '/admin/dashboard' : '/user/dashboard');
           if (pathname !== targetPath) router.push(targetPath);
       }
-      return updatedUserFromDb || optimisticallyUpdatedUser;
+      return optimisticallyUpdatedUser;
 
     } catch(error: any) {
-        setLoading(false); // Ensure loading is false on error
+        setLoading(false);
         toast({variant: "destructive", title: "Update Failed", description: error.message || "Could not update your profile."});
         throw error; 
     } finally {
@@ -555,4 +574,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

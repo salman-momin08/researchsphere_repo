@@ -6,8 +6,9 @@ import { AuthProvider } from '@/context/auth-context';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
-import React, { Suspense } from 'react'; 
-import ClientSideComponents from '@/components/layout/ClientSideComponents'; // Import the new wrapper
+import React, { Suspense } from 'react';
+import ClientSideComponents from '@/components/layout/ClientSideComponents';
+import GlobalErrorBoundary from '@/components/shared/GlobalErrorBoundary'; // Import the Error Boundary
 
 const inter = Inter({
   variable: '--font-inter',
@@ -27,17 +28,19 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <Suspense fallback={<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}>Loading application...</div>}>
-          <AuthProvider>
-            <div className="antialiased flex flex-col min-h-screen">
-              <Header />
-              <main className="flex-grow">{children}</main>
-              <ClientSideComponents /> {/* Use the wrapper component here */}
-              <Footer />
-              <Toaster />
-            </div>
-          </AuthProvider>
-        </Suspense>
+        <GlobalErrorBoundary> {/* Wrap with Error Boundary */}
+          <Suspense fallback={<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}>Loading application...</div>}>
+            <AuthProvider>
+              <div className="antialiased flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-grow">{children}</main>
+                <ClientSideComponents />
+                <Footer />
+                <Toaster />
+              </div>
+            </AuthProvider>
+          </Suspense>
+        </GlobalErrorBoundary>
       </body>
     </html>
   );
