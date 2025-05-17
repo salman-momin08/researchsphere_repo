@@ -13,6 +13,7 @@ export interface User {
   institution?: string | null; // Stored in Firestore
   role?: "Author" | "Reviewer" | "Admin" | null; // Stored in Firestore
   researcherId?: string | null;// Stored in Firestore
+  isSuspended?: boolean; // New field for user suspension status
   createdAt?: string | Timestamp; // Firestore Timestamp on write, string on read (after conversion)
   updatedAt?: string | Timestamp; // Firestore Timestamp on write, string on read (after conversion)
 }
@@ -28,6 +29,19 @@ export type PaperStatus =
   | "Payment Overdue"
   | "Published";
 
+export interface Review {
+  reviewerId: string; // UID of the reviewer
+  comments: string;
+  recommendation: 'Accept' | 'Reject' | 'Minor Revision' | 'Major Revision';
+  rating?: { // Optional detailed ratings
+    clarity?: number; // e.g., 1-5
+    originality?: number;
+    relevance?: number;
+    quality?: number;
+  };
+  submittedAt: string; // ISO date string of when the review was submitted
+}
+
 export interface Paper {
   id: string; // Firestore document ID
   userId: string; // Firebase UID of the submitter
@@ -36,9 +50,8 @@ export interface Paper {
   authors: string[];
   keywords: string[];
 
-  fileName?: string; // Original filename from upload (e.g., from Cloudinary or Storage)
-  fileUrl?: string; // Download URL for the paper file (e.g., from Cloudinary or Storage)
-  // fileMimeType?: string; // Optional: MIME type, useful if serving files directly
+  fileName?: string | null; // Original filename from upload
+  fileUrl?: string | null; // Download URL for the paper file
 
   uploadDate: string; // ISO date string (after conversion from Firestore Timestamp)
   status: PaperStatus;
@@ -56,4 +69,7 @@ export interface Paper {
   paymentOption?: "payNow" | "payLater" | null;
   paidAt?: string | null; // ISO date string (after conversion from Firestore Timestamp)
   lastUpdatedAt?: string | Timestamp; // ISO date string (after conversion from Firestore Timestamp)
+  assignedReviewerIds?: string[]; // Array of reviewer UIDs
+  reviews?: Review[]; // Array of review objects
 }
+

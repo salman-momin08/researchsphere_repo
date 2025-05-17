@@ -3,13 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types'; 
-import { getAllUsers, toggleUserAdminStatus } from '@/lib/user-service';
+import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff, Ban, Undo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -56,6 +56,24 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleToggleSuspension = async (targetUserId: string, currentIsSuspended: boolean | undefined) => {
+     if (!currentAdminUser || currentAdminUser.id === targetUserId) {
+      toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot suspend their own account through this interface." });
+      return;
+    }
+    const confirmAction = confirm(`Are you sure you want to ${currentIsSuspended ? 'unsuspend' : 'suspend'} this user?`);
+    if (!confirmAction) return;
+
+    try {
+      await toggleUserSuspensionStatus(targetUserId, !!currentIsSuspended);
+      toast({ title: "Success", description: `User suspension status updated.` });
+      fetchUsers(); // Refresh list
+    } catch (err: any)
+     {
+      toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update user suspension status." });
+    }
+  }
+
 
   if (isLoading) {
     return (
@@ -95,19 +113,17 @@ export default function UserManagementPage() {
                   <TableRow>
                     <TableHead>Display Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Username</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Admin</TableHead>
-                    <TableHead>Joined</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} className={user.isSuspended ? "bg-destructive/10" : ""}>
                       <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                       <TableCell>{user.email || 'N/A'}</TableCell>
-                      <TableCell>{user.username || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === "Admin" ? "default" : "secondary"}>
                           {user.role || 'N/A'}
@@ -124,8 +140,16 @@ export default function UserManagementPage() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell>{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
+                        {user.isSuspended ? (
+                          <Badge variant="destructive">
+                            <Ban className="mr-1 h-3.5 w-3.5" /> Suspended
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Active</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1 flex justify-end items-center">
                         <Button
                           variant={user.isAdmin ? "destructive" : "default"}
                           size="sm"
@@ -137,6 +161,19 @@ export default function UserManagementPage() {
                             <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
                           ) : (
                             <><ShieldCheck className="mr-2 h-4 w-4" /> Make Admin</>
+                          )}
+                        </Button>
+                        <Button
+                          variant={user.isSuspended ? "secondary" : "destructive"}
+                          size="sm"
+                          onClick={() => handleToggleSuspension(user.id, user.isSuspended)}
+                          disabled={currentAdminUser?.id === user.id}
+                          className="w-32"
+                        >
+                          {user.isSuspended ? (
+                             <><Undo className="mr-2 h-4 w-4" /> Unsuspend</>
+                          ) : (
+                             <><Ban className="mr-2 h-4 w-4" /> Suspend</>
                           )}
                         </Button>
                       </TableCell>
@@ -151,3 +188,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+

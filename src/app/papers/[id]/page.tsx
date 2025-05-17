@@ -1,16 +1,16 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/hooks/use-auth';
-import type { Paper, PaperStatus } from '@/types';
+import type { Paper, PaperStatus, User, Review } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Shield, LayoutDashboard } from 'lucide-react';
+import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard, UserCheck, UserPlus, Send, Star, MessageCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -21,12 +21,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { getPaper, updatePaperStatus, updatePaperData } from '@/lib/paper-service';
+import { getPaper, updatePaperStatus, updatePaperData, addReviewToPaper } from '@/lib/paper-service';
 import CountdownTimer from '@/components/shared/CountdownTimer';
+import { getAllUsers } from '@/lib/user-service';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Timestamp } from 'firebase/firestore';
 
 function PaperDetailsContent() {
   const params = useParams();
-  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict with window.URLSearchParams
+  const searchParamsHook = useNextSearchParams(); 
   const router = useRouter();
   const { user, isAdmin } = useAuth();
 
@@ -40,46 +43,67 @@ function PaperDetailsContent() {
   const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useState(false);
   const [isCheckingAcceptance, setIsCheckingAcceptance] = useState(false);
 
-  useEffect(() => {
+  const [availableReviewers, setAvailableReviewers] = useState<User[]>([]);
+  const [selectedReviewer, setSelectedReviewer] = useState<string>("");
+  const [isAssigningReviewer, setIsAssigningReviewer] = useState(false);
+
+  const [reviewComments, setReviewComments] = useState("");
+  const [reviewRecommendation, setReviewRecommendation] = useState<'Accept' | 'Reject' | 'Minor Revision' | 'Major Revision' | undefined>(undefined);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const isUserAssignedReviewer = user && currentPaper?.assignedReviewerIds?.includes(user.id);
+  const hasUserAlreadyReviewed = user && currentPaper?.reviews?.some(r => r.reviewerId === user.id);
+
+
+  const fetchPaperDetails = useCallback(async () => {
     const paperId = params.id as string;
     if (paperId && user) {
       setLoadingPaper(true);
-      getPaper(paperId)
-        .then(paper => {
-          if (paper) {
-            if (paper.userId !== user.id && !isAdmin && paper.status !== "Published") {
-                setCurrentPaper(null);
-                toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
-                router.push(isAdmin ? '/admin/dashboard' : '/');
-                return;
-            }
-            setCurrentPaper(paper);
-            if(paper.adminFeedback) setAdminFeedbackText(paper.adminFeedback);
-            const paymentDueDateValid = paper.paymentDueDate && !isNaN(new Date(paper.paymentDueDate).getTime());
-            if (paper.status === "Payment Pending" && paymentDueDateValid) {
-              if (new Date() > new Date(paper.paymentDueDate!)) {
-                setIsPaperOverdue(true);
-              }
-            }
-          } else {
+      try {
+        const paper = await getPaper(paperId);
+        if (paper) {
+          const isOwner = paper.userId === user.id;
+          const isAssigned = paper.assignedReviewerIds?.includes(user.id);
+
+          if (!isOwner && !isAdmin && !isAssigned && paper.status !== "Published") {
             setCurrentPaper(null);
-            toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
-            router.push(isAdmin ? '/admin/dashboard' : '/');
+            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
+            router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+            return;
           }
-        })
-        .catch((err: any) => {
+          setCurrentPaper(paper);
+          if (paper.adminFeedback) setAdminFeedbackText(paper.adminFeedback);
+          const paymentDueDateValid = paper.paymentDueDate && !isNaN(new Date(paper.paymentDueDate).getTime());
+          if (paper.status === "Payment Pending" && paymentDueDateValid) {
+            if (new Date() > new Date(paper.paymentDueDate!)) {
+              setIsPaperOverdue(true);
+            }
+          }
+        } else {
           setCurrentPaper(null);
-          toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
-          router.push(isAdmin ? '/admin/dashboard' : '/');
-        })
-        .finally(() => setLoadingPaper(false));
-    } else if (!user && loadingPaper) {
-        // Wait for user
-    } else if (!user && !loadingPaper) {
+          toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
+          router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+        }
+      } catch (err: any) {
         setCurrentPaper(null);
+        toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
+        router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+      } finally {
         setLoadingPaper(false);
+      }
+    } else if (!user && loadingPaper) {
+      // Wait for user
+    } else if (!user && !loadingPaper) {
+      setCurrentPaper(null);
+      setLoadingPaper(false);
     }
-  }, [params.id, user, isAdmin, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id, user, isAdmin, router]); // Added missing dependencies
+
+  useEffect(() => {
+    fetchPaperDetails();
+  }, [fetchPaperDetails]);
+
 
   useEffect(() => {
     const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
@@ -88,18 +112,21 @@ function PaperDetailsContent() {
     }
   }, [searchParamsHook, currentPaper, isPaperOverdue, user, isAdmin]);
 
+  useEffect(() => {
+    if (isAdmin) {
+      getAllUsers()
+        .then(users => setAvailableReviewers(users.filter(u => u.role === "Reviewer" && !u.isSuspended)))
+        .catch(() => toast({ variant: "destructive", title: "Error", description: "Could not load reviewers." }));
+    }
+  }, [isAdmin]);
+
   const handlePaymentSuccess = async (paperIdToUpdate?: string) => {
     const targetPaperId = paperIdToUpdate || currentPaper?.id;
     if (!targetPaperId) return;
 
     try {
       await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
-      setCurrentPaper(prev => {
-        if (prev && prev.id === targetPaperId) {
-          return { ...prev, status: 'Submitted', paidAt: new Date().toISOString(), submissionDate: new Date().toISOString(), paymentDueDate: null };
-        }
-        return prev;
-      });
+      await fetchPaperDetails(); // Re-fetch to get latest status
       setIsPaymentModalOpen(false);
       toast({title: "Payment Successful", description: "Paper status updated to Submitted."});
     } catch (error: any) {
@@ -115,10 +142,10 @@ function PaperDetailsContent() {
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
         title: "Feedback Submitted Successfully",
-        description: `Your feedback for "${currentPaper.title}" has been saved. The author would typically be notified by email (this is simulated).`,
+        description: `Your feedback for "${currentPaper.title}" has been saved. (Email simulation: Author would be notified).`,
         duration: 7000
       });
-      setAdminFeedbackText(""); // Clear feedback box
+      setAdminFeedbackText(""); 
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
@@ -130,13 +157,12 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin) return;
     try {
       await updatePaperStatus(currentPaper.id, newStatus);
-      setCurrentPaper(prev => prev ? { ...prev, status: newStatus } : null);
+      await fetchPaperDetails(); // Re-fetch
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
       } else {
         toast({title: "Status Updated", description: `Paper status changed to ${newStatus}.`});
       }
-
       if (newStatus !== "Payment Pending") {
         setIsPaperOverdue(false);
       }
@@ -201,13 +227,8 @@ function PaperDetailsContent() {
   const handleDownloadOriginalFile = () => {
     if (currentPaper?.fileUrl) {
         window.open(currentPaper.fileUrl, '_blank');
-        toast({ title: "Opening Original File", description: `Attempting to open ${currentPaper.fileName || 'the paper'}.` });
     } else {
-        toast({
-            variant: "destructive",
-            title: "File Not Available",
-            description: "File URL is missing for this paper.",
-        });
+        toast({ variant: "destructive", title: "File Not Available", description: "File URL is missing." });
     }
   };
 
@@ -241,6 +262,70 @@ function PaperDetailsContent() {
     toast({ title: "Details Downloaded", description: `${filename} prepared.` });
   };
 
+  const handleAssignReviewer = async () => {
+    if (!currentPaper || !selectedReviewer || !isAdmin) return;
+    setIsAssigningReviewer(true);
+    const currentAssigned = currentPaper.assignedReviewerIds || [];
+    if (currentAssigned.includes(selectedReviewer)) {
+      toast({ variant: "default", title: "Already Assigned", description: "This reviewer is already assigned to this paper." });
+      setIsAssigningReviewer(false);
+      return;
+    }
+    try {
+      await updatePaperData(currentPaper.id, { assignedReviewerIds: [...currentAssigned, selectedReviewer] });
+      setCurrentPaper(prev => prev ? { ...prev, assignedReviewerIds: [...(prev.assignedReviewerIds || []), selectedReviewer] } : null);
+      toast({ title: "Reviewer Assigned", description: `Reviewer assigned successfully.` });
+      setSelectedReviewer("");
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Assignment Failed", description: error.message || "Could not assign reviewer." });
+    } finally {
+      setIsAssigningReviewer(false);
+    }
+  };
+
+  const handleUnassignReviewer = async (reviewerIdToUnassign: string) => {
+    if (!currentPaper || !isAdmin) return;
+    setIsAssigningReviewer(true); // Re-use loading state
+    const currentAssigned = currentPaper.assignedReviewerIds || [];
+    const updatedAssigned = currentAssigned.filter(id => id !== reviewerIdToUnassign);
+    try {
+      await updatePaperData(currentPaper.id, { assignedReviewerIds: updatedAssigned });
+      setCurrentPaper(prev => prev ? { ...prev, assignedReviewerIds: updatedAssigned } : null);
+      toast({ title: "Reviewer Unassigned", description: `Reviewer unassigned successfully.` });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Unassignment Failed", description: error.message || "Could not unassign reviewer." });
+    } finally {
+      setIsAssigningReviewer(false);
+    }
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!currentPaper || !user || !isUserAssignedReviewer || !reviewComments.trim() || !reviewRecommendation) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please provide comments and a recommendation." });
+      return;
+    }
+    setIsSubmittingReview(true);
+    const newReview: Review = {
+      reviewerId: user.id,
+      comments: reviewComments,
+      recommendation: reviewRecommendation,
+      submittedAt: new Date().toISOString(),
+      // rating: { clarity: 5, ... } // Example if implementing detailed ratings
+    };
+    try {
+      await addReviewToPaper(currentPaper.id, newReview);
+      setCurrentPaper(prev => prev ? { ...prev, reviews: [...(prev.reviews || []), newReview] } : null);
+      toast({ title: "Review Submitted", description: "Your review has been successfully submitted." });
+      setReviewComments("");
+      setReviewRecommendation(undefined);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Review Submission Failed", description: error.message || "Could not submit your review." });
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+
   if (loadingPaper) {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
   }
@@ -251,7 +336,7 @@ function PaperDetailsContent() {
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found or Access Denied</h2>
         <p className="text-muted-foreground">The paper may have been removed, or you might not have permission to view it.</p>
-        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/')} className="mt-6">Go to Dashboard</Button>
+        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard')} className="mt-6">Go to Dashboard</Button>
       </div>
     );
   }
@@ -301,7 +386,7 @@ function PaperDetailsContent() {
                       <Download className="mr-2 h-5 w-5" /> Download Original File
                   </Button>
                 )}
-                 <Button onClick={handleDownloadMetadata} size="lg" variant="outline" className="w-full sm:w-auto">
+                 <Button onClick={handleDownloadMetadata} variant="outline" size="lg" className="w-full sm:w-auto">
                     <FileTextIcon className="mr-2 h-4 w-4" /> Download Details
                 </Button>
                 {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdmin && !isPaperOverdue && (
@@ -320,45 +405,47 @@ function PaperDetailsContent() {
         <CardContent className="pt-6 grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
             <div>
-              <h3 className="text-lg font-semibold mb-2 flex items-center"><User className="h-5 w-5 mr-2 text-primary" />Abstract</h3>
+              <h3 className="text-lg font-semibold mb-2 flex items-center"><UserIcon className="h-5 w-5 mr-2 text-primary" />Abstract</h3>
               <p className="text-muted-foreground whitespace-pre-wrap">{currentPaper.abstract}</p>
             </div>
 
             <Separator />
 
             {isAdmin && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation Tools
-                </h3>
-                <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.fileUrl} variant="outline">
-                    {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined ? 'Re-run Plagiarism Validation (File)' : 'Run Plagiarism Validation (File)'}
-                  </Button>
-                  <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.abstract} variant="outline">
-                    {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined ? 'Re-run Acceptance Validation (Abstract)' : 'Run Acceptance Validation (Abstract)'}
-                  </Button>
-                </div>
+              <>
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation Tools
+                  </h3>
+                  <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                    <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.fileUrl} variant="outline">
+                      {isCheckingPlagiarism ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                      {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined ? 'Re-run Plagiarism Validation (File)' : 'Run Plagiarism Validation (File)'}
+                    </Button>
+                    <Button onClick={handleRunAcceptanceValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.abstract} variant="outline">
+                      {isCheckingAcceptance ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                      {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined ? 'Re-run Acceptance Validation (Abstract)' : 'Run Acceptance Validation (Abstract)'}
+                    </Button>
+                  </div>
 
-                {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined && currentPaper.plagiarismReport && (
-                    <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
-                )}
-                {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined && currentPaper.acceptanceReport && (
-                    <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
-                )}
-                {((currentPaper.plagiarismScore === null || currentPaper.plagiarismScore === undefined) && (currentPaper.acceptanceProbability === null || currentPaper.acceptanceProbability === undefined) && !isCheckingPlagiarism && !isCheckingAcceptance) && (
-                    <Alert variant="default" className="mt-4">
-                      <Sparkles className="h-4 w-4" />
-                      <AlertTitle>AI Validation Available</AlertTitle>
-                      <AlertDescription>
-                        Run plagiarism validation on the uploaded file and acceptance validation on the paper's abstract using the buttons above.
-                      </AlertDescription>
-                    </Alert>
-                )}
+                  {currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined && currentPaper.plagiarismReport && (
+                      <PlagiarismReport result={{ plagiarismScore: currentPaper.plagiarismScore, highlightedSections: currentPaper.plagiarismReport.highlightedSections }} />
+                  )}
+                  {currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined && currentPaper.acceptanceReport && (
+                      <AcceptanceProbabilityReport result={{ probabilityScore: currentPaper.acceptanceProbability, reasoning: currentPaper.acceptanceReport.reasoning }} />
+                  )}
+                  {((currentPaper.plagiarismScore === null || currentPaper.plagiarismScore === undefined) && (currentPaper.acceptanceProbability === null || currentPaper.acceptanceProbability === undefined) && !isCheckingPlagiarism && !isCheckingAcceptance) && (
+                      <Alert variant="default" className="mt-4">
+                        <Sparkles className="h-4 w-4" />
+                        <AlertTitle>AI Validation Available</AlertTitle>
+                        <AlertDescription>
+                          Run plagiarism validation on the uploaded file and acceptance validation on the paper's abstract using the buttons above.
+                        </AlertDescription>
+                      </Alert>
+                  )}
+                </div>
                  <Separator className="my-6"/>
-              </div>
+              </>
             )}
 
 
@@ -390,7 +477,7 @@ function PaperDetailsContent() {
                   disabled={isSubmittingFeedback}
                 />
                 <Button onClick={handleAdminFeedbackSubmit} disabled={isSubmittingFeedback || !adminFeedbackText.trim()}>
-                  {isSubmittingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                  {isSubmittingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                   Submit Feedback
                 </Button>
               </div>
@@ -424,6 +511,135 @@ function PaperDetailsContent() {
                   </div>
                 </div>
               )}
+            
+            {isAdmin && (
+              <div className="mt-6 p-4 border rounded-md">
+                <h3 className="text-lg font-semibold mb-2 flex items-center"><UserCheck className="h-5 w-5 mr-2 text-primary" />Manage Reviewers</h3>
+                {currentPaper.assignedReviewerIds && currentPaper.assignedReviewerIds.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-md font-medium mb-1">Currently Assigned:</h4>
+                    <ul className="list-disc list-inside pl-2 text-sm">
+                      {currentPaper.assignedReviewerIds.map(reviewerId => {
+                        const reviewer = availableReviewers.find(r => r.id === reviewerId);
+                        return (
+                          <li key={reviewerId} className="flex justify-between items-center py-1">
+                            <span>{reviewer ? `${reviewer.displayName} (${reviewer.email})` : reviewerId}</span>
+                            <Button variant="ghost" size="sm" onClick={() => handleUnassignReviewer(reviewerId)} disabled={isAssigningReviewer}>
+                              Unassign
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {availableReviewers.filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)).length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedReviewer} onValueChange={setSelectedReviewer} disabled={isAssigningReviewer}>
+                      <SelectTrigger className="flex-grow">
+                        <SelectValue placeholder="Select a reviewer to assign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableReviewers
+                          .filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)) // Only show unassigned reviewers
+                          .map(rev => (
+                            <SelectItem key={rev.id} value={rev.id}>
+                              {rev.displayName} ({rev.email})
+                            </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleAssignReviewer} disabled={!selectedReviewer || isAssigningReviewer}>
+                      {isAssigningReviewer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                      Assign
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {currentPaper.assignedReviewerIds && currentPaper.assignedReviewerIds.length > 0 
+                      ? "All available reviewers are assigned or no other reviewers available." 
+                      : "No reviewers available to assign (or all are already assigned). Ensure users are registered with the 'Reviewer' role."}
+                  </p>
+                )}
+              </div>
+            )}
+
+             {/* Review Submission Form for Assigned Reviewers */}
+            {isUserAssignedReviewer && !hasUserAlreadyReviewed && user && !isAdmin && (
+              <Card className="mt-6 p-4 border-primary/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center"><MessageCircle className="mr-2 h-6 w-6 text-primary" />Submit Your Review</CardTitle>
+                  <CardDescription>Provide your feedback and recommendation for this paper.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="reviewComments">Comments *</Label>
+                    <Textarea
+                      id="reviewComments"
+                      value={reviewComments}
+                      onChange={(e) => setReviewComments(e.target.value)}
+                      rows={6}
+                      placeholder="Provide detailed comments on the paper's strengths, weaknesses, and suggestions for improvement..."
+                      className="mt-1"
+                      disabled={isSubmittingReview}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="reviewRecommendation">Recommendation *</Label>
+                    <Select
+                      value={reviewRecommendation}
+                      onValueChange={(value) => setReviewRecommendation(value as Review['recommendation'])}
+                      disabled={isSubmittingReview}
+                    >
+                      <SelectTrigger id="reviewRecommendation" className="mt-1">
+                        <SelectValue placeholder="Select your recommendation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Accept">Accept</SelectItem>
+                        <SelectItem value="Minor Revision">Minor Revision</SelectItem>
+                        <SelectItem value="Major Revision">Major Revision</SelectItem>
+                        <SelectItem value="Reject">Reject</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* Optional: Add fields for detailed ratings (clarity, originality, etc.) here */}
+                  <Button onClick={handleReviewSubmit} disabled={isSubmittingReview || !reviewComments.trim() || !reviewRecommendation} className="w-full">
+                    {isSubmittingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                    Submit Review
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Display Existing Reviews (for Admin and Author) */}
+            {currentPaper.reviews && currentPaper.reviews.length > 0 && (user?.id === currentPaper.userId || isAdmin) && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2 flex items-center"><Star className="h-5 w-5 mr-2 text-primary" />Reviews Received</h3>
+                <div className="space-y-4">
+                  {currentPaper.reviews.map((review, index) => {
+                    const reviewerUser = isAdmin ? availableReviewers.find(u => u.id === review.reviewerId) : null;
+                    const reviewerDisplayName = isAdmin && reviewerUser ? `${reviewerUser.displayName} (Reviewer)` : `Reviewer ${index + 1}`;
+                    return (
+                      <Card key={index} className="bg-secondary/50">
+                        <CardHeader>
+                          <CardTitle className="text-md">
+                            {reviewerDisplayName}
+                          </CardTitle>
+                          <CardDescription>
+                            Recommendation: <Badge variant={review.recommendation === "Accept" ? "default" : review.recommendation === "Reject" ? "destructive" : "secondary"}>{review.recommendation}</Badge>
+                            <span className="text-xs ml-2 text-muted-foreground">Submitted: {new Date(review.submittedAt).toLocaleDateString()}</span>
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm whitespace-pre-wrap">{review.comments}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
 
           </div>
           <aside className="space-y-6">
@@ -489,3 +705,4 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
+

@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -10,18 +11,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Helper function to check if the requester is the owner of the resource
-    // function isOwner(userIdFromResource) { // Not directly used in this simplified version, but good for reference
-    //   return request.auth != null && request.auth.uid == userIdFromResource;
-    // }
-
     // Users Collection
     match /users/{userId} {
       // CREATE:
       // - User must be authenticated.
-      // - User can only create their own user document (userId in path must match auth.uid).
-      // - The 'userId' field in the document must also match their auth.uid.
-      // - During self-creation, 'isAdmin' must be false or not present (AuthContext handles true for admin-creator email).
+      // - User can only create their own user document.
+      // - 'isAdmin' must be false or not present during self-creation.
       allow create: if request.auth != null &&
                        request.auth.uid == userId &&
                        request.resource.data.userId == request.auth.uid &&
@@ -34,27 +29,27 @@ service cloud.firestore {
 
       // UPDATE:
       // - User can update their own profile, but cannot change 'isAdmin', 'userId', or 'email'.
-      // - An admin can update any field of *another* user (including 'isAdmin').
-      // - An admin cannot use this rule to change their *own* 'isAdmin' status (must be done via console or dedicated backend function).
+      // - An admin can update most fields of *another* user's profile, including 'isSuspended' and 'isAdmin'.
+      // - An admin cannot use this rule to change their *own* 'isAdmin' or 'isSuspended' status.
       allow update: if request.auth != null &&
                        (
-                         // Case 1: User updating their own profile (cannot change critical fields)
+                         // Case 1: User updating their own profile
                          (request.auth.uid == userId &&
-                           (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin) &&
-                           (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
-                           (!('email' in request.resource.data) || request.resource.data.email == resource.data.email)
+                           (!('isAdmin'in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin) &&
+                           (!('isSuspended'in request.resource.data) || request.resource.data.isSuspended == resource.data.isSuspended) && // User cannot change their own suspension
+                           (!('userId'in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
+                           (!('email'in request.resource.data) || request.resource.data.email == resource.data.email)
                          ) ||
-                         // Case 2: Admin updating *another* user's profile (can change any field, including isAdmin)
+                         // Case 2: Admin updating *another* user's profile
                          (isAdmin() && request.auth.uid != userId)
                        );
 
       // LIST:
-      // - Any authenticated user can list/query users.
-      // - This is primarily for client-side uniqueness checks (username, phone number) during profile updates.
+      // - Any authenticated user can list/query users (for client-side uniqueness checks, reviewer selection).
       allow list: if request.auth != null;
 
-      // DELETE: (Generally not allowed for users to delete their own accounts directly via client for cascading reasons)
-      // - Only admins can delete user accounts (if this functionality is built).
+      // DELETE:
+      // - Only admins can delete user accounts.
       allow delete: if isAdmin();
     }
 
@@ -65,30 +60,44 @@ service cloud.firestore {
         return request.auth != null && resource.data.userId == request.auth.uid;
       }
 
+      // Helper function to check if the requester is an assigned reviewer for this paper
+      function isAssignedReviewer() {
+        return request.auth != null && resource.data.assignedReviewerIds.hasAny([request.auth.uid]);
+      }
+
       // READ (GET):
       // - Paper owner can read their paper.
       // - Admin can read any paper.
-      // - Any user (authenticated or not) can read a 'Published' paper.
-      allow get: if isPaperOwner() || isAdmin() || (resource.data.status == 'Published');
+      // - Any user (even unauthenticated) can read a 'Published' paper.
+      allow get: if isPaperOwner() || isAdmin() || resource.data.status == 'Published';
 
       // LIST:
       // - Admins can list all papers.
-      // - Authenticated users can list papers if the query filters by their 'userId' (for their dashboard).
-      // - Anyone (authenticated or not) can list papers if the query filters by 'status' == 'Published' (for public search).
-      // This relies on client queries being appropriately filtered for non-admins/non-owners.
+      // - Authenticated users can list papers if the query filters by their 'userId'.
+      // - Anyone (even unauthenticated) can list papers if the query filters by 'status' == 'Published'.
       allow list: if isAdmin() ||
-                     (request.auth != null && resource.data.userId == request.auth.uid) || // Allows if document matches user's own paper
-                     (resource.data.status == 'Published');       // Allows if document is a published paper, regardless of auth
+                     (request.auth != null && request.query.filters.find(f => f[0] == 'userId' && f[2] == request.auth.uid) != null) ||
+                     (request.query.filters.find(f => f[0] == 'status' && f[2] == 'Published') != null);
+
 
       // CREATE:
       // - Authenticated user can create a paper.
       // - The 'userId' in the new paper document must match the creator's auth.uid.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
-      // UPDATE / DELETE:
-      // - Paper owner can update/delete their paper.
-      // - Admin can update/delete any paper.
-      allow update, delete: if isPaperOwner() || isAdmin();
+      // UPDATE:
+      // - Paper owner can update their paper.
+      // - Admin can update any paper (includes assigning reviewers, changing status).
+      // - An assigned reviewer can update the 'reviews' array (to add their review).
+      allow update: if isPaperOwner() || isAdmin() ||
+                       (isAssignedReviewer() && request.resource.data.reviews.size() == resource.data.reviews.size() + 1 &&
+                        request.resource.data.reviews[-1].reviewerId == request.auth.uid && // Ensure they are adding their own review
+                        !request.resource.data.reviews[-1].keys().hasAny(['reviewerId', 'submittedAt'])); // Cannot modify reviewerId or submittedAt of their new review via this update path
+
+      // DELETE:
+      // - Paper owner can delete their paper.
+      // - Admin can delete any paper.
+      allow delete: if isPaperOwner() || isAdmin();
     }
   }
 }
