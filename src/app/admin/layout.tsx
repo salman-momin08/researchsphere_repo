@@ -14,7 +14,7 @@ interface AdminLayoutProps {
 }
 
 const adminNavLinks = [
-  { href: '/admin/dashboard', label: 'Dashboard Overview', icon: <LayoutDashboard /> }, // Changed label
+  { href: '/admin/dashboard', label: 'Dashboard Overview', icon: <LayoutDashboard /> },
   { href: '/admin/users', label: 'User Management', icon: <Users /> },
   { href: '/admin/registered-admins', label: 'Registered Admins', icon: <UserCheck /> },
   { href: '/admin/reviewers', label: 'Reviewer Management', icon: <Eye /> },
@@ -25,8 +25,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div className="flex flex-1 bg-secondary/30">
-        <aside className="hidden md:flex w-64 bg-background border-r p-4 space-y-4 shadow-md fixed top-0 left-0 h-full pt-16 flex-col">
+      <div className="flex flex-1 bg-secondary/30"> {/* Changed from min-h-screen to flex-1 */}
+        <aside className="hidden md:flex w-64 bg-background border-r p-4 shadow-md fixed top-0 left-0 h-full pt-16 flex-col"> {/* Added flex-col */}
           <div className="flex items-center gap-2 mb-6 px-2 mt-4">
             <Shield className="h-7 w-7 text-primary" />
             <h2 className="text-xl font-semibold tracking-tight">Admin Panel</h2>
@@ -37,7 +37,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <Button
                   variant={pathname === link.href || (link.href !== '/admin/dashboard' && pathname.startsWith(link.href)) ? 'default' : 'ghost'}
                   className={cn(
-                    'w-full justify-start text-base py-3 px-3 [&_svg]:mr-2 [&_svg]:h-5 [&_svg]:w-5', // Ensure icon spacing
+                    'w-full justify-start text-base py-3 px-3 [&_svg]:mr-2 [&_svg]:h-5 [&_svg]:w-5',
                     (pathname === link.href || (link.href !== '/admin/dashboard' && pathname.startsWith(link.href)))
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                       : 'hover:bg-accent hover:text-accent-foreground'
@@ -50,7 +50,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             ))}
           </nav>
         </aside>
-        <main className="flex-1 flex flex-col md:ml-64 mt-16">
+        <main className="flex-1 flex flex-col md:ml-64 mt-16"> {/* Added flex flex-col */}
           <div className="flex-grow p-6 md:p-8">
             {children}
           </div>

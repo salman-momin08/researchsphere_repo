@@ -5,7 +5,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams } from "next/navigation"; // Ensure this is imported
+import { useSearchParams } from "next/navigation";
+import React from 'react'; // Ensure React is imported for Suspense
 
 // This is the main content of the page
 function AuthorProfileSettingsPageContent() {
@@ -21,8 +22,8 @@ function AuthorProfileSettingsPageContent() {
             {isCompletingProfile ? "Complete Your Profile" : "Profile Settings"}
           </CardTitle>
           <CardDescription>
-            {isCompletingProfile 
-              ? "Please provide the remaining details to finish setting up your account." 
+            {isCompletingProfile
+              ? "Please provide the remaining details to finish setting up your account."
               : "Update your personal information."}
           </CardDescription>
         </CardHeader>
@@ -36,9 +37,12 @@ function AuthorProfileSettingsPageContent() {
 
 // Wrapping the page with route protection
 export default function AuthorProfileSettingsPage() {
+  // For the profile settings page, we need to ensure the user is authenticated
+  // but we don't necessarily need to enforce profile completeness here, as this IS the page to complete it.
+  // AuthContext will handle redirecting away once the profile IS complete.
   return (
     <ProtectedRoute>
-      <AuthorProfileSettingsPageContent />
+        <AuthorProfileSettingsPageContent />
     </ProtectedRoute>
   );
 }

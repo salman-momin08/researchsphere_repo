@@ -1,5 +1,5 @@
-
-"use client"; // All layouts using hooks or context need to be client components
+// src/app/author/layout.tsx
+"use client";
 
 import React from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -11,11 +11,12 @@ interface AuthorLayoutProps {
 }
 
 export default function AuthorLayout({ children }: AuthorLayoutProps) {
+  // The ProtectedRoute here ensures that only authenticated users can access any page under /author/
+  // The specific logic for profile completion vs. other pages within /author/
+  // is handled by AuthContext and the individual page's ProtectedRoute if needed.
   return (
     <ProtectedRoute>
-      {/* If you had an author-specific sidebar or sub-header, it would go here */}
-      {/* For now, it just ensures the route is protected */}
-      <div className="w-full"> {/* Ensure content takes full width if no specific layout needed */}
+      <div className="w-full">
         {children}
       </div>
     </ProtectedRoute>
