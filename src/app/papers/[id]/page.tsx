@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard, UserCheck, UserPlus, Send, Star, MessageCircle } from 'lucide-react';
+import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon, UserCheck, UserPlus, Send, Star, MessageCircle } from 'lucide-react'; // Renamed LayoutDashboard to AdminDashboardIcon
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -23,7 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { getPaper, updatePaperStatus, updatePaperData, addReviewToPaper } from '@/lib/paper-service';
 import CountdownTimer from '@/components/shared/CountdownTimer';
-import { getAllUsers } from '@/lib/user-service';
+import { getAllUsers, getUserProfile } from '@/lib/user-service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Timestamp } from 'firebase/firestore';
 
@@ -44,20 +44,23 @@ function PaperDetailsContent() {
   const [isCheckingAcceptance, setIsCheckingAcceptance] = useState(false);
 
   const [availableReviewers, setAvailableReviewers] = useState<User[]>([]);
+  const [assignedReviewerDetails, setAssignedReviewerDetails] = useState<User[]>([]); // For displaying names
+  const [allReviewData, setAllReviewData] = useState<Array<Review & {reviewerDisplayName?: string}>>([]); // For displaying names in reviews
+
+
   const [selectedReviewer, setSelectedReviewer] = useState<string>("");
   const [isAssigningReviewer, setIsAssigningReviewer] = useState(false);
 
   const [reviewComments, setReviewComments] = useState("");
-  const [reviewRecommendation, setReviewRecommendation] = useState<'Accept' | 'Reject' | 'Minor Revision' | 'Major Revision' | undefined>(undefined);
+  const [reviewRecommendation, setReviewRecommendation] = useState<Review['recommendation'] | undefined>(undefined);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const isUserAssignedReviewer = user && currentPaper?.assignedReviewerIds?.includes(user.id);
   const hasUserAlreadyReviewed = user && currentPaper?.reviews?.some(r => r.reviewerId === user.id);
 
-
   const fetchPaperDetails = useCallback(async () => {
     const paperId = params.id as string;
-    if (paperId && user) {
+    if (paperId && user) { // Ensure user context is loaded
       setLoadingPaper(true);
       try {
         const paper = await getPaper(paperId);
@@ -68,7 +71,7 @@ function PaperDetailsContent() {
           if (!isOwner && !isAdmin && !isAssigned && paper.status !== "Published") {
             setCurrentPaper(null);
             toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
-            router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+            router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
             return;
           }
           setCurrentPaper(paper);
@@ -79,26 +82,51 @@ function PaperDetailsContent() {
               setIsPaperOverdue(true);
             }
           }
+
+          // Fetch details for assigned reviewers
+          if (paper.assignedReviewerIds && paper.assignedReviewerIds.length > 0) {
+            const reviewerPromises = paper.assignedReviewerIds.map(id => getUserProfile(id));
+            const reviewers = (await Promise.all(reviewerPromises)).filter(Boolean) as User[];
+            setAssignedReviewerDetails(reviewers);
+          } else {
+            setAssignedReviewerDetails([]);
+          }
+
+          // Fetch details for reviewers who submitted reviews
+          if (paper.reviews && paper.reviews.length > 0) {
+             const reviewDetailPromises = paper.reviews.map(async (review) => {
+                const reviewerProfile = await getUserProfile(review.reviewerId);
+                return {
+                    ...review,
+                    reviewerDisplayName: reviewerProfile?.displayName || `Reviewer (ID: ${review.reviewerId.substring(0,6)})`
+                };
+             });
+             setAllReviewData(await Promise.all(reviewDetailPromises));
+          } else {
+            setAllReviewData([]);
+          }
+
+
         } else {
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
-          router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+          router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
         }
       } catch (err: any) {
         setCurrentPaper(null);
         toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
-        router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard');
+         router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
       } finally {
         setLoadingPaper(false);
       }
-    } else if (!user && loadingPaper) {
-      // Wait for user
-    } else if (!user && !loadingPaper) {
-      setCurrentPaper(null);
+    } else if (!user && loadingPaper && params.id) { // Still waiting for user context
+        // Handled by ProtectedRoute or initial loading screen
+    } else if (!user && !loadingPaper) { // No user and not loading, indicates problem or public access attempt that should be handled.
+      setCurrentPaper(null); // Should be handled by ProtectedRoute for private pages
       setLoadingPaper(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, user, isAdmin, router]); // Added missing dependencies
+  }, [params.id, user, isAdmin, router]);
 
   useEffect(() => {
     fetchPaperDetails();
@@ -126,7 +154,7 @@ function PaperDetailsContent() {
 
     try {
       await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
-      await fetchPaperDetails(); // Re-fetch to get latest status
+      await fetchPaperDetails(); 
       setIsPaymentModalOpen(false);
       toast({title: "Payment Successful", description: "Paper status updated to Submitted."});
     } catch (error: any) {
@@ -141,8 +169,8 @@ function PaperDetailsContent() {
       await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
       setCurrentPaper(prev => prev ? { ...prev, adminFeedback: adminFeedbackText } : null);
       toast({
-        title: "Feedback Submitted Successfully",
-        description: `Your feedback for "${currentPaper.title}" has been saved. (Email simulation: Author would be notified).`,
+        title: "Feedback Submitted",
+        description: `Your feedback for "${currentPaper.title}" has been saved. The author would typically be notified by email (this is simulated).`,
         duration: 7000
       });
       setAdminFeedbackText(""); 
@@ -157,7 +185,7 @@ function PaperDetailsContent() {
     if (!currentPaper || !isAdmin) return;
     try {
       await updatePaperStatus(currentPaper.id, newStatus);
-      await fetchPaperDetails(); // Re-fetch
+      await fetchPaperDetails(); 
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
       } else {
@@ -273,7 +301,7 @@ function PaperDetailsContent() {
     }
     try {
       await updatePaperData(currentPaper.id, { assignedReviewerIds: [...currentAssigned, selectedReviewer] });
-      setCurrentPaper(prev => prev ? { ...prev, assignedReviewerIds: [...(prev.assignedReviewerIds || []), selectedReviewer] } : null);
+      await fetchPaperDetails(); // Re-fetch to update assignedReviewerDetails
       toast({ title: "Reviewer Assigned", description: `Reviewer assigned successfully.` });
       setSelectedReviewer("");
     } catch (error: any) {
@@ -285,12 +313,12 @@ function PaperDetailsContent() {
 
   const handleUnassignReviewer = async (reviewerIdToUnassign: string) => {
     if (!currentPaper || !isAdmin) return;
-    setIsAssigningReviewer(true); // Re-use loading state
+    setIsAssigningReviewer(true); 
     const currentAssigned = currentPaper.assignedReviewerIds || [];
     const updatedAssigned = currentAssigned.filter(id => id !== reviewerIdToUnassign);
     try {
       await updatePaperData(currentPaper.id, { assignedReviewerIds: updatedAssigned });
-      setCurrentPaper(prev => prev ? { ...prev, assignedReviewerIds: updatedAssigned } : null);
+      await fetchPaperDetails(); // Re-fetch
       toast({ title: "Reviewer Unassigned", description: `Reviewer unassigned successfully.` });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Unassignment Failed", description: error.message || "Could not unassign reviewer." });
@@ -310,11 +338,10 @@ function PaperDetailsContent() {
       comments: reviewComments,
       recommendation: reviewRecommendation,
       submittedAt: new Date().toISOString(),
-      // rating: { clarity: 5, ... } // Example if implementing detailed ratings
     };
     try {
       await addReviewToPaper(currentPaper.id, newReview);
-      setCurrentPaper(prev => prev ? { ...prev, reviews: [...(prev.reviews || []), newReview] } : null);
+      await fetchPaperDetails(); // Re-fetch to update reviews and hasUserAlreadyReviewed
       toast({ title: "Review Submitted", description: "Your review has been successfully submitted." });
       setReviewComments("");
       setReviewRecommendation(undefined);
@@ -331,12 +358,14 @@ function PaperDetailsContent() {
   }
 
   if (!currentPaper) {
+    // This state is usually indicative of an access issue handled by fetchPaperDetails or ProtectedRoute,
+    // or if user context isn't loaded yet. If user context is loaded and still no paper, it's a genuine not found/denied.
     return (
       <div className="container py-12 text-center px-4">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found or Access Denied</h2>
         <p className="text-muted-foreground">The paper may have been removed, or you might not have permission to view it.</p>
-        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard')} className="mt-6">Go to Dashboard</Button>
+        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'))} className="mt-6">Go to Dashboard</Button>
       </div>
     );
   }
@@ -396,7 +425,7 @@ function PaperDetailsContent() {
                 )}
                 {isAdmin && (
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
-                        <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
+                        <AdminDashboardIcon className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}
             </div>
@@ -464,8 +493,11 @@ function PaperDetailsContent() {
 
 
             {isAdmin && effectiveStatus !== "Payment Overdue" && (
-              <div className="mt-6 p-4 border rounded-md">
-                <h3 className="text-lg font-semibold mb-2">Provide Feedback to Author</h3>
+              <Card className="mt-6 p-4 border rounded-md bg-card">
+                <CardHeader className="p-2">
+                    <CardTitle className="text-lg flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Provide Feedback to Author</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 space-y-2">
                 <Label htmlFor="adminFeedback">Feedback / Comments (this will be visible to the author)</Label>
                 <Textarea
                   id="adminFeedback"
@@ -480,56 +512,61 @@ function PaperDetailsContent() {
                   {isSubmittingFeedback ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                   Submit Feedback
                 </Button>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
              {isAdmin && (
-                <div className="mt-6 p-4 border rounded-md">
-                  <h3 className="text-lg font-semibold mb-2">Change Paper Status</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(["Submitted", "Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
-                      <Button
-                        key={statusOption}
-                        variant={currentPaper.status === statusOption ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleStatusChange(statusOption)}
-                        disabled={isSubmittingFeedback || currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
-                      >
-                        Mark as {statusOption}
-                      </Button>
-                    ))}
-                     {isPaperOverdue && currentPaper.status === "Payment Pending" && (
+                <Card className="mt-6 p-4 border rounded-md bg-card">
+                  <CardHeader className="p-2">
+                    <CardTitle className="text-lg">Change Paper Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2">
+                    <div className="flex flex-wrap gap-2">
+                        {(["Submitted", "Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
                         <Button
-                            variant="destructive"
+                            key={statusOption}
+                            variant={currentPaper.status === statusOption ? "default" : "outline"}
                             size="sm"
-                            onClick={() => handleStatusChange("Rejected")}
-                            disabled={isSubmittingFeedback}
+                            onClick={() => handleStatusChange(statusOption)}
+                            disabled={isSubmittingFeedback || currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
                         >
-                            Confirm Rejection (Overdue)
+                            Mark as {statusOption}
                         </Button>
-                     )}
-                  </div>
-                </div>
+                        ))}
+                        {isPaperOverdue && currentPaper.status === "Payment Pending" && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleStatusChange("Rejected")}
+                                disabled={isSubmittingFeedback}
+                            >
+                                Confirm Rejection (Overdue)
+                            </Button>
+                        )}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             
             {isAdmin && (
-              <div className="mt-6 p-4 border rounded-md">
-                <h3 className="text-lg font-semibold mb-2 flex items-center"><UserCheck className="h-5 w-5 mr-2 text-primary" />Manage Reviewers</h3>
-                {currentPaper.assignedReviewerIds && currentPaper.assignedReviewerIds.length > 0 && (
+              <Card className="mt-6 p-4 border rounded-md bg-card">
+                <CardHeader className="p-2">
+                  <CardTitle className="text-lg flex items-center"><UserCheck className="h-5 w-5 mr-2 text-primary" />Manage Reviewers</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 space-y-3">
+                {assignedReviewerDetails.length > 0 && (
                   <div className="mb-4">
                     <h4 className="text-md font-medium mb-1">Currently Assigned:</h4>
-                    <ul className="list-disc list-inside pl-2 text-sm">
-                      {currentPaper.assignedReviewerIds.map(reviewerId => {
-                        const reviewer = availableReviewers.find(r => r.id === reviewerId);
-                        return (
-                          <li key={reviewerId} className="flex justify-between items-center py-1">
-                            <span>{reviewer ? `${reviewer.displayName} (${reviewer.email})` : reviewerId}</span>
-                            <Button variant="ghost" size="sm" onClick={() => handleUnassignReviewer(reviewerId)} disabled={isAssigningReviewer}>
-                              Unassign
-                            </Button>
-                          </li>
-                        );
-                      })}
+                    <ul className="list-disc list-inside pl-2 text-sm space-y-1">
+                      {assignedReviewerDetails.map(reviewer => (
+                        <li key={reviewer.id} className="flex justify-between items-center py-1">
+                          <span>{reviewer.displayName || reviewer.email}</span>
+                          <Button variant="ghost" size="sm" onClick={() => handleUnassignReviewer(reviewer.id)} disabled={isAssigningReviewer}>
+                            Unassign
+                          </Button>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
@@ -541,7 +578,7 @@ function PaperDetailsContent() {
                       </SelectTrigger>
                       <SelectContent>
                         {availableReviewers
-                          .filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)) // Only show unassigned reviewers
+                          .filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)) 
                           .map(rev => (
                             <SelectItem key={rev.id} value={rev.id}>
                               {rev.displayName} ({rev.email})
@@ -555,23 +592,22 @@ function PaperDetailsContent() {
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {currentPaper.assignedReviewerIds && currentPaper.assignedReviewerIds.length > 0 
-                      ? "All available reviewers are assigned or no other reviewers available." 
-                      : "No reviewers available to assign (or all are already assigned). Ensure users are registered with the 'Reviewer' role."}
-                  </p>
+                   assignedReviewerDetails.length === 0 && <p className="text-sm text-muted-foreground">No reviewers currently assigned. No available reviewers to assign.</p>
                 )}
-              </div>
+                {availableReviewers.filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)).length === 0 && assignedReviewerDetails.length > 0 && (
+                     <p className="text-sm text-muted-foreground">All available reviewers are assigned or no other reviewers to assign.</p>
+                )}
+                </CardContent>
+              </Card>
             )}
 
-             {/* Review Submission Form for Assigned Reviewers */}
             {isUserAssignedReviewer && !hasUserAlreadyReviewed && user && !isAdmin && (
-              <Card className="mt-6 p-4 border-primary/30">
-                <CardHeader>
-                  <CardTitle className="flex items-center"><MessageCircle className="mr-2 h-6 w-6 text-primary" />Submit Your Review</CardTitle>
+              <Card className="mt-6 p-4 border-primary/30 bg-card">
+                <CardHeader className="p-2">
+                  <CardTitle className="text-lg flex items-center"><MessageCircle className="mr-2 h-6 w-6 text-primary" />Submit Your Review</CardTitle>
                   <CardDescription>Provide your feedback and recommendation for this paper.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-2 space-y-4">
                   <div>
                     <Label htmlFor="reviewComments">Comments *</Label>
                     <Textarea
@@ -602,7 +638,6 @@ function PaperDetailsContent() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {/* Optional: Add fields for detailed ratings (clarity, originality, etc.) here */}
                   <Button onClick={handleReviewSubmit} disabled={isSubmittingReview || !reviewComments.trim() || !reviewRecommendation} className="w-full">
                     {isSubmittingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                     Submit Review
@@ -611,14 +646,18 @@ function PaperDetailsContent() {
               </Card>
             )}
 
-            {/* Display Existing Reviews (for Admin and Author) */}
-            {currentPaper.reviews && currentPaper.reviews.length > 0 && (user?.id === currentPaper.userId || isAdmin) && (
+            {allReviewData && allReviewData.length > 0 && (user?.id === currentPaper.userId || isAdmin) && (
               <div className="mt-6">
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><Star className="h-5 w-5 mr-2 text-primary" />Reviews Received</h3>
                 <div className="space-y-4">
-                  {currentPaper.reviews.map((review, index) => {
-                    const reviewerUser = isAdmin ? availableReviewers.find(u => u.id === review.reviewerId) : null;
-                    const reviewerDisplayName = isAdmin && reviewerUser ? `${reviewerUser.displayName} (Reviewer)` : `Reviewer ${index + 1}`;
+                  {allReviewData.map((review, index) => {
+                    let reviewerDisplayName = `Reviewer ${index + 1}`; // Default for author view
+                    if (isAdmin) {
+                        reviewerDisplayName = review.reviewerDisplayName || `Reviewer (ID: ${review.reviewerId.substring(0,6)})`;
+                    } else if (user?.id === review.reviewerId) { // If current user is the reviewer
+                        reviewerDisplayName = "Your Review";
+                    }
+                    
                     return (
                       <Card key={index} className="bg-secondary/50">
                         <CardHeader>
@@ -705,4 +744,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-

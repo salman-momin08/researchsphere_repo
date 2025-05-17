@@ -2,9 +2,9 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import type { Paper, PaperStatus } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users, FileText as FileTextIcon, Clock, Info, LayoutDashboard } from "lucide-react";
-import { useEffect, useState } from "react";
+import type { Paper, PaperStatus, User } from "@/types";
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users as UsersIcon, FileText as FileTextIcon, Clock, Info, LayoutDashboard, UserCheck, Eye } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,26 +13,35 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
+import { getAllUsers } from "@/lib/user-service"; // Import user service
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
 function AdminDashboardContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [isLoadingPapers, setIsLoadingPapers] = useState(true);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // State for all users
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const [stats, setStats] = useState({
     totalSubmissions: 0,
     pendingReview: 0,
     issuesFound: 0,
     paymentPending: 0,
+    totalUsers: 0,
+    totalAuthors: 0,
+    totalReviewers: 0,
   });
 
-  const fetchAndSetPapers = async () => {
+  const fetchAdminData = useCallback(async () => {
     if (!authLoading && user && isAdmin) {
-      setIsLoadingPapers(true);
+      setIsLoadingData(true);
       try {
-        const fetchedPapers = await getAllPapers();
+        const [fetchedPapers, fetchedUsers] = await Promise.all([
+          getAllPapers(),
+          getAllUsers()
+        ]);
+
         const now = new Date();
         const processedPapers = fetchedPapers.map(p => {
           const paymentDueDateValid = p.paymentDueDate && !isNaN(new Date(p.paymentDueDate).getTime());
@@ -42,31 +51,46 @@ function AdminDashboardContent() {
           return { ...p, displayStatus: p.status };
         });
         setPapers(processedPapers);
+        setAllUsers(fetchedUsers);
 
         const totalSubmissions = processedPapers.length;
         const pendingReview = processedPapers.filter(p => p.status === 'Submitted' || p.status === 'Under Review').length;
         const issuesFound = processedPapers.filter(p => p.status === 'Action Required' || (p.plagiarismScore && p.plagiarismScore > 0.15)).length;
         const paymentPending = processedPapers.filter(p => p.status === 'Payment Pending' && !(p.displayStatus === 'Payment Overdue')).length;
 
-        setStats({ totalSubmissions, pendingReview, issuesFound, paymentPending });
+        const totalUsers = fetchedUsers.length;
+        const totalAuthors = fetchedUsers.filter(u => u.role === 'Author').length;
+        const totalReviewers = fetchedUsers.filter(u => u.role === 'Reviewer').length;
+
+        setStats({
+          totalSubmissions,
+          pendingReview,
+          issuesFound,
+          paymentPending,
+          totalUsers,
+          totalAuthors,
+          totalReviewers,
+        });
       } catch (error: any) {
-        toast({ variant: "destructive", title: "Error Loading Papers", description: error.message || "Could not load papers for admin." });
+        toast({ variant: "destructive", title: "Error Loading Admin Data", description: error.message || "Could not load data for admin." });
       } finally {
-        setIsLoadingPapers(false);
+        setIsLoadingData(false);
       }
     } else if (!authLoading && user && !isAdmin) {
       setPapers([]);
-      setIsLoadingPapers(false);
+      setAllUsers([]);
+      setIsLoadingData(false);
     } else if (!authLoading && !user) {
       setPapers([]);
-      setIsLoadingPapers(false);
+      setAllUsers([]);
+      setIsLoadingData(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAndSetPapers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAdmin, authLoading]);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, [fetchAdminData]);
 
   const getStatusBadgeVariant = (status: PaperStatus | undefined) => {
     switch (status) {
@@ -86,12 +110,12 @@ function AdminDashboardContent() {
       if (paperToNotify) {
         toast({
           title: "Email Notification (Simulated)",
-          description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}.`,
+          description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}. (This is a simulation).`,
           variant: "default",
           duration: 7000,
         });
       }
-      fetchAndSetPapers(); // Refresh paper list
+      fetchAdminData(); // Refresh data
     } catch (error: any) {
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
     }
@@ -108,11 +132,11 @@ function AdminDashboardContent() {
           <Shield className="h-5 w-5" />
           <AlertTitle>Admin Access Required</AlertTitle>
           <AlertDescription>
-            You do not have permission to view this page. Please ensure your user profile has `isAdmin: true` set in Firestore if you are an administrator.
+            You do not have permission to view this page.
           </AlertDescription>
         </Alert>
-        <Link href="/user/dashboard">
-          <Button className="mt-6">Go to User Dashboard</Button>
+        <Link href="/author/dashboard">
+          <Button className="mt-6">Go to Your Dashboard</Button>
         </Link>
       </div>
     );
@@ -135,7 +159,7 @@ function AdminDashboardContent() {
      );
   }
 
-  if (isLoadingPapers) {
+  if (isLoadingData) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
 
@@ -147,7 +171,7 @@ function AdminDashboardContent() {
         </h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"> {/* Adjusted for potentially more stat cards */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
@@ -160,8 +184,38 @@ function AdminDashboardContent() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <UsersIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground">registered on platform</p>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Authors</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalAuthors}</div>
+            <p className="text-xs text-muted-foreground">registered as authors</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Reviewers</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalReviewers}</div>
+            <p className="text-xs text-muted-foreground">registered as reviewers</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Awaiting Review</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground" /> {/* Changed icon */}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pendingReview}</div>
@@ -229,10 +283,8 @@ function AdminDashboardContent() {
                         </TableCell>
                         <TableCell>{paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell>
-                          {isPaymentOverdue ? (
-                             <span className={"text-destructive font-semibold"}>Yes</span>
-                          ) : paper.status === 'Payment Pending' ? (
-                             <span className={"text-yellow-600 font-semibold"}>Yes</span>
+                          {effectiveStatus === 'Payment Pending' || isPaymentOverdue ? (
+                             <span className={isPaymentOverdue ? "text-destructive font-semibold" : "text-yellow-600 font-semibold"}>Yes</span>
                           ) : (
                             <span className="text-muted-foreground">N/A</span>
                           )}
