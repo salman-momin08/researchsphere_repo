@@ -3,9 +3,8 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, usePathname } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react"; // Removed useState as initialCheckComplete is handled by AuthContext
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { useToast } from "@/hooks/use-toast";
 
 const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings';
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
@@ -28,12 +27,12 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading, isAdminUser, setShowLoginModal, initialAuthCheckComplete } = useAuth();
+  const { user, loading, isAdminUser, setShowLoginModal, initialAuthCheckComplete, isProfileComplete } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
 
-  if (!initialAuthCheckComplete || loading) {
+  // Use initialAuthCheckComplete from AuthContext to determine if initial auth processing is done
+  if (!initialAuthCheckComplete || loading) { // Also check general loading state
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
@@ -46,17 +45,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
   );
 
-  if (isPublicPage) {
+  // Allow access to public pages unless it's an adminOnly public page (which shouldn't exist)
+  if (isPublicPage && !adminOnly) {
     return <>{children}</>;
   }
 
-  // If no user and not on a public page or auth utility page, prompt login
+  // If no user, and it's not a public page
   if (!user) {
     if (typeof window !== "undefined") {
       localStorage.setItem("redirectAfterLogin", pathname + window.location.search);
     }
-    // Defer showing modal to a microtask to avoid issues during render
-    setTimeout(() => setShowLoginModal(true), 0);
+    setTimeout(() => setShowLoginModal(true), 0); // Defer to avoid issues during render
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
@@ -69,11 +68,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
 
   // If it's an admin-only route and user is not an admin
   if (adminOnly && !isAdminUser) {
-    toast({
-      title: "Access Denied",
-      description: "You do not have permission to view this admin page.",
-      variant: "destructive",
-    });
     const userDashboard = user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
     router.push(userDashboard);
     return (
@@ -84,14 +78,29 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     );
   }
 
-  // Allow access to profile settings page if user is authenticated, AuthContext will handle incomplete profile logic
+  // Allow access to profile settings page for any authenticated user.
+  // AuthContext will handle redirecting TO it if incomplete, or AWAY if completed.
   if (pathname === AUTHOR_PROFILE_SETTINGS_PATH || pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
     return <>{children}</>;
   }
+  
+  // If profile is incomplete and user is trying to access a page other than profile settings or public pages
+  // AuthContext is responsible for redirecting them to AUTHOR_PROFILE_SETTINGS_PATH.
+  // ProtectedRoute shows a loading/checking state while AuthContext processes this.
+  if (!isProfileComplete && !isPublicPage) {
+    // AuthContext should have already initiated a redirect if needed.
+    // This state indicates we are waiting for that redirect or for profile to be completed.
+    // console.log(`ProtectedRoute: User ${user.email} profile incomplete on ${pathname}. AuthContext should handle redirect.`);
+    return (
+        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+            <LoadingSpinner size={48} />
+            <p className="ml-2">Checking profile status...</p>
+        </div>
+    );
+  }
 
+  // If all checks pass, render the children
   return <>{children}</>;
 };
 
 export default ProtectedRoute;
-
-    

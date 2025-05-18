@@ -36,7 +36,7 @@ interface NavLinkItemProps {
 }
 
 const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }) => {
-  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-sm md:text-base font-medium rounded-md"; // Adjusted base text size
+  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-sm md:text-base font-medium rounded-md";
   let activeStyleClasses = "";
   let hoverStyleClasses = "";
 
@@ -50,6 +50,12 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
 
   const combinedClasses = cn(baseClasses, activeStyleClasses, hoverStyleClasses, "[&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4");
 
+  const content = (
+    <>
+      {icon}{children}
+    </>
+  );
+
   if (href) {
     return (
       <Link href={href} passHref legacyBehavior>
@@ -58,7 +64,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
           onClick={onClick}
           className={combinedClasses}
         >
-          {icon}{children}
+          {content}
         </Button>
       </Link>
     );
@@ -70,7 +76,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
         onClick={onClick}
         className={combinedClasses}
       >
-        {icon}{children}
+        {content}
       </Button>
     );
   }
@@ -126,8 +132,8 @@ export default function Header() {
 
   const isViewingAdminSection = pathname.startsWith('/admin');
 
-  const baseNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
-    { href: "/", label: "Home", icon: null },
+  const baseNavLinks: Array<{ href: string; label: string; icon?: React.ReactNode; }> = [
+    { href: "/", label: "Home" },
     { href: "/registration", label: "Registration", icon: <FileTextIconLucide /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
@@ -135,9 +141,9 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
   
-  const authorNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
-    { href: "/", label: "Home", icon: null },
-    { href: "/author/dashboard", label: "Author Dashboard", icon: <LayoutDashboard /> },
+  const authorNavLinks: Array<{ href?: string; label: string; icon?: React.ReactNode; action?: () => void; }> = [
+    { href: "/", label: "Home" },
+    { href: "/author/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
     { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" },
     { label: "AI Pre-Check", action: handleAiPreCheckClick, icon: <Sparkles />, href: "/author/ai-pre-check" },
     { href: "/registration", label: "Registration", icon: <FileTextIconLucide /> },
@@ -147,14 +153,14 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
 
-  const reviewerNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
-    { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
+  const reviewerNavLinks: Array<{ href: string; label: string; icon?: React.ReactNode; }> = [
+    { href: "/reviewer/dashboard", label: "Dashboard", icon: <Eye /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
   
-  const adminNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
+  const adminNavLinks: Array<{ href: string; label: string; icon?: React.ReactNode; }> = [
     { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield /> },
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
@@ -165,6 +171,7 @@ export default function Header() {
       { href: "/admin/users", label: "User Management", icon: <UsersIconLucide /> },
       { href: "/admin/registered-admins", label: "Registered Admins", icon: <UserCheck /> },
       { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye /> },
+      { href: "/admin/profile/settings", label: "Profile Settings", icon: <Settings /> },
   ];
 
   let currentNavLinks = baseNavLinks; 
@@ -174,11 +181,10 @@ export default function Header() {
       currentNavLinks = adminNavLinks;
     } else if (user && user.role === "Reviewer") {
       currentNavLinks = reviewerNavLinks;
-    } else if (user) { 
+    } else if (user && user.role === "Author") { 
       currentNavLinks = authorNavLinks;
     }
   }
-
 
   return (
     <header className={cn(
@@ -229,7 +235,7 @@ export default function Header() {
                 key={link.href || link.label}
                 variant="ghost"
                 onClick={() => {
-                  if (link.action) link.action();
+                  if ((link as any).action) (link as any).action();
                   else if (link.href) router.push(link.href);
                   setIsMobileMenuOpen(false);
                 }}
@@ -261,25 +267,40 @@ export default function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {isAdminUser ? (
-                  <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
-                    <Shield className="mr-2 h-4 w-4" />
-                    <span>Admin Panel</span>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>Admin Panel</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/admin/profile/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Profile Settings</span>
+                    </DropdownMenuItem>
+                  </>
                 ) : user.role === "Reviewer" ? (
-                   <DropdownMenuItem onClick={() => router.push('/reviewer/dashboard')}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    <span>Reviewer Dashboard</span>
-                  </DropdownMenuItem>
-                ) : ( 
-                  <DropdownMenuItem onClick={() => router.push('/author/dashboard')}>
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    <span>Author Dashboard</span>
-                  </DropdownMenuItem>
+                   <>
+                    <DropdownMenuItem onClick={() => router.push('/reviewer/dashboard')}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      <span>Reviewer Dashboard</span>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => router.push('/author/profile/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Profile Settings</span>
+                    </DropdownMenuItem>
+                   </>
+                ) : ( // Author
+                  <>
+                    <DropdownMenuItem onClick={() => router.push('/author/dashboard')}>
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      <span>Author Dashboard</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/author/profile/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Profile Settings</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
-                <DropdownMenuItem onClick={() => router.push('/author/profile/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Profile Settings</span>
-                </DropdownMenuItem>
+                
                 {user.role !== "Reviewer" && !isAdminUser && ( 
                   <>
                     <DropdownMenuItem onClick={handleSubmitPaperClick}>
@@ -292,12 +313,11 @@ export default function Header() {
                     </DropdownMenuItem>
                   </>
                 )}
-                {(user.role !== "Reviewer" || isAdminUser) && ( 
-                   <DropdownMenuItem onClick={() => router.push('/search-papers')}>
-                    <SearchIcon className="mr-2 h-4 w-4" />
-                    <span>Search Papers</span>
-                   </DropdownMenuItem>
-                )}
+                {/* Search Papers link for all authenticated users */}
+                <DropdownMenuItem onClick={() => router.push('/search-papers')}>
+                  <SearchIcon className="mr-2 h-4 w-4" />
+                  <span>Search Papers</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -346,12 +366,12 @@ export default function Header() {
                       key={link.href || link.label}
                       href={link.href}
                       onClick={() => {
-                        if (link.action) link.action();
+                        if ((link as any).action) (link as any).action();
                         else if (link.href) router.push(link.href);
                         setIsMobileMenuOpen(false);
                       }}
                       isActive={isActive}
-                      isAction={!!link.action}
+                      isAction={!!(link as any).action}
                       icon={link.icon}
                       isAdminContext={!!(user && isAdminUser)}
                     >
@@ -389,10 +409,16 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                    <NavLinkItem href="/author/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/author/profile/settings")} icon={<Settings />} isAdminContext={!!(user && isAdminUser)}>
+                    <NavLinkItem 
+                      href={isAdminUser ? "/admin/profile/settings" : "/author/profile/settings"} 
+                      onClick={() => setIsMobileMenuOpen(false)} 
+                      isActive={pathname.startsWith(isAdminUser ? "/admin/profile/settings" : "/author/profile/settings")} 
+                      icon={<Settings />} 
+                      isAdminContext={isAdminUser}
+                    >
                       Profile Settings
                     </NavLinkItem>
-                    {user.role !== "Reviewer" && !isAdminUser && (
+                    {user.role === "Author" && !isAdminUser && ( // Only for Authors
                       <>
                         <NavLinkItem onClick={handleSubmitPaperClick} isActive={pathname === "/author/submit"} isAction icon={<UploadCloud />} >
                           Submit Paper
@@ -402,11 +428,9 @@ export default function Header() {
                         </NavLinkItem>
                       </>
                     )}
-                    {(user.role !== "Reviewer" || isAdminUser) && ( 
-                         <NavLinkItem href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/search-papers"} icon={<SearchIcon />}>
-                            Search Papers
-                         </NavLinkItem>
-                    )}
+                    <NavLinkItem href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/search-papers"} icon={<SearchIcon />}>
+                        Search Papers
+                    </NavLinkItem>
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-sm md:text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
                       <LogOut /> Log Out
                     </Button>
@@ -425,3 +449,4 @@ export default function Header() {
     </header>
   );
 }
+

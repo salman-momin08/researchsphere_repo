@@ -10,7 +10,7 @@ import React, { Suspense } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 // This internal component uses the hook
-function ProfileSettingsPageContent() {
+function AuthorProfileSettingsPageContent() {
   const searchParams = useNextSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
@@ -38,9 +38,12 @@ function ProfileSettingsPageContent() {
 
 export default function AuthorProfileSettingsPage() {
   return (
-    <ProtectedRoute> {/* Ensures only authenticated users can access */}
+    // ProtectedRoute ensures only authenticated users can access.
+    // AuthContext will handle redirecting TO here if profile is incomplete.
+    // AuthContext (via updateUserProfile) will handle redirecting AWAY if profile is completed.
+    <ProtectedRoute> 
       <Suspense fallback={<div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>}>
-        <ProfileSettingsPageContent />
+        <AuthorProfileSettingsPageContent />
       </Suspense>
     </ProtectedRoute>
   );
