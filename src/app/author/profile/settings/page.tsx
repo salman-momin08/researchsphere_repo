@@ -1,17 +1,16 @@
 
-// app/author/profile/settings/page.tsx
 "use client";
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams as useNextSearchParams } from "next/navigation"; 
-import React from 'react';
+import { useSearchParams as useNextSearchParams } from "next/navigation";
+import React, { Suspense } from 'react';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
-// This is the main content of the page
-function AuthorProfileSettingsPageContent() {
-  const searchParams = useNextSearchParams(); 
+function ProfileSettingsPageContent() {
+  const searchParams = useNextSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (
@@ -36,11 +35,14 @@ function AuthorProfileSettingsPageContent() {
   );
 }
 
-// Wrapping the page with route protection
 export default function AuthorProfileSettingsPage() {
+  // ProtectedRoute around this ensures user is authenticated to access this page.
+  // AuthContext will handle redirecting AWAY from here once profile is complete.
   return (
     <ProtectedRoute>
-        <AuthorProfileSettingsPageContent />
+      <Suspense fallback={<div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>}>
+        <ProfileSettingsPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }

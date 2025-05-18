@@ -1,24 +1,20 @@
 
-// src/app/author/layout.tsx
-"use client";
+"use client"; // This layout itself doesn't need client hooks if children are wrapped.
 
 import React from 'react';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
+// ProtectedRoute is applied by individual pages or higher up if needed universally for /author
+// For instance, if /author/profile/settings applies it, this layout doesn't need to double-apply.
 
 interface AuthorLayoutProps {
   children: React.ReactNode;
 }
 
 export default function AuthorLayout({ children }: AuthorLayoutProps) {
-  // This layout ensures that all routes under /author/* are protected
-  // and require authentication. The specific logic for profile completion
-  // or role-based access within these routes can be handled by AuthContext
-  // or the individual page components.
+  // This layout is simpler, assuming child pages or a higher layout handles protection.
+  // It ensures all routes under /author/* can have a shared structure if needed in the future.
   return (
-    <ProtectedRoute>
-      <div className="w-full">
-        {children}
-      </div>
-    </ProtectedRoute>
+    <div className="w-full">
+      {children}
+    </div>
   );
 }
