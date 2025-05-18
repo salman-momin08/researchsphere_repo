@@ -41,7 +41,7 @@ const submissionOptions: SubmissionOption[] = [
       "Secure Online Payment",
     ],
     cta: "Submit Your Paper",
-    href: "/user/submit", // Updated path
+    href: "/author/submit", 
     icon: <FileText className="h-8 w-8 mb-2 text-primary" />
   },
   {
@@ -88,17 +88,17 @@ const submissionOptions: SubmissionOption[] = [
 
 const benefits = [
     {
-        icon: <FileText className="h-10 w-10 text-primary mb-4" />,
+        icon: <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-primary mb-4" />,
         title: "Streamlined Submission",
         description: "Our intuitive platform makes submitting your research papers quick and easy. Focus on your research, we'll handle the rest.",
     },
     {
-        icon: <ShieldCheck className="h-10 w-10 text-primary mb-4" />,
+        icon: <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-primary mb-4" />,
         title: "AI-Powered Insights",
         description: "Leverage our advanced AI tools for plagiarism detection and acceptance probability analysis to enhance your paper's quality (based on abstract).",
     },
     {
-        icon: <Award className="h-10 w-10 text-primary mb-4" />,
+        icon: <Award className="h-8 w-8 sm:h-10 sm:w-10 text-primary mb-4" />,
         title: "Quality Assurance",
         description: "Benefit from a structured review process designed to ensure high academic standards and provide constructive feedback.",
     },
@@ -108,7 +108,7 @@ export default function RegistrationPricingPage() {
   const { user } = useAuth(); 
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
-    if (!text) { // Prevent copying if text is null/undefined
+    if (!text) { 
         toast({ variant: "destructive", title: "Copy Failed", description: `${fieldName} has no value to copy.` });
         return;
     }
@@ -116,7 +116,6 @@ export default function RegistrationPricingPage() {
       toast({ title: "Copied to Clipboard", description: `${fieldName} copied successfully.` });
     }).catch(err => {
       toast({ variant: "destructive", title: "Copy Failed", description: `Could not copy ${fieldName}.` });
-      // console.error('Failed to copy text: ', err);
     });
   };
 
@@ -125,28 +124,28 @@ export default function RegistrationPricingPage() {
     <div className="bg-secondary">
       <div className="container mx-auto py-12 md:py-20 px-4 sm:px-6 lg:px-8">
         <header className="text-center mb-12 md:mb-16">
-          <Users className="mx-auto h-16 w-16 text-primary mb-4" />
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          <Users className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-primary mb-4" />
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
             Join ResearchSphere
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-md sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Submit your research, get AI-powered feedback, and manage your publications efficiently. Explore our submission options below.
           </p>
         </header>
 
         <section className="mb-16 md:mb-24">
-             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-10 sm:mb-12">
                 Why <span className="text-primary">ResearchSphere</span>?
             </h2>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
                 {benefits.map((benefit, index) => (
                      <Card key={index} className="shadow-lg text-center p-4 hover:shadow-xl transition-shadow duration-300">
                         <CardHeader>
                             {benefit.icon}
-                            <CardTitle>{benefit.title}</CardTitle>
+                            <CardTitle className="text-lg sm:text-xl">{benefit.title}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-muted-foreground">{benefit.description}</p>
+                            <p className="text-sm sm:text-base text-muted-foreground">{benefit.description}</p>
                         </CardContent>
                     </Card>
                 ))}
@@ -154,23 +153,23 @@ export default function RegistrationPricingPage() {
         </section>
 
         <section>
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-10 sm:mb-12">
             Submission <span className="text-primary">Options</span>
           </h2>
-          <div className="grid sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
             {submissionOptions.map((option) => (
               <Card key={option.name} className="flex flex-col shadow-xl hover:shadow-2xl transition-shadow duration-300">
                 <CardHeader className="pb-4 items-center text-center">
                   {option.icon}
-                  <CardTitle className="text-2xl text-primary">{option.name}</CardTitle>
+                  <CardTitle className="text-xl sm:text-2xl text-primary">{option.name}</CardTitle>
                   <div className="flex items-baseline justify-center">
-                    <span className="text-4xl font-extrabold tracking-tight">{option.price}</span>
-                    {option.price !== "Contact Us" && <span className="ml-1 text-xl font-semibold text-muted-foreground">{option.priceFrequency}</span>}
+                    <span className="text-3xl sm:text-4xl font-extrabold tracking-tight">{option.price}</span>
+                    {option.price !== "Contact Us" && <span className="ml-1 text-lg sm:text-xl font-semibold text-muted-foreground">{option.priceFrequency}</span>}
                   </div>
-                   <CardDescription className="pt-2 h-12">{option.description}</CardDescription>
+                   <CardDescription className="pt-2 h-12 text-sm sm:text-base">{option.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <ul role="list" className="space-y-3">
+                  <ul role="list" className="space-y-3 text-sm sm:text-base">
                     {option.features.map((feature) => (
                       <li key={feature} className="flex items-center">
                         <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
@@ -179,7 +178,7 @@ export default function RegistrationPricingPage() {
                     ))}
                   </ul>
                    {(option.name === "Institutional Membership" || option.isSubscription) && (
-                    <p className="text-sm text-muted-foreground mt-4">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-4">
                       {option.isSubscription 
                         ? "To activate your annual subscription, please make a payment to the bank account details provided below. Email your payment confirmation to subscriptions@researchsphere.com."
                         : "For institutional plans and payment details, please contact our support team."}
@@ -188,7 +187,7 @@ export default function RegistrationPricingPage() {
                 </CardContent>
                 <div className="p-6 pt-4 mt-auto">
                   <Link href={option.href} passHref>
-                    <Button className="w-full" size="lg" onClick={option.isSubscription ? (e) => {e.preventDefault(); const element = document.getElementById('subscription-details'); if (element) element.scrollIntoView({behavior: 'smooth'});} : undefined}>
+                    <Button className="w-full text-base sm:text-lg" size="lg" onClick={option.isSubscription ? (e) => {e.preventDefault(); const element = document.getElementById('subscription-details'); if (element) element.scrollIntoView({behavior: 'smooth'});} : undefined}>
                       {option.cta}
                     </Button>
                   </Link>
@@ -202,23 +201,23 @@ export default function RegistrationPricingPage() {
           <section id="subscription-details" className="mt-16 md:mt-24">
             <Card className="max-w-2xl mx-auto shadow-lg">
               <CardHeader>
-                <CardTitle className="text-2xl flex items-center">
-                  <Landmark className="mr-3 h-6 w-6 text-primary" />
+                <CardTitle className="text-xl sm:text-2xl flex items-center">
+                  <Landmark className="mr-3 h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                   Annual Subscription Payment Details
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm sm:text-base">
                   To activate your annual subscription, please transfer the subscription fee to the following bank account and notify us.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 text-sm sm:text-base">
                 {Object.entries(submissionOptions.find(opt => opt.isSubscription && opt.bankDetails)!.bankDetails!).map(([key, value]) => {
-                  if (value === undefined || value === null) return null; // Skip rendering if value is null or undefined
+                  if (value === undefined || value === null) return null; 
                   const displayKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                   return (
                     <div key={key} className="flex justify-between items-center p-2 border-b last:border-b-0">
                       <span className="font-medium text-muted-foreground">{displayKey}:</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-foreground">{String(value)}</span> {/* Ensure value is rendered as a string */}
+                        <span className="text-foreground">{String(value)}</span> 
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyToClipboard(String(value), displayKey)}>
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -226,7 +225,7 @@ export default function RegistrationPricingPage() {
                     </div>
                   );
                 })}
-                <p className="text-sm text-muted-foreground pt-3">
+                <p className="text-xs sm:text-sm text-muted-foreground pt-3">
                   After payment, please email your transaction receipt/confirmation to <strong className="text-primary">subscriptions@researchsphere.com</strong> along with your registered username or email to activate your subscription.
                 </p>
               </CardContent>
@@ -236,12 +235,12 @@ export default function RegistrationPricingPage() {
 
         {!user && (
           <section className="mt-16 md:mt-24 text-center">
-              <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Begin?</h2>
-              <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4">Ready to Begin?</h2>
+              <p className="text-sm sm:text-base text-muted-foreground mb-8 max-w-xl mx-auto">
                   Create your free ResearchSphere account today to explore the platform. Submission fees apply when you are ready to submit your paper.
               </p>
               <Link href="/signup">
-                  <Button size="lg" variant="default">Create Your Account</Button>
+                  <Button size="lg" variant="default" className="text-base sm:text-lg">Create Your Account</Button>
               </Link>
           </section>
         )}
@@ -249,4 +248,3 @@ export default function RegistrationPricingPage() {
     </div>
   );
 }
-

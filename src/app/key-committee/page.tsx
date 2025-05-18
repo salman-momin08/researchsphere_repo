@@ -62,7 +62,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "researcher woman tech",
+    dataAiHint: "researcher tech",
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
       "Lead organizer for the TPC of three major AI conferences.",
@@ -107,7 +107,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "International Liaison",
     affiliation: "Global Research Network",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "professional man asia",
+    dataAiHint: "professional man",
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
       "Established partnerships with over 25 international institutions.",
@@ -132,7 +132,7 @@ const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: Committ
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="text-center sm:text-left">
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-            <Avatar className="h-28 w-28 border-2 border-primary">
+            <Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-2 border-primary">
               {member.imageUrl ? (
                 <Image
                   src={member.imageUrl}
@@ -143,20 +143,20 @@ const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: Committ
                   data-ai-hint={member.dataAiHint || "professional portrait"}
                 />
               ) : (
-                <AvatarFallback className="text-4xl bg-muted">
+                <AvatarFallback className="text-3xl sm:text-4xl bg-muted">
                   <UserCircle size={60} />
                 </AvatarFallback>
               )}
             </Avatar>
             <div className="text-center sm:text-left">
-              <DialogTitle className="text-2xl font-bold">{member.name}</DialogTitle>
-              <DialogDescription className="text-primary font-medium">{member.title}</DialogDescription>
-              <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center sm:justify-start">
+              <DialogTitle className="text-xl sm:text-2xl font-bold">{member.name}</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base text-primary font-medium">{member.title}</DialogDescription>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center justify-center sm:justify-start">
                 <Building className="h-4 w-4 mr-2 text-primary/80" />
                 {member.affiliation}
               </p>
               {member.email && (
-                 <a href={`mailto:${member.email}`} className="text-sm text-muted-foreground hover:text-primary transition-colors mt-1 flex items-center justify-center sm:justify-start">
+                 <a href={`mailto:${member.email}`} className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors mt-1 flex items-center justify-center sm:justify-start">
                     <Mail size={14} className="mr-2 text-primary/80" />
                     {member.email}
                   </a>
@@ -167,18 +167,18 @@ const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: Committ
 
         <Separator className="my-4" />
 
-        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 text-sm sm:text-base">
           {member.bio && (
             <div>
               <h4 className="font-semibold mb-1 text-foreground">Biography</h4>
-              <p className="text-sm text-muted-foreground">{member.bio}</p>
+              <p className="text-muted-foreground">{member.bio}</p>
             </div>
           )}
 
           {member.achievements && member.achievements.length > 0 && (
             <div>
               <h4 className="font-semibold mt-3 mb-1 text-foreground">Key Achievements & Experience</h4>
-              <ul className="list-none space-y-1.5 text-sm text-muted-foreground">
+              <ul className="list-none space-y-1.5 text-muted-foreground">
                 {member.achievements.map((achievement, index) => (
                   <li key={index} className="flex items-start">
                     <Star className="h-4 w-4 mr-2 mt-0.5 text-yellow-500 flex-shrink-0" />
@@ -190,7 +190,7 @@ const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: Committ
           )}
         </div>
         <DialogFooter className="mt-4">
-         <Button onClick={() => onOpenChange(false)} className="w-full sm:w-auto" variant="outline">
+         <Button onClick={() => onOpenChange(false)} className="w-full sm:w-auto text-sm sm:text-base" variant="outline">
             Close
         </Button>
         </DialogFooter>
@@ -219,16 +219,16 @@ export default function KeyCommitteePage() {
       <div className="bg-secondary">
         <div className="container mx-auto py-12 md:py-20 px-4 sm:px-6 lg:px-8">
           <header className="text-center mb-12 md:mb-16">
-            <Briefcase size={64} strokeWidth={1.5} className="mx-auto mb-6 text-primary" />
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            <Briefcase size={48} strokeWidth={1.5} className="mx-auto mb-4 md:mb-6 text-primary" />
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
               Key <span className="text-primary">Committee</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-md sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Meet the dedicated individuals organizing and overseeing ResearchSphere's academic endeavors. Click on a member to learn more.
             </p>
           </header>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {committeeMembers.map((member) => (
               <Card
                 key={member.id}
@@ -236,7 +236,7 @@ export default function KeyCommitteePage() {
                 onClick={() => handleCardClick(member)}
               >
                 <CardHeader className="items-center text-center">
-                  <Avatar className="h-24 w-24 mb-4 border-2 border-primary group-hover:border-primary/70 transition-colors">
+                  <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary group-hover:border-primary/70 transition-colors">
                     {member.imageUrl ? (
                     <Image
                       src={member.imageUrl}
@@ -247,21 +247,21 @@ export default function KeyCommitteePage() {
                       data-ai-hint={member.dataAiHint || "professional portrait"}
                     />
                     ) : (
-                    <AvatarFallback className="text-3xl bg-muted">
+                    <AvatarFallback className="text-2xl sm:text-3xl bg-muted">
                       <UserCircle size={48} />
                     </AvatarFallback>
                     )}
                   </Avatar>
-                  <CardTitle className="text-xl group-hover:text-primary transition-colors">{member.name}</CardTitle>
-                  <CardDescription className="text-sm text-primary font-medium group-hover:text-primary/80 transition-colors">{member.title}</CardDescription>
+                  <CardTitle className="text-lg sm:text-xl group-hover:text-primary transition-colors">{member.name}</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm text-primary font-medium group-hover:text-primary/80 transition-colors">{member.title}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <div className="flex items-center text-sm text-muted-foreground mb-2 justify-center">
+                  <div className="flex items-center text-xs sm:text-sm text-muted-foreground mb-2 justify-center">
                     <Building className="h-4 w-4 mr-2 text-primary/80" />
                     <span>{member.affiliation}</span>
                   </div>
                   {member.bio && (
-                    <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-border line-clamp-3">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-3 pt-3 border-t border-border line-clamp-3">
                       {member.bio}
                     </p>
                   )}

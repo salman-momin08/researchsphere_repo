@@ -36,7 +36,7 @@ interface NavLinkItemProps {
 }
 
 const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }) => {
-  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-base font-medium rounded-md";
+  const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-sm md:text-base font-medium rounded-md"; // Adjusted base text size
   let activeStyleClasses = "";
   let hoverStyleClasses = "";
 
@@ -74,7 +74,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
       </Button>
     );
   }
-  return null; // Should not happen if href or onClick (for action) is provided
+  return null; 
 };
 
 
@@ -106,7 +106,7 @@ export default function Header() {
 
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false);
-    if (user && !isAdminUser) { // Admins should not submit papers through this flow
+    if (user && !isAdminUser) { 
       router.push('/author/submit');
     } else if (!user) {
       if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/submit');
@@ -116,7 +116,7 @@ export default function Header() {
   
   const handleAiPreCheckClick = () => {
     setIsMobileMenuOpen(false);
-    if (user) { // Non-admins and potentially admins (if logic allows)
+    if (user) { 
       router.push('/author/ai-pre-check');
     } else {
       if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/ai-pre-check');
@@ -126,7 +126,7 @@ export default function Header() {
 
   const isViewingAdminSection = pathname.startsWith('/admin');
 
-  const baseNavLinks = [
+  const baseNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
     { href: "/", label: "Home", icon: null },
     { href: "/registration", label: "Registration", icon: <FileTextIconLucide /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
@@ -135,7 +135,7 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
   
-  const authorNavLinks = [
+  const authorNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
     { href: "/", label: "Home", icon: null },
     { href: "/author/dashboard", label: "Author Dashboard", icon: <LayoutDashboard /> },
     { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" },
@@ -147,15 +147,14 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
 
-  const reviewerNavLinks = [
+  const reviewerNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
     { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
-    // "Home", "Registration", "Templates" are removed for reviewers
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
   
-  const adminNavLinks = [
+  const adminNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [
     { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield /> },
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
@@ -168,17 +167,16 @@ export default function Header() {
       { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye /> },
   ];
 
-  let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = baseNavLinks; // Default to base links
+  let currentNavLinks = baseNavLinks; 
   
-  if (isClient) { // Only determine links after client has mounted and user state is available
+  if (isClient) { 
     if (user && isAdminUser) {
       currentNavLinks = adminNavLinks;
     } else if (user && user.role === "Reviewer") {
       currentNavLinks = reviewerNavLinks;
-    } else if (user) { // Authenticated Author or user with no specific role yet (defaults to author view)
+    } else if (user) { 
       currentNavLinks = authorNavLinks;
     }
-    // If not logged in, it remains baseNavLinks
   }
 
 
@@ -187,12 +185,10 @@ export default function Header() {
       "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
       isViewingAdminSection && "md:pl-64" 
     )}>
-      <div className={cn(
-          "container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between",
-          )}>
+      <div className={cn("container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between")}>
         <Link href="/" className="mr-auto md:mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">ResearchSphere</span>
+          <span className="text-lg sm:text-xl font-bold">ResearchSphere</span>
         </Link>
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
@@ -200,10 +196,8 @@ export default function Header() {
             let isActive = false;
             if (link.href) {
                 if (link.href === "/" && pathname === "/") isActive = true;
-                // For admin panel, make "Admin Panel" active if any /admin/* path is matched, but not if on other specific admin links
                 else if (link.href === "/admin/dashboard" && isViewingAdminSection) {
-                   isActive = true; // Active if on any admin page
-                   // More specific admin links like /search-papers or /key-committee should highlight themselves if current
+                   isActive = true; 
                    if ( (pathname === "/search-papers" || pathname === "/key-committee") && link.href !== pathname) {
                        isActive = false;
                    }
@@ -216,14 +210,14 @@ export default function Header() {
             let buttonClasses = "";
             if (user && isAdminUser) { 
               buttonClasses = cn(
-                "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
+                "px-3 py-2 text-xs sm:text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
                   ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                   : "text-foreground hover:bg-accent hover:text-accent-foreground" 
               );
             } else { 
               buttonClasses = cn(
-                "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
+                "px-3 py-2 text-xs sm:text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
                   ? "text-primary font-semibold bg-secondary" 
                   : "text-foreground hover:text-primary hover:bg-secondary" 
@@ -298,7 +292,7 @@ export default function Header() {
                     </DropdownMenuItem>
                   </>
                 )}
-                {(user.role !== "Reviewer" || isAdminUser) && ( // Search for admins and authors
+                {(user.role !== "Reviewer" || isAdminUser) && ( 
                    <DropdownMenuItem onClick={() => router.push('/search-papers')}>
                     <SearchIcon className="mr-2 h-4 w-4" />
                     <span>Search Papers</span>
@@ -313,8 +307,8 @@ export default function Header() {
             </DropdownMenu>
           ) : isClient ? (
             <>
-              <Button variant="ghost" onClick={handleLoginClick} className="text-foreground">Log In</Button>
-              <Button onClick={handleSignupClick}>Sign Up</Button>
+              <Button variant="ghost" onClick={handleLoginClick} className="text-foreground text-sm md:text-base">Log In</Button>
+              <Button onClick={handleSignupClick} className="text-sm md:text-base">Sign Up</Button>
             </>
           ) : null}
         </div>
@@ -330,12 +324,12 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0">
               <SheetHeader className="p-4 border-b">
-                <SheetTitle className="text-left flex items-center gap-2">
+                <SheetTitle className="text-left flex items-center gap-2 text-lg">
                   <BookOpenText className="h-6 w-6 text-primary" /> ResearchSphere
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1 p-2">
-                {currentNavLinks.map(link => { // Use filtered links for mobile too
+                {currentNavLinks.map(link => { 
                     let isActive = false;
                     if (link.href) {
                         if (link.href === "/" && pathname === "/") isActive = true;
@@ -369,7 +363,7 @@ export default function Header() {
                 {isClient && user && isAdminUser && (
                   <>
                      <DropdownMenuSeparator className="my-2" />
-                     <div className="px-3 py-1 text-sm font-semibold text-muted-foreground">Admin Tools</div>
+                     <div className="px-3 py-1 text-xs font-semibold text-muted-foreground">Admin Tools</div>
                      {adminSidebarLinks.map(link => {
                          const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname.startsWith(link.href));
                          return (
@@ -408,19 +402,19 @@ export default function Header() {
                         </NavLinkItem>
                       </>
                     )}
-                    {(user.role !== "Reviewer" || isAdminUser) && (
+                    {(user.role !== "Reviewer" || isAdminUser) && ( 
                          <NavLinkItem href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/search-papers"} icon={<SearchIcon />}>
                             Search Papers
                          </NavLinkItem>
                     )}
-                    <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
+                    <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-sm md:text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
                       <LogOut /> Log Out
                     </Button>
                   </>
                 ) : isClient ? (
                   <>
-                    <Button variant="default" onClick={() => { handleLoginClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start">Log In</Button>
-                    <Button variant="outline" onClick={() => { handleSignupClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start">Sign Up</Button>
+                    <Button variant="default" onClick={() => { handleLoginClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start text-sm md:text-base">Log In</Button>
+                    <Button variant="outline" onClick={() => { handleSignupClick(); setIsMobileMenuOpen(false); }} className="w-full justify-start text-sm md:text-base">Sign Up</Button>
                   </>
                 ) : null}
               </div>

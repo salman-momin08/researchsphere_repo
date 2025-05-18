@@ -87,9 +87,9 @@ export default function HomePage() {
 
   const handleSubmitPaperClick = () => {
     if (user) {
-      router.push('/user/submit');
+      router.push('/author/submit');
     } else {
-      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/user/submit');
+      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/submit');
       setShowLoginModal(true);
     }
   };
@@ -99,17 +99,17 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-12 md:py-20 bg-secondary">
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 tracking-tight">
             Welcome to <span className="text-primary">ResearchSphere</span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-md sm:text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             The premier platform for students and researchers to upload, manage, and enhance their academic papers with cutting-edge AI evaluation tools.
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
-            <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
+            <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto text-base md:text-lg">
               <UploadCloud className="mr-2 h-5 w-5" /> Submit Your Paper
             </Button>
-            <Button size="lg" variant="outline" onClick={() => router.push('#features')} className="w-full sm:w-auto">
+            <Button size="lg" variant="outline" onClick={() => router.push('#features')} className="w-full sm:w-auto text-base md:text-lg">
               Learn More
             </Button>
           </div>
@@ -119,18 +119,18 @@ export default function HomePage() {
       {/* Features Section */}
       <section id="features" className="py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12">
             Platform <span className="text-primary">Features</span>
           </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
                 <CardHeader className="items-center text-center">
                   {feature.icon}
-                  <CardTitle className="mt-4 text-xl">{feature.title}</CardTitle>
+                  <CardTitle className="mt-4 text-lg md:text-xl">{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground text-center">{feature.description}</p>
+                  <p className="text-sm md:text-base text-muted-foreground text-center">{feature.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -141,24 +141,24 @@ export default function HomePage() {
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-secondary">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12">
             How It <span className="text-primary">Works</span>
           </h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div className="p-6">
-              <div className="bg-primary text-primary-foreground rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
-              <h3 className="text-xl font-semibold mb-2">Upload Your Paper</h3>
-              <p className="text-muted-foreground">Easily submit your research document through our secure portal.</p>
+              <div className="bg-primary text-primary-foreground rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-4 text-xl sm:text-2xl font-bold">1</div>
+              <h3 className="text-lg md:text-xl font-semibold mb-2">Upload Your Paper</h3>
+              <p className="text-sm md:text-base text-muted-foreground">Easily submit your research document through our secure portal.</p>
             </div>
             <div className="p-6">
-              <div className="bg-primary text-primary-foreground rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">2</div>
-              <h3 className="text-xl font-semibold mb-2">AI Evaluation</h3>
-              <p className="text-muted-foreground">Our AI tools analyze for plagiarism and predict acceptance chances.</p>
+              <div className="bg-primary text-primary-foreground rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-4 text-xl sm:text-2xl font-bold">2</div>
+              <h3 className="text-lg md:text-xl font-semibold mb-2">AI Evaluation</h3>
+              <p className="text-sm md:text-base text-muted-foreground">Our AI tools analyze for plagiarism and predict acceptance chances.</p>
             </div>
             <div className="p-6">
-              <div className="bg-primary text-primary-foreground rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">3</div>
-              <h3 className="text-xl font-semibold mb-2">Review & Submit</h3>
-              <p className="text-muted-foreground">Review AI feedback, make improvements, and finalize your submission.</p>
+              <div className="bg-primary text-primary-foreground rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-4 text-xl sm:text-2xl font-bold">3</div>
+              <h3 className="text-lg md:text-xl font-semibold mb-2">Review & Submit</h3>
+              <p className="text-sm md:text-base text-muted-foreground">Review AI feedback, make improvements, and finalize your submission.</p>
             </div>
           </div>
         </div>
@@ -167,21 +167,21 @@ export default function HomePage() {
       {/* Guidelines Section */}
       <section id="guidelines" className="py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12">
             Platform <span className="text-primary">Guidelines</span>
           </h2>
           <div className="max-w-3xl mx-auto">
             <Accordion type="single" collapsible className="w-full">
               {guidelines.map((guideline) => (
                 <AccordionItem value={guideline.id} key={guideline.id}>
-                  <AccordionTrigger className="text-xl font-semibold hover:no-underline text-left">
+                  <AccordionTrigger className="text-lg md:text-xl font-semibold hover:no-underline text-left">
                     <div className="flex items-center">
                       {guideline.icon}
                       {guideline.title}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
+                    <ul className="list-disc space-y-2 pl-6 text-sm md:text-base text-muted-foreground">
                       {guideline.content.map((item, index) => (
                         <li key={index}>{item}</li>
                       ))}
@@ -205,15 +205,16 @@ export default function HomePage() {
               className="object-cover"
               data-ai-hint="research collaboration"
               sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
+              priority
             />
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6">
             Ready to Elevate Your Research?
           </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+          <p className="text-md sm:text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Join ResearchSphere today and take the first step towards publishing your impactful work.
           </p>
-          <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto">
+          <Button size="lg" onClick={handleSubmitPaperClick} className="w-full sm:w-auto text-base md:text-lg">
             Get Started Now
           </Button>
         </div>

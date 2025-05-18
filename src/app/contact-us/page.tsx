@@ -52,7 +52,7 @@ const contactPersons: ContactPerson[] = [
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "support man tech"
+    dataAiHint: "tech support"
   },
   {
     id: "3",
@@ -107,22 +107,22 @@ export default function ContactUsPage() {
     <div className="min-h-[calc(100vh-8rem)] bg-secondary py-12 md:py-20 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
         <header className="text-center mb-12 md:mb-16">
-            <Mail size={64} strokeWidth={1.5} className="mx-auto mb-6 text-primary" />
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            <Mail size={48} strokeWidth={1.5} className="mx-auto mb-4 md:mb-6 text-primary" />
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
             Get in <span className="text-primary">Touch</span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-md sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Have questions or need support? Reach out to our team or fill out the contact form below.
           </p>
         </header>
 
         <section className="mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl font-semibold text-center mb-10">Meet Our Support Team</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-8 md:mb-10">Meet Our Support Team</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             {contactPersons.map((person) => (
               <Card key={person.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
                 <CardHeader className="items-center text-center">
-                  <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
+                  <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary">
                     {person.imageUrl ? (
                       <Image
                         src={person.imageUrl}
@@ -138,19 +138,19 @@ export default function ContactUsPage() {
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <CardTitle className="text-xl">{person.name}</CardTitle>
-                  <p className="text-sm text-primary font-medium flex items-center justify-center">
-                    <Briefcase size={16} className="mr-2" /> {person.designation}
+                  <CardTitle className="text-lg sm:text-xl">{person.name}</CardTitle>
+                  <p className="text-xs sm:text-sm text-primary font-medium flex items-center justify-center">
+                    <Briefcase size={14} sm:size={16} className="mr-2" /> {person.designation}
                   </p>
                 </CardHeader>
-                <CardContent className="flex-grow space-y-2 text-sm text-muted-foreground text-center">
+                <CardContent className="flex-grow space-y-2 text-xs sm:text-sm text-muted-foreground text-center">
                   <a href={`mailto:${person.email}`} className="flex items-center justify-center hover:text-primary transition-colors">
-                    <Mail size={16} className="mr-2 text-primary/80" />
+                    <Mail size={14} sm:size={16} className="mr-2 text-primary/80" />
                     <span>{person.email}</span>
                   </a>
                   {person.phone && (
                     <a href={`tel:${person.phone}`} className="flex items-center justify-center hover:text-primary transition-colors">
-                      <Phone size={16} className="mr-2 text-primary/80" />
+                      <Phone size={14} sm:size={16} className="mr-2 text-primary/80" />
                       <span>{person.phone}</span>
                     </a>
                   )}
@@ -162,12 +162,12 @@ export default function ContactUsPage() {
 
         <Card className="w-full max-w-lg mx-auto shadow-xl">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold tracking-tight">Send Us a Message</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">Send Us a Message</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
               Fill out the form and we&apos;ll get back to you as soon as possible.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6">
             {isSuccess ? (
               <Alert variant="default" className="border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
                 <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
@@ -217,14 +217,14 @@ export default function ContactUsPage() {
                     rows={5}
                     {...form.register("message")}
                     disabled={isLoading}
-                    className="mt-1"
+                    className="mt-1 text-sm sm:text-base"
                   />
                   {form.formState.errors.message && (
                     <p className="text-sm text-destructive mt-1">{form.formState.errors.message.message}</p>
                   )}
                 </div>
 
-                <Button type="submit" className="w-full mt-4" disabled={isLoading}>
+                <Button type="submit" className="w-full mt-4 text-sm sm:text-base" disabled={isLoading}>
                   {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
