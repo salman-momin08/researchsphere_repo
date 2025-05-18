@@ -6,12 +6,12 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams as useNextSearchParams } from "next/navigation"; // Changed from useSearchParams to avoid conflict if Next evolves it
+import { useSearchParams as useNextSearchParams } from "next/navigation"; 
 import React from 'react';
 
 // This is the main content of the page
 function AuthorProfileSettingsPageContent() {
-  const searchParams = useNextSearchParams(); // Use the aliased import
+  const searchParams = useNextSearchParams(); 
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (
