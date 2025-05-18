@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, LayoutDashboard as AdminDashboardIcon, UserCheck, UserPlus, Send, Star, MessageCircle } from 'lucide-react'; // Renamed LayoutDashboard to AdminDashboardIcon
+import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Eye, UserCheck, UserPlus, Send, Star, MessageCircle, LayoutDashboard as AdminDashboardIcon } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -29,9 +29,9 @@ import { Timestamp } from 'firebase/firestore';
 
 function PaperDetailsContent() {
   const params = useParams();
-  const searchParamsHook = useNextSearchParams(); 
+  const searchParamsHook = useNextSearchParams();
   const router = useRouter();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdminUser } = useAuth(); // Use isAdminUser from context
 
   const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
   const [loadingPaper, setLoadingPaper] = useState(true);
@@ -44,8 +44,8 @@ function PaperDetailsContent() {
   const [isCheckingAcceptance, setIsCheckingAcceptance] = useState(false);
 
   const [availableReviewers, setAvailableReviewers] = useState<User[]>([]);
-  const [assignedReviewerDetails, setAssignedReviewerDetails] = useState<User[]>([]); // For displaying names
-  const [allReviewData, setAllReviewData] = useState<Array<Review & {reviewerDisplayName?: string}>>([]); // For displaying names in reviews
+  const [assignedReviewerDetails, setAssignedReviewerDetails] = useState<User[]>([]);
+  const [allReviewData, setAllReviewData] = useState<Array<Review & {reviewerDisplayName?: string}>>([]);
 
 
   const [selectedReviewer, setSelectedReviewer] = useState<string>("");
@@ -60,7 +60,7 @@ function PaperDetailsContent() {
 
   const fetchPaperDetails = useCallback(async () => {
     const paperId = params.id as string;
-    if (paperId && user) { // Ensure user context is loaded
+    if (paperId && user) {
       setLoadingPaper(true);
       try {
         const paper = await getPaper(paperId);
@@ -68,10 +68,10 @@ function PaperDetailsContent() {
           const isOwner = paper.userId === user.id;
           const isAssigned = paper.assignedReviewerIds?.includes(user.id);
 
-          if (!isOwner && !isAdmin && !isAssigned && paper.status !== "Published") {
+          if (!isOwner && !isAdminUser && !isAssigned && paper.status !== "Published") {
             setCurrentPaper(null);
             toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
-            router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
+            router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
             return;
           }
           setCurrentPaper(paper);
@@ -83,7 +83,6 @@ function PaperDetailsContent() {
             }
           }
 
-          // Fetch details for assigned reviewers
           if (paper.assignedReviewerIds && paper.assignedReviewerIds.length > 0) {
             const reviewerPromises = paper.assignedReviewerIds.map(id => getUserProfile(id));
             const reviewers = (await Promise.all(reviewerPromises)).filter(Boolean) as User[];
@@ -92,7 +91,6 @@ function PaperDetailsContent() {
             setAssignedReviewerDetails([]);
           }
 
-          // Fetch details for reviewers who submitted reviews
           if (paper.reviews && paper.reviews.length > 0) {
              const reviewDetailPromises = paper.reviews.map(async (review) => {
                 const reviewerProfile = await getUserProfile(review.reviewerId);
@@ -110,23 +108,23 @@ function PaperDetailsContent() {
         } else {
           setCurrentPaper(null);
           toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
-          router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
+          router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
         }
       } catch (err: any) {
         setCurrentPaper(null);
         toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
-         router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
+         router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
       } finally {
         setLoadingPaper(false);
       }
-    } else if (!user && loadingPaper && params.id) { // Still waiting for user context
+    } else if (!user && loadingPaper && params.id) {
         // Handled by ProtectedRoute or initial loading screen
-    } else if (!user && !loadingPaper) { // No user and not loading, indicates problem or public access attempt that should be handled.
-      setCurrentPaper(null); // Should be handled by ProtectedRoute for private pages
+    } else if (!user && !loadingPaper) {
+      setCurrentPaper(null);
       setLoadingPaper(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, user, isAdmin, router]);
+  }, [params.id, user, isAdminUser, router]); // isAdminUser is now from context
 
   useEffect(() => {
     fetchPaperDetails();
@@ -135,18 +133,18 @@ function PaperDetailsContent() {
 
   useEffect(() => {
     const paymentDueDateValid = currentPaper?.paymentDueDate && !isNaN(new Date(currentPaper.paymentDueDate).getTime());
-    if (searchParamsHook.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && paymentDueDateValid && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdmin) {
+    if (searchParamsHook.get('action') === 'pay' && currentPaper?.status === 'Payment Pending' && paymentDueDateValid && !isPaperOverdue && user && currentPaper.userId === user.id && !isAdminUser) {
       setIsPaymentModalOpen(true);
     }
-  }, [searchParamsHook, currentPaper, isPaperOverdue, user, isAdmin]);
+  }, [searchParamsHook, currentPaper, isPaperOverdue, user, isAdminUser]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdminUser) {
       getAllUsers()
         .then(users => setAvailableReviewers(users.filter(u => u.role === "Reviewer" && !u.isSuspended)))
         .catch(() => toast({ variant: "destructive", title: "Error", description: "Could not load reviewers." }));
     }
-  }, [isAdmin]);
+  }, [isAdminUser]);
 
   const handlePaymentSuccess = async (paperIdToUpdate?: string) => {
     const targetPaperId = paperIdToUpdate || currentPaper?.id;
@@ -154,7 +152,7 @@ function PaperDetailsContent() {
 
     try {
       await updatePaperStatus(targetPaperId, 'Submitted', { paidAt: new Date().toISOString() });
-      await fetchPaperDetails(); 
+      await fetchPaperDetails();
       setIsPaymentModalOpen(false);
       toast({title: "Payment Successful", description: "Paper status updated to Submitted."});
     } catch (error: any) {
@@ -163,7 +161,7 @@ function PaperDetailsContent() {
   };
 
   const handleAdminFeedbackSubmit = async () => {
-    if (!currentPaper || !isAdmin || !adminFeedbackText.trim()) return;
+    if (!currentPaper || !isAdminUser || !adminFeedbackText.trim()) return;
     setIsSubmittingFeedback(true);
     try {
       await updatePaperData(currentPaper.id, { adminFeedback: adminFeedbackText });
@@ -173,7 +171,7 @@ function PaperDetailsContent() {
         description: `Your feedback for "${currentPaper.title}" has been saved. The author would typically be notified by email (this is simulated).`,
         duration: 7000
       });
-      setAdminFeedbackText(""); 
+      setAdminFeedbackText("");
     } catch (error: any) {
       toast({variant: "destructive", title: "Feedback Submission Failed", description: error.message || "Could not submit feedback."});
     } finally {
@@ -182,10 +180,10 @@ function PaperDetailsContent() {
   };
 
   const handleStatusChange = async (newStatus: Paper['status']) => {
-    if (!currentPaper || !isAdmin) return;
+    if (!currentPaper || !isAdminUser) return;
     try {
       await updatePaperStatus(currentPaper.id, newStatus);
-      await fetchPaperDetails(); 
+      await fetchPaperDetails();
       if (newStatus === "Rejected" && isPaperOverdue) {
         toast({title: "Paper Rejected", description: `Paper marked as rejected due to overdue payment.`});
       } else {
@@ -273,7 +271,7 @@ function PaperDetailsContent() {
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
     content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
 
-    if (isAdmin) {
+    if (isAdminUser) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
     }
@@ -291,7 +289,7 @@ function PaperDetailsContent() {
   };
 
   const handleAssignReviewer = async () => {
-    if (!currentPaper || !selectedReviewer || !isAdmin) return;
+    if (!currentPaper || !selectedReviewer || !isAdminUser) return;
     setIsAssigningReviewer(true);
     const currentAssigned = currentPaper.assignedReviewerIds || [];
     if (currentAssigned.includes(selectedReviewer)) {
@@ -301,7 +299,7 @@ function PaperDetailsContent() {
     }
     try {
       await updatePaperData(currentPaper.id, { assignedReviewerIds: [...currentAssigned, selectedReviewer] });
-      await fetchPaperDetails(); // Re-fetch to update assignedReviewerDetails
+      await fetchPaperDetails();
       toast({ title: "Reviewer Assigned", description: `Reviewer assigned successfully.` });
       setSelectedReviewer("");
     } catch (error: any) {
@@ -312,13 +310,13 @@ function PaperDetailsContent() {
   };
 
   const handleUnassignReviewer = async (reviewerIdToUnassign: string) => {
-    if (!currentPaper || !isAdmin) return;
-    setIsAssigningReviewer(true); 
+    if (!currentPaper || !isAdminUser) return;
+    setIsAssigningReviewer(true);
     const currentAssigned = currentPaper.assignedReviewerIds || [];
     const updatedAssigned = currentAssigned.filter(id => id !== reviewerIdToUnassign);
     try {
       await updatePaperData(currentPaper.id, { assignedReviewerIds: updatedAssigned });
-      await fetchPaperDetails(); // Re-fetch
+      await fetchPaperDetails();
       toast({ title: "Reviewer Unassigned", description: `Reviewer unassigned successfully.` });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Unassignment Failed", description: error.message || "Could not unassign reviewer." });
@@ -341,7 +339,7 @@ function PaperDetailsContent() {
     };
     try {
       await addReviewToPaper(currentPaper.id, newReview);
-      await fetchPaperDetails(); // Re-fetch to update reviews and hasUserAlreadyReviewed
+      await fetchPaperDetails();
       toast({ title: "Review Submitted", description: "Your review has been successfully submitted." });
       setReviewComments("");
       setReviewRecommendation(undefined);
@@ -358,14 +356,12 @@ function PaperDetailsContent() {
   }
 
   if (!currentPaper) {
-    // This state is usually indicative of an access issue handled by fetchPaperDetails or ProtectedRoute,
-    // or if user context isn't loaded yet. If user context is loaded and still no paper, it's a genuine not found/denied.
     return (
       <div className="container py-12 text-center px-4">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold">Paper Not Found or Access Denied</h2>
         <p className="text-muted-foreground">The paper may have been removed, or you might not have permission to view it.</p>
-        <Button onClick={() => router.push(isAdmin ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'))} className="mt-6">Go to Dashboard</Button>
+        <Button onClick={() => router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'))} className="mt-6">Go to Dashboard</Button>
       </div>
     );
   }
@@ -384,7 +380,7 @@ function PaperDetailsContent() {
 
   return (
     <div className="container py-8 md:py-12 px-4">
-      <Card className="shadow-xl">
+      <Card className="shadow-xl max-w-5xl mx-auto">
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
             <div>
@@ -418,12 +414,12 @@ function PaperDetailsContent() {
                  <Button onClick={handleDownloadMetadata} variant="outline" size="lg" className="w-full sm:w-auto">
                     <FileTextIcon className="mr-2 h-4 w-4" /> Download Details
                 </Button>
-                {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdmin && !isPaperOverdue && (
+                {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdminUser && !isPaperOverdue && (
                 <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full sm:w-auto">
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
-                {isAdmin && (
+                {isAdminUser && (
                     <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
                         <AdminDashboardIcon className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
@@ -440,7 +436,7 @@ function PaperDetailsContent() {
 
             <Separator />
 
-            {isAdmin && (
+            {isAdminUser && (
               <>
                 <div>
                   <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -478,10 +474,10 @@ function PaperDetailsContent() {
             )}
 
 
-            {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdmin) && (
+            {currentPaper.adminFeedback && (user?.id === currentPaper.userId || isAdminUser) && (
               <div>
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />
-                  {isAdmin? "Current Feedback Sent to Author" : "Admin/Reviewer Feedback"}
+                  {isAdminUser? "Current Feedback Sent to Author" : "Admin/Reviewer Feedback"}
                 </h3>
                 <Alert variant={currentPaper.status === "Action Required" ? "destructive" : "default"} className="bg-secondary/50">
                   {currentPaper.status === "Action Required" ? <AlertTriangle className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
@@ -492,7 +488,7 @@ function PaperDetailsContent() {
             )}
 
 
-            {isAdmin && effectiveStatus !== "Payment Overdue" && (
+            {isAdminUser && effectiveStatus !== "Payment Overdue" && (
               <Card className="mt-6 p-4 border rounded-md bg-card">
                 <CardHeader className="p-2">
                     <CardTitle className="text-lg flex items-center"><MessageSquare className="h-5 w-5 mr-2 text-primary" />Provide Feedback to Author</CardTitle>
@@ -516,7 +512,7 @@ function PaperDetailsContent() {
               </Card>
             )}
 
-             {isAdmin && (
+             {isAdminUser && (
                 <Card className="mt-6 p-4 border rounded-md bg-card">
                   <CardHeader className="p-2">
                     <CardTitle className="text-lg">Change Paper Status</CardTitle>
@@ -548,14 +544,14 @@ function PaperDetailsContent() {
                   </CardContent>
                 </Card>
               )}
-            
-            {isAdmin && (
+
+            {isAdminUser && (
               <Card className="mt-6 p-4 border rounded-md bg-card">
                 <CardHeader className="p-2">
                   <CardTitle className="text-lg flex items-center"><UserCheck className="h-5 w-5 mr-2 text-primary" />Manage Reviewers</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2 space-y-3">
-                {assignedReviewerDetails.length > 0 && (
+                {assignedReviewerDetails && assignedReviewerDetails.length > 0 && (
                   <div className="mb-4">
                     <h4 className="text-md font-medium mb-1">Currently Assigned:</h4>
                     <ul className="list-disc list-inside pl-2 text-sm space-y-1">
@@ -578,7 +574,7 @@ function PaperDetailsContent() {
                       </SelectTrigger>
                       <SelectContent>
                         {availableReviewers
-                          .filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)) 
+                          .filter(r => !currentPaper.assignedReviewerIds?.includes(r.id))
                           .map(rev => (
                             <SelectItem key={rev.id} value={rev.id}>
                               {rev.displayName} ({rev.email})
@@ -592,16 +588,16 @@ function PaperDetailsContent() {
                     </Button>
                   </div>
                 ) : (
-                   assignedReviewerDetails.length === 0 && <p className="text-sm text-muted-foreground">No reviewers currently assigned. No available reviewers to assign.</p>
+                   assignedReviewerDetails && assignedReviewerDetails.length === 0 && <p className="text-sm text-muted-foreground">No reviewers currently assigned. No available reviewers to assign.</p>
                 )}
-                {availableReviewers.filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)).length === 0 && assignedReviewerDetails.length > 0 && (
+                {availableReviewers.filter(r => !currentPaper.assignedReviewerIds?.includes(r.id)).length === 0 && assignedReviewerDetails && assignedReviewerDetails.length > 0 && (
                      <p className="text-sm text-muted-foreground">All available reviewers are assigned or no other reviewers to assign.</p>
                 )}
                 </CardContent>
               </Card>
             )}
 
-            {isUserAssignedReviewer && !hasUserAlreadyReviewed && user && !isAdmin && (
+            {isUserAssignedReviewer && !hasUserAlreadyReviewed && user && !isAdminUser && (
               <Card className="mt-6 p-4 border-primary/30 bg-card">
                 <CardHeader className="p-2">
                   <CardTitle className="text-lg flex items-center"><MessageCircle className="mr-2 h-6 w-6 text-primary" />Submit Your Review</CardTitle>
@@ -646,18 +642,18 @@ function PaperDetailsContent() {
               </Card>
             )}
 
-            {allReviewData && allReviewData.length > 0 && (user?.id === currentPaper.userId || isAdmin) && (
+            {allReviewData && allReviewData.length > 0 && (user?.id === currentPaper.userId || isAdminUser) && (
               <div className="mt-6">
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><Star className="h-5 w-5 mr-2 text-primary" />Reviews Received</h3>
                 <div className="space-y-4">
                   {allReviewData.map((review, index) => {
                     let reviewerDisplayName = `Reviewer ${index + 1}`; // Default for author view
-                    if (isAdmin) {
+                    if (isAdminUser) {
                         reviewerDisplayName = review.reviewerDisplayName || `Reviewer (ID: ${review.reviewerId.substring(0,6)})`;
                     } else if (user?.id === review.reviewerId) { // If current user is the reviewer
                         reviewerDisplayName = "Your Review";
                     }
-                    
+
                     return (
                       <Card key={index} className="bg-secondary/50">
                         <CardHeader>
@@ -727,7 +723,7 @@ function PaperDetailsContent() {
       </Card>
       {user && currentPaper && (
         <PaymentModal
-          isOpen={isPaymentModalOpen && currentPaper.userId === user.id && !isAdmin}
+          isOpen={isPaymentModalOpen && currentPaper.userId === user.id && !isAdminUser}
           onOpenChange={setIsPaymentModalOpen}
           paper={currentPaper}
           onPaymentSuccess={handlePaymentSuccess}
