@@ -1,3 +1,4 @@
+
 // app/author/profile/settings/page.tsx
 "use client";
 
@@ -5,12 +6,12 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams } from "next/navigation"; // Import directly from next/navigation
-import React from 'react'; // Ensure React is imported
+import { useSearchParams as useNextSearchParams } from "next/navigation"; // Changed from useSearchParams to avoid conflict if Next evolves it
+import React from 'react';
 
 // This is the main content of the page
 function AuthorProfileSettingsPageContent() {
-  const searchParams = useSearchParams(); // Needs to be called within a Client Component
+  const searchParams = useNextSearchParams(); // Use the aliased import
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (
