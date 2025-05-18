@@ -5,13 +5,13 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams as useNextSearchParams } from "next/navigation"; // Renamed to avoid conflict
-import React, { Suspense } from 'react'; 
+import { useSearchParams as useNextSearchParams } from "next/navigation";
+import React, { Suspense } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 // This internal component uses the hook
 function ProfileSettingsPageContent() {
-  const searchParams = useNextSearchParams(); 
+  const searchParams = useNextSearchParams();
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (
@@ -36,10 +36,9 @@ function ProfileSettingsPageContent() {
   );
 }
 
-
 export default function AuthorProfileSettingsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute> {/* Ensures only authenticated users can access */}
       <Suspense fallback={<div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>}>
         <ProfileSettingsPageContent />
       </Suspense>

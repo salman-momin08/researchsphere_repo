@@ -25,15 +25,17 @@ import { BookOpenText, LayoutDashboard, LogOut, UserCircle, UploadCloud, Sparkle
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }: {
-  href?: string,
-  children: React.ReactNode,
-  onClick?: () => void,
-  isActive?: boolean,
-  isAction?: boolean,
-  icon?: React.ReactNode,
-  isAdminContext?: boolean
-}) => {
+interface NavLinkItemProps {
+  href?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  isActive?: boolean;
+  isAction?: boolean;
+  icon?: React.ReactNode;
+  isAdminContext?: boolean;
+}
+
+const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isActive, isAction, icon, isAdminContext }) => {
   const baseClasses = "w-full justify-start flex items-center px-3 py-2 text-base font-medium rounded-md";
   let activeStyleClasses = "";
   let hoverStyleClasses = "";
@@ -42,12 +44,26 @@ const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdmi
     activeStyleClasses = isActive ? "bg-primary text-primary-foreground" : "text-foreground";
     hoverStyleClasses = isActive ? "hover:bg-primary/90" : "hover:bg-accent hover:text-accent-foreground";
   } else {
-    activeStyleClasses = isActive ? "bg-secondary text-primary" : "text-foreground";
+    activeStyleClasses = isActive ? "bg-secondary text-primary font-semibold" : "text-foreground"; // Emphasize active user links
     hoverStyleClasses = isActive ? "hover:bg-secondary/80" : (isAction ? "hover:bg-primary/10" : "hover:bg-secondary hover:text-primary");
   }
 
   const combinedClasses = cn(baseClasses, activeStyleClasses, hoverStyleClasses, "[&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4");
 
+  if (href) {
+    return (
+      <Link href={href} passHref legacyBehavior>
+        <Button
+          variant="ghost"
+          onClick={onClick} // onClick for closing sheet
+          className={combinedClasses}
+        >
+          {icon}{children}
+        </Button>
+      </Link>
+    );
+  }
+  // For actions without a direct href, like submit paper via modal
   if (isAction && onClick) {
     return (
       <Button
@@ -57,20 +73,6 @@ const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdmi
       >
         {icon}{children}
       </Button>
-    );
-  }
-
-  if (href) {
-    return (
-      <Link href={href} passHref legacyBehavior>
-        <Button
-          variant="ghost"
-          onClick={onClick}
-          className={combinedClasses}
-        >
-          {icon}{children}
-        </Button>
-      </Link>
     );
   }
   return null;
@@ -105,10 +107,20 @@ export default function Header() {
 
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false);
-    if (user) { // Admins should not submit papers
+    if (user && !isAdminUser) {
       router.push('/author/submit');
-    } else {
+    } else if (!user) {
       if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/submit');
+      setShowLoginModal(true);
+    }
+  };
+  
+  const handleAiPreCheckClick = () => {
+    setIsMobileMenuOpen(false);
+    if (user) {
+      router.push('/author/ai-pre-check');
+    } else {
+      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/ai-pre-check');
       setShowLoginModal(true);
     }
   };
@@ -124,56 +136,57 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
 
-  const authorNavLinks = [
+  // Links for authenticated non-admin users (Authors/Reviewers)
+  const userNavLinks = [
     { href: "/", label: "Home", icon: null },
-    { href: "/author/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" },
-    { href: "/author/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles /> },
+    // Dashboard link will be determined by role
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" }, // href for active state check
+    { label: "AI Pre-Check", action: handleAiPreCheckClick, icon: <Sparkles />, href: "/author/ai-pre-check" }, // href for active state check
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
   
-  const reviewerNavLinks = [
-    { href: "/", label: "Home", icon: null },
-    { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
-    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
-    { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
-    { href: "/contact-us", label: "Contact", icon: <Phone /> },
-  ];
-
   const adminNavLinks = [
     { href: "/admin/dashboard", label: "Admin Panel", icon: <Shield /> },
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
   ];
   
-  const adminSidebarLinks = [
+  const adminSidebarLinks = [ // For mobile sheet when admin is logged in
       { href: "/admin/dashboard", label: "Dashboard Overview", icon: <LayoutDashboard /> },
       { href: "/admin/users", label: "User Management", icon: <UsersIconLucide /> },
       { href: "/admin/registered-admins", label: "Registered Admins", icon: <UserCheck /> },
       { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye /> },
   ];
 
-
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
     if (user && isAdminUser) {
       currentNavLinks = adminNavLinks;
-    } else if (user && user.role === "Reviewer") {
-      currentNavLinks = reviewerNavLinks;
-    } else if (user && user.role === "Author") {
-      currentNavLinks = authorNavLinks;
-    } else { // Guest or user with no specific role yet (should be prompted to complete profile)
+    } else if (user) { // Authenticated non-admin
+      currentNavLinks = [...userNavLinks];
+      // Add role-specific dashboard link
+      const dashboardLink = user.role === "Reviewer" 
+        ? { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> }
+        : { href: "/author/dashboard", label: "Author Dashboard", icon: <LayoutDashboard /> };
+      currentNavLinks.splice(1, 0, dashboardLink); // Insert dashboard link after "Home"
+    } else { // Guest
       currentNavLinks = baseNavLinks;
     }
   }
 
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
+    <header className={cn(
+      "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      isViewingAdminSection && "md:pl-64" // Adjust main header padding if admin sidebar is present
+    )}>
+      <div className={cn(
+          "container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between",
+          // isViewingAdminSection && "md:ml-64" // This was removed to allow full width header with offset content
+          )}>
         <Link href="/" className="mr-auto md:mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
           <span className="text-xl font-bold">ResearchSphere</span>
@@ -181,25 +194,29 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
-            const isActiveAdminPanelLink = link.href === "/admin/dashboard" && isViewingAdminSection;
-            const isGeneralActiveLink = link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== "/admin/dashboard";
-            const isHomeActiveLink = link.href === '/' && pathname === '/';
-            const isActive = isActiveAdminPanelLink || isGeneralActiveLink || isHomeActiveLink;
+            // Determine active state
+            let isActive = false;
+            if (link.href) {
+                if (link.href === "/" && pathname === "/") isActive = true;
+                else if (link.href !== "/" && pathname.startsWith(link.href)) isActive = true;
+                // Specific check for admin dashboard when in any admin/* route
+                if (link.href === "/admin/dashboard" && isViewingAdminSection) isActive = true;
+            }
             
             let buttonClasses = "";
-            if (user && isAdminUser) {
+            if (user && isAdminUser) { // Styling for admin users
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90" // Admin active style
+                  : "text-foreground hover:bg-accent hover:text-accent-foreground" // Admin inactive hover
               );
-            } else {
+            } else { // Styling for guest or regular users
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
-                  ? "text-primary font-semibold bg-secondary"
-                  : "text-foreground hover:text-primary hover:bg-secondary"
+                  ? "text-primary font-semibold bg-secondary" // User active style
+                  : "text-foreground hover:text-primary hover:bg-secondary" // User inactive hover
               );
             }
 
@@ -252,21 +269,21 @@ export default function Header() {
                 ) : ( // Author or user completing profile
                   <DropdownMenuItem onClick={() => router.push('/author/dashboard')}>
                     <LayoutDashboard className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
+                    <span>Author Dashboard</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => router.push('/author/profile/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {!isAdminUser && user.role !== "Reviewer" && ( // Show submit for authors
+                {!isAdminUser && user.role !== "Reviewer" && ( 
                   <DropdownMenuItem onClick={handleSubmitPaperClick}>
                     <UploadCloud className="mr-2 h-4 w-4" />
                     <span>Submit Paper</span>
                   </DropdownMenuItem>
                 )}
-                {!isAdminUser && ( // Show AI pre-check for authors and reviewers
-                  <DropdownMenuItem onClick={() => router.push('/author/ai-pre-check')}>
+                {!isAdminUser && ( 
+                  <DropdownMenuItem onClick={handleAiPreCheckClick}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     <span>AI Pre-Check</span>
                   </DropdownMenuItem>
@@ -290,6 +307,7 @@ export default function Header() {
           ) : null}
         </div>
 
+        {/* Mobile Menu */}
         <div className="flex items-center md:hidden">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -298,19 +316,20 @@ export default function Header() {
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-              <SheetHeader className="mb-4">
+            <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0">
+              <SheetHeader className="p-4 border-b">
                 <SheetTitle className="text-left flex items-center gap-2">
                   <BookOpenText className="h-6 w-6 text-primary" /> ResearchSphere
                 </SheetTitle>
               </SheetHeader>
-              <div className="flex flex-col space-y-1">
+              <div className="flex flex-col space-y-1 p-2">
                 {isClient && currentNavLinks.map(link => {
-                   const isActiveAdminPanelLink = link.href === "/admin/dashboard" && isViewingAdminSection;
-                   const isGeneralActiveLink = link.href && link.href !== '/' && pathname.startsWith(link.href) && link.href !== "/admin/dashboard";
-                   const isHomeActiveLink = link.href === '/' && pathname === '/';
-                   const isActive = isActiveAdminPanelLink || isGeneralActiveLink || isHomeActiveLink;
-
+                    let isActive = false;
+                    if (link.href) {
+                        if (link.href === "/" && pathname === "/") isActive = true;
+                        else if (link.href !== "/" && pathname.startsWith(link.href)) isActive = true;
+                        if (link.href === "/admin/dashboard" && isViewingAdminSection) isActive = true;
+                    }
                   return (
                     <NavLinkItem
                       key={link.href || link.label}
@@ -330,9 +349,11 @@ export default function Header() {
                   );
                 })}
 
+                {/* Admin Sidebar Links in Mobile Menu */}
                 {isClient && user && isAdminUser && (
                   <>
                      <DropdownMenuSeparator className="my-2" />
+                     <div className="px-3 py-1 text-sm font-semibold text-muted-foreground">Admin Tools</div>
                      {adminSidebarLinks.map(link => {
                          const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname.startsWith(link.href));
                          return (
@@ -362,16 +383,16 @@ export default function Header() {
                       Profile Settings
                     </NavLinkItem>
                     {!isAdminUser && user.role !== "Reviewer" && (
-                      <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname === "/author/submit"} isAction={true} icon={<UploadCloud />} >
+                      <NavLinkItem onClick={handleSubmitPaperClick} isActive={pathname === "/author/submit"} isAction icon={<UploadCloud />} >
                         Submit Paper
                       </NavLinkItem>
                     )}
                      {!isAdminUser && (
-                      <NavLinkItem href="/author/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/author/ai-pre-check"} icon={<Sparkles />} >
+                      <NavLinkItem onClick={handleAiPreCheckClick} isActive={pathname === "/author/ai-pre-check"} isAction icon={<Sparkles />} >
                         AI Pre-Check
                       </NavLinkItem>
                     )}
-                    <Button variant="ghost" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
+                    <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
                       <LogOut /> Log Out
                     </Button>
                   </>
