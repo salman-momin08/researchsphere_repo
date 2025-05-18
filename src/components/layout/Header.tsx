@@ -74,7 +74,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
       </Button>
     );
   }
-  return null;
+  return null; // Should not happen if href or onClick (for action) is provided
 };
 
 
@@ -106,7 +106,7 @@ export default function Header() {
 
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false);
-    if (user && !isAdminUser) {
+    if (user && !isAdminUser) { // Admins should not submit papers through this flow
       router.push('/author/submit');
     } else if (!user) {
       if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/submit');
@@ -116,7 +116,7 @@ export default function Header() {
   
   const handleAiPreCheckClick = () => {
     setIsMobileMenuOpen(false);
-    if (user) {
+    if (user) { // Non-admins and potentially admins (if logic allows)
       router.push('/author/ai-pre-check');
     } else {
       if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/ai-pre-check');
@@ -148,11 +148,9 @@ export default function Header() {
   ];
 
   const reviewerNavLinks = [
-    { href: "/", label: "Home", icon: null },
     { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
-    // "Registration" is removed for reviewers as requested
+    // "Home", "Registration", "Templates" are removed for reviewers
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
-    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
@@ -170,17 +168,17 @@ export default function Header() {
       { href: "/admin/reviewers", label: "Reviewer Management", icon: <Eye /> },
   ];
 
-  let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
-  if (isClient) {
+  let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = baseNavLinks; // Default to base links
+  
+  if (isClient) { // Only determine links after client has mounted and user state is available
     if (user && isAdminUser) {
       currentNavLinks = adminNavLinks;
     } else if (user && user.role === "Reviewer") {
       currentNavLinks = reviewerNavLinks;
     } else if (user) { // Authenticated Author or user with no specific role yet (defaults to author view)
       currentNavLinks = authorNavLinks;
-    } else { // Guest
-      currentNavLinks = baseNavLinks;
     }
+    // If not logged in, it remains baseNavLinks
   }
 
 
@@ -198,12 +196,21 @@ export default function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
-          {isClient && currentNavLinks.map(link => {
+          {currentNavLinks.map(link => {
             let isActive = false;
             if (link.href) {
                 if (link.href === "/" && pathname === "/") isActive = true;
-                else if (link.href !== "/" && pathname.startsWith(link.href)) isActive = true;
-                if (link.href === "/admin/dashboard" && isViewingAdminSection) isActive = true;
+                // For admin panel, make "Admin Panel" active if any /admin/* path is matched, but not if on other specific admin links
+                else if (link.href === "/admin/dashboard" && isViewingAdminSection) {
+                   isActive = true; // Active if on any admin page
+                   // More specific admin links like /search-papers or /key-committee should highlight themselves if current
+                   if ( (pathname === "/search-papers" || pathname === "/key-committee") && link.href !== pathname) {
+                       isActive = false;
+                   }
+                }
+                else if (link.href !== "/" && pathname.startsWith(link.href)) {
+                     isActive = true;
+                }
             }
             
             let buttonClasses = "";
@@ -291,10 +298,12 @@ export default function Header() {
                     </DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem onClick={() => router.push('/search-papers')}>
-                  <SearchIcon className="mr-2 h-4 w-4" />
-                  <span>Search Papers</span>
-                </DropdownMenuItem>
+                {(user.role !== "Reviewer" || isAdminUser) && ( // Search for admins and authors
+                   <DropdownMenuItem onClick={() => router.push('/search-papers')}>
+                    <SearchIcon className="mr-2 h-4 w-4" />
+                    <span>Search Papers</span>
+                   </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -326,12 +335,17 @@ export default function Header() {
                 </SheetTitle>
               </SheetHeader>
               <div className="flex flex-col space-y-1 p-2">
-                {isClient && currentNavLinks.map(link => {
+                {currentNavLinks.map(link => { // Use filtered links for mobile too
                     let isActive = false;
                     if (link.href) {
                         if (link.href === "/" && pathname === "/") isActive = true;
+                        else if (link.href === "/admin/dashboard" && isViewingAdminSection) {
+                            isActive = true;
+                             if ( (pathname === "/search-papers" || pathname === "/key-committee") && link.href !== pathname) {
+                                isActive = false;
+                            }
+                        }
                         else if (link.href !== "/" && pathname.startsWith(link.href)) isActive = true;
-                        if (link.href === "/admin/dashboard" && isViewingAdminSection) isActive = true;
                     }
                   return (
                     <NavLinkItem
@@ -393,6 +407,11 @@ export default function Header() {
                           AI Pre-Check
                         </NavLinkItem>
                       </>
+                    )}
+                    {(user.role !== "Reviewer" || isAdminUser) && (
+                         <NavLinkItem href="/search-papers" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/search-papers"} icon={<SearchIcon />}>
+                            Search Papers
+                         </NavLinkItem>
                     )}
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
                       <LogOut /> Log Out
