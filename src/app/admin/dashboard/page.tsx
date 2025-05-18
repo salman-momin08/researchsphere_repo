@@ -13,14 +13,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
-import { getAllUsers } from "@/lib/user-service"; // Import user service
+import { getAllUsers } from "@/lib/user-service";
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
 
 function AdminDashboardContent() {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdminUser, loading: authLoading } = useAuth(); // Use isAdminUser from context
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]); // State for all users
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const [stats, setStats] = useState({
@@ -34,7 +34,7 @@ function AdminDashboardContent() {
   });
 
   const fetchAdminData = useCallback(async () => {
-    if (!authLoading && user && isAdmin) {
+    if (!authLoading && user && isAdminUser) {
       setIsLoadingData(true);
       try {
         const [fetchedPapers, fetchedUsers] = await Promise.all([
@@ -76,7 +76,7 @@ function AdminDashboardContent() {
       } finally {
         setIsLoadingData(false);
       }
-    } else if (!authLoading && user && !isAdmin) {
+    } else if (!authLoading && user && !isAdminUser) {
       setPapers([]);
       setAllUsers([]);
       setIsLoadingData(false);
@@ -86,7 +86,7 @@ function AdminDashboardContent() {
       setIsLoadingData(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isAdmin, authLoading]);
+  }, [user, isAdminUser, authLoading]);
 
   useEffect(() => {
     fetchAdminData();
@@ -110,7 +110,7 @@ function AdminDashboardContent() {
       if (paperToNotify) {
         toast({
           title: "Email Notification (Simulated)",
-          description: `An email notification about the rejection (due to non-payment) would be sent for paper: ${paperToNotify.title}. (This is a simulation).`,
+          description: `An email about the rejection (due to non-payment) for paper "${paperToNotify.title}" would typically be sent to the author. This is a simulation.`,
           variant: "default",
           duration: 7000,
         });
@@ -125,7 +125,7 @@ function AdminDashboardContent() {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Verifying admin status...</p></div>;
   }
   
-  if (!isAdmin && user) { 
+  if (!isAdminUser && user) { 
      return (
       <div className="container py-8 md:py-12 px-4 text-center">
         <Alert variant="destructive" className="max-w-lg mx-auto">
@@ -135,7 +135,7 @@ function AdminDashboardContent() {
             You do not have permission to view this page.
           </AlertDescription>
         </Alert>
-        <Link href="/author/dashboard">
+        <Link href={user.role === 'Reviewer' ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH}>
           <Button className="mt-6">Go to Your Dashboard</Button>
         </Link>
       </div>
@@ -162,6 +162,23 @@ function AdminDashboardContent() {
   if (isLoadingData) {
     return <div className="flex justify-center items-center py-10"><LoadingSpinner size={32}/> <p className="ml-2">Loading admin dashboard data...</p></div>;
   }
+   if (!user.isAdmin) { // Should be caught by ProtectedRoute, but as a fallback
+    return (
+      <div className="container py-8 md:py-12 px-4 text-center">
+          <Alert variant="destructive" className="max-w-lg mx-auto">
+              <Shield className="h-5 w-5" />
+              <AlertTitle>Admin Access Required</AlertTitle>
+              <AlertDescription>
+                  You do not have permission to view this page. Please check if your admin status is correctly set up in the system.
+              </AlertDescription>
+          </Alert>
+          <Link href={user.role === "Reviewer" ? "/reviewer/dashboard" : "/author/dashboard"}>
+              <Button className="mt-6">Go to Your Dashboard</Button>
+          </Link>
+      </div>
+    );
+  }
+
 
   return (
     <div className="w-full space-y-8 max-w-screen-2xl mx-auto">
@@ -171,7 +188,7 @@ function AdminDashboardContent() {
         </h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"> {/* Adjusted for potentially more stat cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
@@ -215,7 +232,7 @@ function AdminDashboardContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Awaiting Review</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" /> {/* Changed icon */}
+            <Clock className="h-4 w-4 text-muted-foreground" /> 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pendingReview}</div>

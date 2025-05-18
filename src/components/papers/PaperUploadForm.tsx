@@ -34,7 +34,7 @@ const paperSchema = z.object({
   keywords: z.string().min(1, "At least one keyword is required.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   file: z.any()
     .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0), "A paper file is required.")
-    .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0 && files[0].size <= 10 * 1024 * 1024), "File size must be less than 10MB.")
+    .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0 && files[0].size <= 10 * 1024 * 1024), "File size must be less than 10MB.") // Max 10MB
     .refine(files => typeof window === 'undefined' || (files instanceof FileList && files.length > 0 && ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(files[0].type)), "Only PDF or DOCX files are allowed."),
   paymentOption: z.enum(["payNow", "payLater"], { required_error: "Please select a payment option." }),
 });
@@ -74,7 +74,8 @@ export default function PaperUploadForm() {
     }
   }, [watchedFile, form]);
 
-  const proceedWithSubmission = async (data: PaperFormValues, existingPaperId?: string): Promise<PaperType | null> => {
+  // Renamed and refactored from proceedWithSubmission for clarity
+  const createInitialPaperRecord = async (data: PaperFormValues): Promise<PaperType | null> => {
     if (!user || !user.id) {
       setFormError("Authentication Error: User session is invalid. Please log in again.");
       return null;
@@ -82,7 +83,7 @@ export default function PaperUploadForm() {
     setFormError(null);
 
     let fileToUpload: File | null = null;
-    if (!existingPaperId && data.file) {
+    if (data.file) {
       const fileList = data.file as FileList | undefined;
       if (typeof window === 'undefined' || !(fileList instanceof FileList) || fileList.length === 0) {
         setFormError("No file provided or file list is invalid. Please select a file.");
@@ -90,6 +91,10 @@ export default function PaperUploadForm() {
         return null;
       }
       fileToUpload = fileList[0];
+    } else {
+        setFormError("A paper file is required.");
+        form.setError("file", { type: "manual", message: "A paper file is required." });
+        return null;
     }
 
     const paperApiServiceData = {
@@ -101,15 +106,11 @@ export default function PaperUploadForm() {
     };
 
     try {
-      const createdOrUpdatedPaper = await addPaper(
-        paperApiServiceData,
-        fileToUpload, // This can be null if existingPaperId is provided (update flow)
-        user.id,
-        existingPaperId
-      );
-      return createdOrUpdatedPaper;
+      // Call addPaper without existingPaperId to create a new record
+      const createdPaper = await addPaper(paperApiServiceData, fileToUpload, user.id, undefined);
+      return createdPaper;
     } catch (error: any) {
-      const errorMessage = error.message || "An unexpected error occurred during paper submission.";
+      const errorMessage = error.message || "An unexpected error occurred during initial paper processing.";
       setFormError(errorMessage);
       return null;
     }
@@ -120,22 +121,18 @@ export default function PaperUploadForm() {
     setFormError(null);
 
     if (data.paymentOption === "payNow") {
-      // For "Pay Now", first create the paper record with Cloudinary upload
-      // Status will be 'Payment Pending' or similar until payment is confirmed
-      const initialPaperForPayNow = { ...data, paymentOption: "payNow" as "payNow" };
-      const createdPaper = await proceedWithSubmission(initialPaperForPayNow, undefined);
-
-      if (createdPaper) {
-        setNewlyCreatedPaperForPayment(createdPaper);
-        setPendingSubmissionData(data);
+      const initialPaper = await createInitialPaperRecord(data);
+      if (initialPaper) {
+        setNewlyCreatedPaperForPayment(initialPaper);
+        setPendingSubmissionData(data); // Save form data for post-payment update
         setShowPayNowModal(true);
-        // isSubmitting will be false by PaymentModal or its close handler
+        // isSubmitting will be false via PaymentModal or its close handler
       } else {
         toast({variant: "destructive", title: "Submission Error", description: formError || "Could not initiate paper submission for payment."});
         setIsSubmitting(false);
       }
     } else { // Pay Later
-      const createdPaper = await proceedWithSubmission(data, undefined);
+      const createdPaper = await createInitialPaperRecord(data); // This saves with "Payment Pending" status
       if (createdPaper) {
         toast({ title: "Paper Submission Initiated!", description: `"${data.title}" processed. Payment is due shortly.` });
         form.reset();
@@ -158,40 +155,63 @@ export default function PaperUploadForm() {
       return;
     }
     
-    // Now update the paper status to 'Submitted', set paidAt, submissionDate etc.
-    // The file is already uploaded from the initial creation step.
-    // We pass null for fileToUpload as it's already handled.
-    const updatedPaper = await proceedWithSubmission(pendingSubmissionData, newlyCreatedPaperForPayment.id);
+    setIsSubmitting(true); // Show loading for the final update step
+    try {
+      // Call addPaper WITH existingPaperId to update status, paidAt, submissionDate
+      // File upload is NOT needed again as it was done during initialPaper creation
+      // Pass null for fileToUpload
+      const paperApiServiceDataForUpdate = {
+        title: pendingSubmissionData.title,
+        abstract: pendingSubmissionData.abstract,
+        authors: pendingSubmissionData.authors,
+        keywords: pendingSubmissionData.keywords,
+        paymentOption: "payNow" as "payNow", // Confirm it's payNow
+      };
 
-    if (updatedPaper) {
-      toast({ title: "Paper Submitted & Paid Successfully!", description: `"${updatedPaper.title}" has been processed.` });
-      form.reset();
-      setFileNameDisplay(null);
-      router.push(`/papers/${updatedPaper.id}`);
-    } else {
-      toast({ variant: "destructive", title: "Post-Payment Update Failed", description: formError || "Could not update paper status after payment. Your paper is saved but payment status may be incorrect.", duration: 7000 });
-      router.push(`/papers/${newlyCreatedPaperForPayment.id}`);
+      const updatedPaper = await addPaper(
+        paperApiServiceDataForUpdate,
+        null, // No file needed for update
+        newlyCreatedPaperForPayment.userId, // Should be current user.id
+        newlyCreatedPaperForPayment.id // Pass existing ID
+      );
+
+      if (updatedPaper) {
+        toast({ title: "Paper Submitted & Paid Successfully!", description: `"${updatedPaper.title}" has been processed.` });
+        form.reset();
+        setFileNameDisplay(null);
+        router.push(`/papers/${updatedPaper.id}`);
+      } else {
+        // This case should be rare if addPaper throws errors, but as a fallback
+        toast({ variant: "destructive", title: "Post-Payment Update Failed", description: "Could not update paper status after payment. Please check your dashboard.", duration: 7000 });
+        router.push(`/papers/${newlyCreatedPaperForPayment.id}`);
+      }
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Post-Payment Update Failed", description: error.message || "An error occurred finalizing your submission.", duration: 7000 });
+        router.push(`/papers/${newlyCreatedPaperForPayment.id}`); // Redirect to the paper even if update fails
+    } finally {
+        setShowPayNowModal(false);
+        setIsSubmitting(false);
+        setNewlyCreatedPaperForPayment(null);
+        setPendingSubmissionData(null);
     }
-    
-    setShowPayNowModal(false);
-    setIsSubmitting(false);
-    setNewlyCreatedPaperForPayment(null);
-    setPendingSubmissionData(null);
   };
 
   const handlePayNowModalOpenChange = (open: boolean) => {
     setShowPayNowModal(open);
-    if (!open) {
-      const wasPaymentSuccessful = !newlyCreatedPaperForPayment && !pendingSubmissionData;
-      if (!wasPaymentSuccessful && newlyCreatedPaperForPayment) {
-        toast({ title: "Payment Incomplete", description: `Submission for "${newlyCreatedPaperForPayment.title}" is saved. You can complete payment from the paper details page.`, duration: 7000});
+    if (!open) { // Modal closed
+      // Check if it was closed before payment success
+      if (newlyCreatedPaperForPayment && !form.formState.isSubmitSuccessful) { // isSubmitSuccessful might not be correct here
+        toast({ title: "Payment Incomplete", description: `Submission for "${newlyCreatedPaperForPayment.title}" is saved as 'Payment Pending'. You can complete payment from the paper details page.`, duration: 7000});
         router.push(`/papers/${newlyCreatedPaperForPayment.id}`);
       }
-      setIsSubmitting(false);
+      // Always reset states whether payment was successful or modal just closed
+      setIsSubmitting(false); // Ensure main form button is re-enabled
       setNewlyCreatedPaperForPayment(null);
       setPendingSubmissionData(null);
-    } else if (open && newlyCreatedPaperForPayment) {
-      if(!pendingSubmissionData) setPendingSubmissionData(form.getValues());
+    } else if (open && newlyCreatedPaperForPayment) { // Modal just opened
+      if(!pendingSubmissionData) {
+        setPendingSubmissionData(form.getValues());
+      }
     }
   };
 

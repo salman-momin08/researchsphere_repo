@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service'; // Using getAllUsers from the single user service
+import { getAllUsers } from '@/lib/user-service'; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -16,25 +16,24 @@ export default function ReviewerManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchReviewerUsers = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const allUsers = await getAllUsers();
-        // Filter for users whose role is "Reviewer"
-        const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
-        setReviewerUsers(filteredReviewers);
-      } catch (err: any) {
-        setError(err.message || "Failed to load reviewer users.");
-        toast({ variant: "destructive", title: "Error Loading Reviewers", description: err.message });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchReviewerUsers();
+  const fetchReviewerUsers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const allUsers = await getAllUsers();
+      const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
+      setReviewerUsers(filteredReviewers);
+    } catch (err: any) {
+      setError(err.message || "Failed to load reviewer users.");
+      toast({ variant: "destructive", title: "Error Loading Reviewers", description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchReviewerUsers();
+  }, [fetchReviewerUsers]);
 
   if (isLoading) {
     return (
@@ -98,5 +97,3 @@ export default function ReviewerManagementPage() {
     </div>
   );
 }
-
-    

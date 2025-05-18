@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
 import { getAllUsers } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,24 +17,24 @@ export default function RegisteredAdminsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAdminUsers = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const allUsers = await getAllUsers();
-        const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
-        setAdminUsers(filteredAdmins);
-      } catch (err: any) {
-        setError(err.message || "Failed to load admin users.");
-        toast({ variant: "destructive", title: "Error Loading Admins", description: err.message });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAdminUsers();
+  const fetchAdminUsers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const allUsers = await getAllUsers();
+      const filteredAdmins = allUsers.filter(user => user.isAdmin === true);
+      setAdminUsers(filteredAdmins);
+    } catch (err: any) {
+      setError(err.message || "Failed to load admin users.");
+      toast({ variant: "destructive", title: "Error Loading Admins", description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAdminUsers();
+  }, [fetchAdminUsers]);
 
   if (isLoading) {
     return (
@@ -87,7 +87,7 @@ export default function RegisteredAdminsPage() {
                       <TableCell>{user.username || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={"default"} className="bg-green-600 hover:bg-green-700">
-                           <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {user.role || 'Admin'} {/* Display role, fallback to Admin */}
+                           <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {user.role || 'Admin'}
                         </Badge>
                       </TableCell>
                       <TableCell>{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
@@ -102,5 +102,3 @@ export default function RegisteredAdminsPage() {
     </div>
   );
 }
-
-    

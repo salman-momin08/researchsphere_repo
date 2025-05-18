@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
 import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -32,11 +32,11 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // Removed users from dependency array to prevent potential loops if fetchUsers itself modifies users indirectly
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const handleToggleAdmin = async (targetUserId: string, currentIsAdmin: boolean | undefined) => {
     if (!currentAdminUser || currentAdminUser.id === targetUserId) {
@@ -44,13 +44,12 @@ export default function UserManagementPage() {
       return;
     }
 
-    const confirmAction = confirm(`Are you sure you want to ${currentIsAdmin ? 'revoke' : 'grant'} admin privileges for this user?`);
-    if (!confirmAction) return;
+    if (!confirm(`Are you sure you want to ${currentIsAdmin ? 'revoke' : 'grant'} admin privileges for this user?`)) return;
 
     try {
       await toggleUserAdminStatus(targetUserId, !!currentIsAdmin);
       toast({ title: "Success", description: `User admin status updated.` });
-      fetchUsers(); // Refresh the list
+      fetchUsers(); 
     } catch (err: any) {
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update admin status." });
     }
@@ -61,13 +60,12 @@ export default function UserManagementPage() {
       toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot suspend their own account through this interface." });
       return;
     }
-    const confirmAction = confirm(`Are you sure you want to ${currentIsSuspended ? 'unsuspend' : 'suspend'} this user?`);
-    if (!confirmAction) return;
+    if (!confirm(`Are you sure you want to ${currentIsSuspended ? 'unsuspend' : 'suspend'} this user?`)) return;
 
     try {
       await toggleUserSuspensionStatus(targetUserId, !!currentIsSuspended);
       toast({ title: "Success", description: `User suspension status updated.` });
-      fetchUsers(); // Refresh list
+      fetchUsers(); 
     } catch (err: any)
      {
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update user suspension status." });
@@ -188,5 +186,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
-    
