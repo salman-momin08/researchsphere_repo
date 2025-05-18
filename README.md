@@ -1,5 +1,2 @@
-ddat# Firebase Studio
-
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+The project is developed using the Nextjs Framework to run this project in your system unzip the folder and on within the project folder directory open the command prompt and run 'npm install' command to install the requirements in your system. Once the requirements are installed then use the 'npm run dev' Command to run the project in your local machine.
+Create .env file for the project which invloves the firebase api, google Oauth api and client id, Github Oauth api and client id, cloudinary name, cloudianry api key.
