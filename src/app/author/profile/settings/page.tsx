@@ -5,8 +5,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import React from 'react'; // Ensure React is imported for Suspense
+import { useSearchParams } from "next/navigation"; // Import directly from next/navigation
+import React from 'react'; // Ensure React is imported
 
 // This is the main content of the page
 function AuthorProfileSettingsPageContent() {
@@ -37,9 +37,6 @@ function AuthorProfileSettingsPageContent() {
 
 // Wrapping the page with route protection
 export default function AuthorProfileSettingsPage() {
-  // For the profile settings page, we need to ensure the user is authenticated
-  // but we don't necessarily need to enforce profile completeness here, as this IS the page to complete it.
-  // AuthContext will handle redirecting away once the profile IS complete.
   return (
     <ProtectedRoute>
         <AuthorProfileSettingsPageContent />
