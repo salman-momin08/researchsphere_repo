@@ -14,10 +14,10 @@ import {
   GoogleAuthProvider,
   GithubAuthProvider,
   signInWithPopup,
-  getIdToken,
-  deleteUser as firebaseDeleteUser,
+  // getIdToken, // Not used in frontend-only Firestore interaction model
+  // deleteUser as firebaseDeleteUser, // Not used
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp, query, where, getDocs, updateDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, query, where, getDocs, updateDoc, collection } from 'firebase/firestore';
 import { auth as firebaseAuth, db as firestoreDb } from '@/lib/firebase';
 import type { SignupFormValues } from '@/components/auth/SignupForm';
 import type { User } from '@/types';
@@ -33,7 +33,7 @@ const LOGIN_PATH = '/login';
 const SIGNUP_PATH = '/signup';
 
 const ADMIN_CREATOR_EMAIL = "admin-creator@researchsphere.com";
-const MOCK_ADMIN_EMAIL = "admin@example.com";
+const MOCK_ADMIN_EMAIL = "admin@example.com"; // For easier local admin testing
 
 const convertFirestoreTimestampToISO = (timestamp: any): string | null => {
   if (!timestamp) return null;
@@ -46,9 +46,8 @@ const convertFirestoreTimestampToISO = (timestamp: any): string | null => {
   if (typeof timestamp === 'object' && timestamp.seconds !== undefined && typeof timestamp.seconds === 'number' && timestamp.nanoseconds !== undefined && typeof timestamp.nanoseconds === 'number') {
     return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000).toISOString();
   }
-  return String(timestamp); // Fallback
+  return String(timestamp);
 };
-
 
 interface AuthContextType {
   user: User | null;
@@ -73,7 +72,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // Start true until initial auth check completes
+  const [loading, setLoading] = useState(true);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -81,10 +80,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isMounted, setIsMounted] = useState(false);
   const [initialAuthCheckComplete, setInitialAuthCheckComplete] = useState(false);
   const [hasShownIncompleteProfileToast, setHasShownIncompleteProfileToast] = useState(false);
+  const [justCompletedProfile, setJustCompletedProfile] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
-  const searchParamsFromHook = useNextSearchParams(); // Called at top level
+  const searchParamsFromHook = useNextSearchParams();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const ensureFirestoreUserProfile = useCallback(async (
     firebaseUser: FirebaseUser,
-    profileDataFromSignupOrUpdate?: Partial<SignupFormValues & { displayName?: string }>,
+    profileDataFromSignupOrUpdate?: Partial<SignupFormValues & { displayName?: string; photoURL?: string | null }>,
     isUpdatingProfile: boolean = false
   ): Promise<User | null> => {
     if (!firestoreDb) {
@@ -113,23 +113,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let determinedRole = existingData.role;
         if (isUpdatingProfile && profileDataFromSignupOrUpdate?.role) {
           determinedRole = profileDataFromSignupOrUpdate.role;
-        } else if (!existingData.role && !isUpdatingProfile) {
-          determinedRole = isAdminByEmail ? "Admin" : "Author"; // Default for new social logins if no role
+        } else if (!existingData.role) {
+          determinedRole = isAdminByEmail ? "Admin" : "Author";
         }
 
         let determinedIsAdmin = existingData.isAdmin || false;
         if (isAdminByEmail) {
-            determinedIsAdmin = true;
-            if (!determinedRole || determinedRole !== "Admin") determinedRole = "Admin";
+          determinedIsAdmin = true;
+          if (!determinedRole || determinedRole !== "Admin") determinedRole = "Admin";
         } else if (isUpdatingProfile && profileDataFromSignupOrUpdate && 'isAdmin' in profileDataFromSignupOrUpdate) {
-            determinedIsAdmin = existingData.isAdmin || false; // Users cannot make themselves admin via profile form
+          // Users cannot make themselves admin via profile form; only existing admins can via user management.
+          // This logic path is more for when an admin might be *setting* another user's admin status, not for self-update.
+          // For self-update, isAdmin is usually not part of profileDataFromSignupOrUpdate.
+          // If it were, it would be ignored by Firestore rules for self-updates.
+          determinedIsAdmin = existingData.isAdmin || false;
         }
 
         dataToSave = {
           userId: uid,
-          email: firebaseUser.email || existingData.email,
+          email: firebaseUser.email || existingData.email || null,
           displayName: profileDataFromSignupOrUpdate?.displayName || firebaseUser.displayName || existingData.displayName || firebaseUser.email || "User",
-          photoURL: firebaseUser.photoURL || existingData.photoURL || null,
+          photoURL: profileDataFromSignupOrUpdate?.photoURL || firebaseUser.photoURL || existingData.photoURL || null,
           username: isUpdatingProfile && profileDataFromSignupOrUpdate?.username !== undefined ? (profileDataFromSignupOrUpdate.username || null) : (existingData.username || null),
           role: determinedRole,
           phoneNumber: isUpdatingProfile && profileDataFromSignupOrUpdate?.phoneNumber !== undefined ? (profileDataFromSignupOrUpdate.phoneNumber || null) : (existingData.phoneNumber || null),
@@ -141,14 +145,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           updatedAt: serverTimestamp(),
         };
         await setDoc(userDocRef, dataToSave, { merge: true });
-
       } else { // New user document
         const defaultRole = isAdminByEmail ? "Admin" : (profileDataFromSignupOrUpdate?.role || "Author");
         dataToSave = {
           userId: uid,
           email: firebaseUser.email,
           displayName: profileDataFromSignupOrUpdate?.displayName || firebaseUser.displayName || firebaseUser.email || "User",
-          photoURL: firebaseUser.photoURL || null,
+          photoURL: profileDataFromSignupOrUpdate?.photoURL || firebaseUser.photoURL || null,
           username: profileDataFromSignupOrUpdate?.username || null,
           role: defaultRole,
           phoneNumber: profileDataFromSignupOrUpdate?.phoneNumber || null,
@@ -176,9 +179,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error: any) {
       console.error(`AuthContext (ensureFirestoreUserProfile): Error ensuring Firestore profile for ${uid}: "${error.message}"`, error.code, error);
       if (error.code === 'permission-denied') {
-        toast({ variant: "destructive", title: "Firestore Permission Error", description: `Could not access your profile data. Please check Firestore rules or contact support. Details: ${error.message}`, duration: 10000 });
+        toast({ variant: "destructive", title: "Firestore Permission Error", description: `Could not access or save your profile data. Please check Firestore rules or contact support. Details: ${error.message}`, duration: 10000 });
       } else {
-        toast({ variant: "destructive", title: "Critical Profile Sync Error", description: `Could not save or update your profile in our database. Please try logging out and logging in again. If the problem persists, contact support. Details: ${error.message}`, duration: 10000 });
+        toast({ variant: "destructive", title: "Critical Profile Sync Error", description: `Could not save or update your profile in our database. Details: ${error.message}`, duration: 10000 });
       }
       return null;
     }
@@ -189,28 +192,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (typeof window !== 'undefined' && !sessionStorage.getItem('incompleteProfileToastShownThisSession')) {
       toast({
         title: "Profile Incomplete",
-        description: "Your profile is missing some details (like username, role, or phone number). Please visit Profile Settings to update it.",
+        description: "Your profile is missing some key details (like username, role, or phone number). Please visit Profile Settings to update it.",
         duration: 7000,
         variant: "default"
       });
       sessionStorage.setItem('incompleteProfileToastShownThisSession', 'true');
-      setHasShownIncompleteProfileToast(true); // For current session state
+      setHasShownIncompleteProfileToast(true);
     }
   }, [toast]);
 
   useEffect(() => {
-    if (!isMounted || !firebaseAuth) {
-      if (isMounted && !firebaseAuth) {
-        setLoading(false);
-        setInitialAuthCheckComplete(true);
-      }
-      return;
-    }
+    if (!isMounted || !firebaseAuth) return;
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentFirebaseUser: FirebaseUser | null) => {
+      if (justCompletedProfile) {
+        setJustCompletedProfile(false);
+        setLoading(false);
+        setInitialAuthCheckComplete(true);
+        return;
+      }
+
       setLoading(true);
       const currentWindowPathname = typeof window !== 'undefined' ? window.location.pathname : "";
-      const currentWindowSearch = typeof window !== 'undefined' ? window.location.search : "";
 
       if (currentFirebaseUser) {
         const appUser = await ensureFirestoreUserProfile(currentFirebaseUser);
@@ -219,44 +222,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(appUser);
           const determinedIsAdmin = appUser.isAdmin === true;
           setIsAdminUser(determinedIsAdmin);
-          const determinedProfileComplete = !!(appUser.username && appUser.role && appUser.phoneNumber);
-          setIsProfileComplete(determinedProfileComplete);
+          const isProfileActuallyComplete = !!(appUser.username && appUser.role && appUser.phoneNumber);
+          setIsProfileComplete(isProfileActuallyComplete);
 
           let completingProfileStorageFlag = typeof window !== 'undefined' ? localStorage.getItem('completingProfile') === 'true' : false;
           let redirectAfterLoginPath = typeof window !== 'undefined' ? localStorage.getItem('redirectAfterLogin') : null;
 
-          // Correct redirectAfterLoginPath if it's an old profile settings path
-          if (redirectAfterLoginPath && (redirectAfterLoginPath === '/user/profile/settings' || redirectAfterLoginPath === '/profile/settings')) {
-            redirectAfterLoginPath = `${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`;
-            if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', redirectAfterLoginPath);
+          // Path correction for profile settings
+          if (redirectAfterLoginPath === '/user/profile/settings' || redirectAfterLoginPath === '/profile/settings') {
+            redirectAfterLoginPath = AUTHOR_PROFILE_SETTINGS_PATH;
           }
 
-          if (!determinedProfileComplete && currentWindowPathname !== AUTHOR_PROFILE_SETTINGS_PATH && !currentWindowPathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
-            if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
-            router.push(`${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`);
-          } else if (determinedProfileComplete && completingProfileStorageFlag && (currentWindowPathname === AUTHOR_PROFILE_SETTINGS_PATH || currentWindowPathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?'))) {
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('completingProfile');
-              localStorage.removeItem('redirectAfterLogin');
-            }
-            const targetDashboard = determinedIsAdmin ? ADMIN_DASHBOARD_PATH : (appUser.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
-            router.push(redirectAfterLoginPath && redirectAfterLoginPath !== AUTHOR_PROFILE_SETTINGS_PATH && !redirectAfterLoginPath.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?') ? redirectAfterLoginPath : targetDashboard);
-          } else if (redirectAfterLoginPath) {
-            if (typeof window !== 'undefined') localStorage.removeItem('redirectAfterLogin');
-            router.push(redirectAfterLoginPath);
-          } else {
-            const onAuthPage = [LOGIN_PATH, SIGNUP_PATH].includes(currentWindowPathname);
-            const onNonAdminEntryPoint = [HOME_PATH, LOGIN_PATH, SIGNUP_PATH, AUTHOR_PROFILE_SETTINGS_PATH].includes(currentWindowPathname) || currentWindowPathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?');
 
-            if (determinedIsAdmin && onNonAdminEntryPoint && currentWindowPathname !== ADMIN_DASHBOARD_PATH && !currentWindowPathname.startsWith('/admin/')) {
-              router.push(ADMIN_DASHBOARD_PATH);
-            } else if (!determinedIsAdmin && onAuthPage) {
-              const targetDashboard = appUser.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
-              router.push(targetDashboard);
+          if (!isProfileActuallyComplete) {
+            if (currentWindowPathname !== AUTHOR_PROFILE_SETTINGS_PATH && !currentWindowPathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
+              if (typeof window !== 'undefined') localStorage.setItem('completingProfile', 'true');
+              router.push(`${AUTHOR_PROFILE_SETTINGS_PATH}?complete=true`);
+            }
+          } else { // Profile IS complete
+            if (completingProfileStorageFlag && (currentWindowPathname === AUTHOR_PROFILE_SETTINGS_PATH || currentWindowPathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?'))) {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('completingProfile');
+                localStorage.removeItem('redirectAfterLogin'); // Clear redirect as completion flow is done
+              }
+              const targetDashboard = determinedIsAdmin ? ADMIN_DASHBOARD_PATH : (appUser.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
+              router.push(redirectAfterLoginPath && redirectAfterLoginPath !== AUTHOR_PROFILE_SETTINGS_PATH ? redirectAfterLoginPath : targetDashboard);
+            } else if (redirectAfterLoginPath) {
+              if (typeof window !== 'undefined') localStorage.removeItem('redirectAfterLogin');
+              router.push(redirectAfterLoginPath);
+            } else {
+              // Default redirection if no specific path and profile is complete
+              const onAuthPage = [LOGIN_PATH, SIGNUP_PATH].includes(currentWindowPathname);
+              const nonAdminEntryPoints = [HOME_PATH, LOGIN_PATH, SIGNUP_PATH, AUTHOR_PROFILE_SETTINGS_PATH]; // Add author profile settings here explicitly
+
+              if (determinedIsAdmin && nonAdminEntryPoints.includes(currentWindowPathname) && !currentWindowPathname.startsWith('/admin/')) {
+                 router.push(ADMIN_DASHBOARD_PATH);
+              } else if (!determinedIsAdmin && onAuthPage) {
+                const targetDashboard = appUser.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
+                router.push(targetDashboard);
+              }
             }
           }
         } else { // appUser is null (Firestore error)
-          if (firebaseAuth) await signOut(firebaseAuth); // Ensure Firebase Auth session is also cleared
+          if (firebaseAuth) await signOut(firebaseAuth);
           setUser(null);
           setIsAdminUser(false);
           setIsProfileComplete(false);
@@ -271,7 +279,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsAdminUser(false);
         setIsProfileComplete(false);
         if (typeof window !== 'undefined') {
-          // Don't clear redirectAfterLogin if user was trying to access a page and got logged out before reaching it.
           localStorage.removeItem('completingProfile');
           sessionStorage.removeItem('incompleteProfileToastShownThisSession');
         }
@@ -281,8 +288,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => unsubscribe();
-  }, [isMounted, pathname, searchParamsFromHook, router, ensureFirestoreUserProfile, showIncompleteProfileToast]);
-
+  }, [isMounted, pathname, router, ensureFirestoreUserProfile, searchParamsFromHook, justCompletedProfile]); // Added user.id, justCompletedProfile
 
   const login = async (identifier: string, pass: string) => {
     if (!firebaseAuth || !firestoreDb) {
@@ -296,7 +302,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       if (!identifier.includes('@')) {
-        // Assume it's a username, try to find the email in Firestore
         const usersRef = collection(firestoreDb, "users");
         const q = query(usersRef, where("username", "==", identifier.trim()));
         const querySnapshot = await getDocs(q);
@@ -311,11 +316,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } else {
           // Let Firebase handle "user-not-found" if identifier was a username not in DB
+          // but still try to login with 'identifier' as email if it's in email format
+          // This case is mostly for when input is a username not found or a mistyped email
         }
       }
       await signInWithEmailAndPassword(firebaseAuth, emailToLogin, pass);
-      setShowLoginModal(false); // Close modal on successful Firebase auth
-      setHasShownIncompleteProfileToast(false); // Reset for next session
+      setShowLoginModal(false);
+      setHasShownIncompleteProfileToast(false);
       if (typeof window !== 'undefined') sessionStorage.removeItem('incompleteProfileToastShownThisSession');
       // onAuthStateChanged will handle setting user and redirection
     } catch (error: any) {
@@ -323,7 +330,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         errorMessage = "Invalid email/username or password.";
       } else if (error.message && error.message.includes("User record incomplete")) {
-        // Already set
+        // Message already set
       } else if (error.message) {
         // Use generic for other Firebase errors
       }
@@ -342,12 +349,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
 
     try {
-      // Uniqueness checks are now primarily handled during profile update for simplicity,
-      // Firebase handles email uniqueness.
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
       if (userCredential.user) {
         await firebaseUpdateProfileAuth(userCredential.user, { displayName: data.fullName });
-        // Pass role from signup data to ensureFirestoreUserProfile
         const appUser = await ensureFirestoreUserProfile(userCredential.user, { ...data, displayName: data.fullName });
         if (appUser) {
           toast({ title: "Signup Successful!", description: "Your account has been created." });
@@ -360,41 +364,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           throw new Error("Failed to create Firestore profile after signup.");
         }
       }
-      return null; // Should not happen if createUserWithEmailAndPassword succeeds
+      return null;
     } catch (error: any) {
       let errorMessage = error.message || "Signup failed.";
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = "Email already registered.";
       }
       toast({ variant: "destructive", title: "Signup Failed", description: errorMessage });
-      throw error; // Re-throw to be caught by form
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLoginError = (error: any, providerName: string) => {
-    setActiveSocialLoginProvider(null); // Reset provider specific loading
-    setLoading(false); // Reset global loading
+    setActiveSocialLoginProvider(null);
+    setLoading(false);
 
     let toastTitle = `${providerName.charAt(0).toUpperCase() + providerName.slice(1)} Sign-In Error`;
     let toastMessage = error.message || `An unexpected error occurred during ${providerName} sign-in.`;
 
     if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-      toastMessage = `The ${providerName} sign-in popup was closed. If popups are blocked, please allow them for this site and try again.`;
+      toastMessage = `The ${providerName} sign-in popup was closed before completing. Please ensure popups are not blocked and try again. If the issue persists, you might try a different browser or check your network.`;
     } else if (error.code === 'auth/account-exists-with-different-credential') {
-      toastMessage = `An account already exists with this email using a different sign-in method.`;
+      toastMessage = `An account already exists with this email using a different sign-in method. Try logging in with the original method.`;
     } else if (error.code === 'auth/operation-not-allowed') {
-      toastMessage = `${providerName} sign-in is not enabled. Contact support.`;
+      toastMessage = `${providerName} sign-in is not enabled for this application. Please contact support.`;
     } else if (error.code === 'auth/popup-blocked') {
       toastMessage = `The ${providerName} sign-in popup was blocked by your browser. Please allow popups for this site and try again.`;
     }
-    
+
     toast({
       title: toastTitle,
       description: toastMessage,
       variant: "destructive",
-      duration: 7000,
+      duration: 10000,
     });
   };
 
@@ -407,22 +411,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setActiveSocialLoginProvider(providerName);
 
     const providerInstance = providerName === 'google' ? new GoogleAuthProvider() : new GithubAuthProvider();
-
     if (providerName === 'google') {
-        providerInstance.setCustomParameters({ prompt: 'select_account' });
+      providerInstance.setCustomParameters({ prompt: 'select_account' });
     }
 
     try {
       await signInWithPopup(firebaseAuth, providerInstance);
-      // onAuthStateChanged will handle setting user, profile creation and redirecting
       setShowLoginModal(false);
       setHasShownIncompleteProfileToast(false);
       if (typeof window !== 'undefined') sessionStorage.removeItem('incompleteProfileToastShownThisSession');
-    } catch (error: any) {
+      // onAuthStateChanged will handle setting user, profile creation and redirecting
+    } catch (error) {
       handleSocialLoginError(error, providerName);
     } finally {
-      // setActiveSocialLoginProvider(null); // Reset in handleSocialLoginError or on success via onAuthStateChanged setting user
-      // setLoading(false); // Reset in handleSocialLoginError or on success
+      // setLoading(false); // This will be handled by onAuthStateChanged
+      // setActiveSocialLoginProvider(null); // Reset by onAuthStateChanged or error handler
     }
   };
 
@@ -435,13 +438,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const redirectPath = HOME_PATH;
     try {
       await signOut(firebaseAuth);
-      // User state will be cleared by onAuthStateChanged
       if (typeof window !== 'undefined') {
         localStorage.removeItem('redirectAfterLogin');
         localStorage.removeItem('completingProfile');
         sessionStorage.removeItem('incompleteProfileToastShownThisSession');
       }
-      setHasShownIncompleteProfileToast(false); // Reset for future logins
+      setHasShownIncompleteProfileToast(false);
+      // User state will be cleared by onAuthStateChanged
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
       router.push(redirectPath);
     } catch (error: any) {
@@ -460,7 +463,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await firebaseSendPasswordResetEmail(firebaseAuth, emailForReset);
     } catch (error: any) {
-      throw error; // Let the calling component handle toast
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -508,15 +511,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (updatedData.displayName && currentFirebaseUser.displayName !== updatedData.displayName) {
         await firebaseUpdateProfileAuth(currentFirebaseUser, { displayName: updatedData.displayName });
       }
-      
-      const reFetchedUser = await ensureFirestoreUserProfile(currentFirebaseUser, updatedData, true);
 
-      if (reFetchedUser) {
-        setUser(reFetchedUser); // Optimistically update user state
-        setIsAdminUser(reFetchedUser.isAdmin === true);
-        const isNowComplete = !!(reFetchedUser.username && reFetchedUser.role && reFetchedUser.phoneNumber);
+      const updatedUserFromDb = await ensureFirestoreUserProfile(currentFirebaseUser, updatedData, true);
+
+      if (updatedUserFromDb) {
+        setUser(updatedUserFromDb); // Optimistic update with potentially re-fetched data
+        setIsAdminUser(updatedUserFromDb.isAdmin === true);
+        const isNowComplete = !!(updatedUserFromDb.username && updatedUserFromDb.role && updatedUserFromDb.phoneNumber);
         setIsProfileComplete(isNowComplete);
-        
+        setJustCompletedProfile(true); // Signal that profile was just updated
+
         success = true;
         toast({ title: "Success", description: "Your profile has been updated." });
 
@@ -526,8 +530,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             localStorage.removeItem('completingProfile');
             localStorage.removeItem('redirectAfterLogin');
           }
-          const targetDashboard = reFetchedUser.isAdmin ? ADMIN_DASHBOARD_PATH : (reFetchedUser.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
-          router.push(redirectPath && redirectPath !== AUTHOR_PROFILE_SETTINGS_PATH && !redirectPath.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?') ? redirectPath : targetDashboard);
+          const targetDashboard = updatedUserFromDb.isAdmin ? ADMIN_DASHBOARD_PATH : (updatedUserFromDb.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
+          router.push(redirectPath && redirectPath !== AUTHOR_PROFILE_SETTINGS_PATH && !redirectPath.startsWith(AUTHOR_PROFILE_SETTINGS_PATH+'?') ? redirectPath : targetDashboard);
         }
       } else {
         throw new Error("Failed to re-fetch profile after update.");
@@ -541,24 +545,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return success;
   };
 
-   if (!isMounted || (!initialAuthCheckComplete && loading)) {
-     return (
-        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem'}}>
-          <LoadingSpinner size={48} />
-          <p className="ml-3">Initializing Application...</p>
-        </div>
-     );
-   }
+  if (!isMounted || (!initialAuthCheckComplete && loading)) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', fontSize: '1.2rem' }}>
+        <LoadingSpinner size={48} />
+        <p className="ml-3">Initializing Application...</p>
+      </div>
+    );
+  }
 
-   if ((!firebaseAuth || !firestoreDb) && isMounted) {
-     return (
-       <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background p-4 text-center">
-         <h1 className="text-xl md:text-2xl font-bold text-destructive mb-2">Application Configuration Error</h1>
-         <p className="text-muted-foreground mb-1">Firebase services (Authentication or Firestore) are not available.</p>
-         <p className="text-sm text-muted-foreground">Please ensure your Firebase environment variables (<code>NEXT_PUBLIC_FIREBASE_...</code>) are correctly set up in your <code>.env.local</code> file and your Vercel project settings, and that the development server has been restarted.</p>
-       </div>
-     );
-   }
+  if ((!firebaseAuth || !firestoreDb) && isMounted) {
+    return (
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background p-4 text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-destructive mb-2">Application Configuration Error</h1>
+        <p className="text-muted-foreground mb-1">Firebase services (Authentication or Firestore) are not available.</p>
+        <p className="text-sm text-muted-foreground">Please ensure your Firebase environment variables (<code>NEXT_PUBLIC_FIREBASE_...</code>) are correctly set up in your <code>.env.local</code> file and the development server has been restarted.</p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider
@@ -577,7 +581,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateUserProfile,
         showLoginModal,
         setShowLoginModal,
-        isSocialLoginInProgress: !!activeSocialLoginProvider && loading, // More precise loading state for social
+        isSocialLoginInProgress: !!activeSocialLoginProvider && loading,
         showIncompleteProfileToast
       }}
     >
@@ -585,3 +589,5 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     </AuthContext.Provider>
   );
 };
+
+    
