@@ -4,75 +4,124 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper function to check if the requester is an admin
+    // This relies on the user being able to read their own document.
     function isAdmin() {
       return request.auth != null &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Helper function to check if the requester is the owner of the resource
-    function isOwner(userIdFromResource) {
-      return request.auth != null && request.auth.uid == userIdFromResource;
+    // Helper function to check if the requester is the owner of a user document
+    function isUserDocumentOwner(userIdInPath) {
+      return request.auth != null && request.auth.uid == userIdInPath;
     }
 
     // Users Collection
     match /users/{userId} {
+      // READ (GET):
+      // 1. An authenticated user can read their own profile.
+      // 2. An admin can read any user's profile.
+      allow get: if request.auth != null &&
+                    (isUserDocumentOwner(userId) || isAdmin());
+
+      // LIST:
+      // - Any authenticated user can list/query users.
+      // - Primarily for client-side uniqueness checks (username, phone number) during profile updates.
+      allow list: if request.auth != null;
+
+      // CREATE:
+      // - User must be authenticated.
+      // - User can only create their own user document.
+      // - The 'userId' field in the document must also match their auth.uid.
+      // - 'isAdmin' can only be true if set by predefined admin creator emails (handled by AuthContext logic before write).
+      //   The rule here ensures a regular user cannot set isAdmin to true during self-creation.
       allow create: if request.auth != null &&
-                       request.auth.uid == userId &&
+                       isUserDocumentOwner(userId) &&
                        request.resource.data.userId == request.auth.uid &&
                        (
+                         // Regular user creating profile, isAdmin must be false or not present (will default to false)
                          (request.resource.data.isAdmin == false || !('isAdmin' in request.resource.data)) ||
-                         (request.resource.data.isAdmin == true && request.auth.token.email_verified && (request.auth.token.email == "admin-creator@researchsphere.com" || request.auth.token.email == "admin@example.com"))
+                         // Or, if isAdmin is true, it must be for specific admin creator emails (AuthContext handles this logic,
+                         // this rule is a safeguard if client code was compromised).
+                         (request.resource.data.isAdmin == true &&
+                           (request.auth.token.email == "admin-creator@researchsphere.com" || request.auth.token.email == "admin@example.com")
+                         )
                        );
 
-      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
-
+      // UPDATE:
+      // - User can update their own profile, but cannot change 'isAdmin', 'userId', or 'email'.
+      // - An admin can update any field of *another* user (including 'isAdmin').
       allow update: if request.auth != null &&
                        (
-                         // Case 1: User updating their own profile (cannot change critical fields by themselves)
-                         (request.auth.uid == userId &&
+                         // Case 1: User updating their own profile
+                         (isUserDocumentOwner(userId) &&
                            (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == resource.data.isAdmin) &&
                            (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
                            (!('email' in request.resource.data) || request.resource.data.email == resource.data.email)
                          ) ||
-                         // Case 2: Admin updating *another* user's profile (can change any field, including isAdmin and isSuspended)
-                         (isAdmin() && request.auth.uid != userId)
+                         // Case 2: Admin updating *another* user's profile
+                         (isAdmin() && !isUserDocumentOwner(userId))
                        );
 
-      allow list: if request.auth != null; // For username/phone uniqueness checks by authenticated users, and admin listings
-
+      // DELETE:
+      // - Only admins can delete user accounts.
       allow delete: if isAdmin();
     }
 
     // Papers Collection
     match /papers/{paperId} {
+      // Helper function to check if the requester is the owner of the specific paper document
       function isPaperOwner() {
         return request.auth != null && resource.data.userId == request.auth.uid;
       }
-      function isAssignedReviewer() {
-        return request.auth != null && resource.data.assignedReviewerIds != null && request.auth.uid in resource.data.assignedReviewerIds;
-      }
 
-      allow get: if isPaperOwner() || isAdmin() || (request.auth != null && resource.data.status == 'Published') || isAssignedReviewer();
+      // READ (GET):
+      // - Paper owner can read their paper.
+      // - Admin can read any paper.
+      // - Any authenticated user can read a 'Published' paper (for search results).
+      // - An assigned reviewer can read the paper they are assigned to.
+      allow get: if isPaperOwner() ||
+                    isAdmin() ||
+                    (request.auth != null && resource.data.status == 'Published') ||
+                    (request.auth != null && request.auth.uid in resource.data.assignedReviewerIds);
 
+      // LIST:
+      // - Admins can list all papers.
+      // - Authenticated users can list papers if:
+      //    - They are the owner (resource.data.userId == request.auth.uid)
+      //    - OR The paper is 'Published'
+      //    - OR They are an assigned reviewer for that paper (request.auth.uid in resource.data.assignedReviewerIds)
+      // This means client-side queries must be constructed carefully to align with these document-level checks.
+      // e.g., query for own papers: where('userId', '==', auth.uid)
+      // e.g., query for assigned papers: where('assignedReviewerIds', 'array-contains', auth.uid)
+      // e.g., query for published: where('status', '==', 'Published')
       allow list: if request.auth != null &&
                      (
                        isAdmin() ||
-                       (resource.data.userId == request.auth.uid) || // User listing their own papers
-                       (resource.data.status == 'Published') ||      // Public listing published papers
-                       (resource.data.assignedReviewerIds != null && request.auth.uid in resource.data.assignedReviewerIds) // Reviewer listing their assigned papers
+                       (resource.data.userId == request.auth.uid) ||
+                       (resource.data.status == 'Published') ||
+                       (request.auth.uid in resource.data.assignedReviewerIds)
                      );
 
+      // CREATE:
+      // - Authenticated user can create a paper.
+      // - The 'userId' in the new paper document must match the creator's auth.uid.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
-      // For reviewers adding their review
+      // UPDATE:
+      // - Paper owner or Admin can update most fields.
+      // - Assigned reviewers can only add to the 'reviews' array.
       allow update: if (isPaperOwner() || isAdmin()) ||
-                     (isAssignedReviewer() &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviews', 'lastUpdatedAt']) &&
-                       request.resource.data.reviews.size() == resource.data.reviews.size() + 1 &&
-                       request.resource.data.reviews[request.resource.data.reviews.size() - 1].reviewerId == request.auth.uid
+                     ( // Reviewer adding a review
+                       request.auth != null &&
+                       request.auth.uid in resource.data.assignedReviewerIds &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviews', 'lastUpdatedAt']) && // Only reviews and lastUpdatedAt can change
+                       request.resource.data.reviews.size() == resource.data.reviews.size() + 1 && // Only adding one review
+                       request.resource.data.reviews[-1].reviewerId == request.auth.uid // The new review is by the current user
                      );
-      
+
+      // DELETE:
+      // - Paper owner or Admin can delete.
       allow delete: if isPaperOwner() || isAdmin();
     }
   }
