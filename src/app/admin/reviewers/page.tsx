@@ -3,13 +3,12 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service';
+import { getAllUsers } from '@/lib/user-service'; // Using getAllUsers from the single user service
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Eye, UserCircle, AlertTriangle } from 'lucide-react'; 
+import { Eye, UserCircle, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function ReviewerManagementPage() {
@@ -23,6 +22,7 @@ export default function ReviewerManagementPage() {
       setError(null);
       try {
         const allUsers = await getAllUsers();
+        // Filter for users whose role is "Reviewer"
         const filteredReviewers = allUsers.filter(user => user.role === "Reviewer");
         setReviewerUsers(filteredReviewers);
       } catch (err: any) {
@@ -56,7 +56,7 @@ export default function ReviewerManagementPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-lg w-full"> 
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Eye className="h-6 w-6 text-primary" />
@@ -68,7 +68,7 @@ export default function ReviewerManagementPage() {
           {reviewerUsers.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No reviewers found with the &quot;Reviewer&quot; role.</p>
           ) : (
-            <div className="overflow-x-auto"> 
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -98,3 +98,5 @@ export default function ReviewerManagementPage() {
     </div>
   );
 }
+
+    

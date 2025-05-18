@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import type { User } from '@/types'; 
+import type { User } from '@/types';
 import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -125,7 +125,7 @@ export default function UserManagementPage() {
                       <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                       <TableCell>{user.email || 'N/A'}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === "Admin" ? "default" : "secondary"}>
+                        <Badge variant={user.role === "Admin" ? "default" : (user.role === "Reviewer" ? "secondary" : "outline")}>
                           {user.role || 'N/A'}
                         </Badge>
                       </TableCell>
@@ -189,3 +189,4 @@ export default function UserManagementPage() {
   );
 }
 
+    

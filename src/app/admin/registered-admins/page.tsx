@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@/types';
-import { getAllUsers } from '@/lib/user-service'; 
+import { getAllUsers } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +56,7 @@ export default function RegisteredAdminsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-lg w-full"> 
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <div className="flex items-center gap-2">
             <UserCheck className="h-6 w-6 text-primary" />
@@ -68,7 +68,7 @@ export default function RegisteredAdminsPage() {
           {adminUsers.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No administrators found.</p>
           ) : (
-            <div className="overflow-x-auto"> 
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -87,7 +87,7 @@ export default function RegisteredAdminsPage() {
                       <TableCell>{user.username || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={"default"} className="bg-green-600 hover:bg-green-700">
-                           <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {user.role || 'Admin'}
+                           <ShieldCheck className="mr-1 h-3.5 w-3.5" /> {user.role || 'Admin'} {/* Display role, fallback to Admin */}
                         </Badge>
                       </TableCell>
                       <TableCell>{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
@@ -102,3 +102,5 @@ export default function RegisteredAdminsPage() {
     </div>
   );
 }
+
+    

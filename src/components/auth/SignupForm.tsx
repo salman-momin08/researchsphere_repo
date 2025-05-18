@@ -61,9 +61,9 @@ const signupSchema = z.object({
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupForm() {
-  const { signup, loading: authLoading } = useAuth(); 
+  const { signup, loading: authLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -76,7 +76,7 @@ export default function SignupForm() {
       confirmPassword: "",
       phoneNumber: "",
       institution: "",
-      role: undefined,
+      role: undefined, // Default to undefined, user must select
       researcherId: "",
       termsAccepted: false,
     },
@@ -87,15 +87,23 @@ export default function SignupForm() {
     setError(null);
     try {
       await signup(data);
-      form.reset(); 
+      toast({ title: "Signup Successful!", description: "Your account has been created. Please check your email if verification is required." });
+      form.reset();
+      // Redirection is handled by AuthContext
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
+      // Toast for specific errors (like username/email taken) is handled in AuthContext or already displayed by form
+      if (errorMessage !== "Username already taken. Please choose another one." &&
+          errorMessage !== "Phone number already in use by another account." &&
+          errorMessage !== "Email already registered.") {
+        // toast({ variant: "destructive", title: "Signup Failed", description: errorMessage });
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   const currentIsLoading = isSubmitting || authLoading;
 
   return (
@@ -107,7 +115,7 @@ export default function SignupForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      
+
       <AnimatedInput label="Full Name *" id="fullName" {...form.register("fullName")} disabled={currentIsLoading} />
       {form.formState.errors.fullName && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.fullName.message}</p>}
 
@@ -119,7 +127,7 @@ export default function SignupForm() {
 
       <AnimatedInput label="Confirm Email Address *" id="confirmEmail" type="email" {...form.register("confirmEmail")} disabled={currentIsLoading} />
       {form.formState.errors.confirmEmail && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.confirmEmail.message}</p>}
-      
+
       <AnimatedInput label="Password *" id="password" type="password" {...form.register("password")} disabled={currentIsLoading} />
       {form.formState.errors.password && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.password.message}</p>}
 
@@ -133,14 +141,14 @@ export default function SignupForm() {
       {form.formState.errors.institution && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.institution.message}</p>}
 
       <div className="pt-2">
-        <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Role *</Label>
-        <Select 
-            onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", {shouldValidate: true})} 
+        <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Primary Role *</Label>
+        <Select
+            onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", {shouldValidate: true})}
             value={form.watch("role")}
             disabled={currentIsLoading}
         >
           <SelectTrigger id="role" className="h-10 mt-1">
-            <SelectValue placeholder="Select your role" />
+            <SelectValue placeholder="Select your primary role" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Author">Author</SelectItem>
@@ -177,3 +185,5 @@ export default function SignupForm() {
     </form>
   );
 }
+
+    

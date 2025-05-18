@@ -7,15 +7,15 @@ export interface User {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  username?: string | null;
-  phoneNumber?: string | null;
+  username?: string | null; // Kept optional, completion checked in AuthContext
+  phoneNumber?: string | null; // Kept optional, completion checked in AuthContext
   institution?: string | null;
-  role?: "Author" | "Reviewer" | "Admin" | null;
+  role?: "Author" | "Reviewer" | "Admin" | null; // "Admin" role can be set if isAdmin is true. User selects Author/Reviewer.
   researcherId?: string | null;
-  isAdmin?: boolean;
+  isAdmin?: boolean; // Primary flag for admin status
   isSuspended?: boolean;
-  createdAt?: string | Timestamp | null; // Allow null for flexibility
-  updatedAt?: string | Timestamp | null; // Allow null for flexibility
+  createdAt?: string | Timestamp | null;
+  updatedAt?: string | Timestamp | null;
 }
 
 export type PaperStatus =
@@ -31,11 +31,11 @@ export type PaperStatus =
 
 export interface Review {
   reviewerId: string; // UID of the reviewer
-  reviewerDisplayName?: string; // Added for admin/author view if needed
+  reviewerDisplayName?: string; // For display purposes if needed
   comments: string;
   recommendation: 'Accept' | 'Reject' | 'Minor Revision' | 'Major Revision';
   rating?: {
-    clarity?: number;
+    clarity?: number; // e.g., 1-5
     originality?: number;
     relevance?: number;
     quality?: number;
@@ -51,7 +51,7 @@ export interface Paper {
   authors: string[];
   keywords: string[];
   fileName: string | null;
-  fileUrl: string | null;
+  fileUrl: string | null; // Will be Cloudinary URL
   uploadDate: string | Timestamp;
   status: PaperStatus;
   plagiarismScore?: number | null;
@@ -71,3 +71,5 @@ export interface Paper {
   assignedReviewerIds?: string[];
   reviews?: Review[];
 }
+
+    

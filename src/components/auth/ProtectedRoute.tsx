@@ -10,16 +10,16 @@ import { useToast } from "@/hooks/use-toast";
 const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings';
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 const AUTHOR_DASHBOARD_PATH = '/author/dashboard';
-const REVIEWER_DASHBOARD_PATH = '/reviewer/dashboard'; // Ensure this is correct
+const REVIEWER_DASHBOARD_PATH = '/reviewer/dashboard';
 const HOME_PATH = '/';
 const LOGIN_PATH = '/login';
 const SIGNUP_PATH = '/signup';
-const FORGOT_PASSWORD_PATH = '/forgot-password';
 
 const PUBLIC_PATHS_PATTERNS = [
-  HOME_PATH, LOGIN_PATH, SIGNUP_PATH, FORGOT_PASSWORD_PATH,
+  HOME_PATH, LOGIN_PATH, SIGNUP_PATH,
   /^\/registration$/, /^\/key-committee$/, /^\/sample-templates$/,
-  /^\/contact-us$/, /^\/search-papers$/, /^\/terms$/, /^\/privacy$/
+  /^\/contact-us$/, /^\/search-papers$/, /^\/terms$/, /^\/privacy$/,
+  /^\/forgot-password$/
 ];
 
 interface ProtectedRouteProps {
@@ -28,19 +28,12 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading, isAdminUser, showLoginModal, setShowLoginModal, isProfileComplete } = useAuth();
+  const { user, loading, isAdminUser, setShowLoginModal, initialAuthCheckComplete } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Current path
+  const pathname = usePathname();
   const { toast } = useToast();
-  const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
-  useEffect(() => {
-    if (!loading) {
-      setInitialCheckComplete(true);
-    }
-  }, [loading]);
-
-  if (loading || !initialCheckComplete) {
+  if (!initialAuthCheckComplete || loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
@@ -53,7 +46,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
   );
 
-  // Allow access to public pages, login, signup, forgot password regardless of auth state
   if (isPublicPage) {
     return <>{children}</>;
   }
@@ -63,15 +55,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     if (typeof window !== "undefined") {
       localStorage.setItem("redirectAfterLogin", pathname + window.location.search);
     }
-    if (!showLoginModal) {
-        // Defer showing modal to a microtask to avoid issues during render
-        setTimeout(() => setShowLoginModal(true), 0);
-    }
+    // Defer showing modal to a microtask to avoid issues during render
+    setTimeout(() => setShowLoginModal(true), 0);
     return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-            <LoadingSpinner size={48} />
-            <p className="ml-2">Redirecting to login...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <LoadingSpinner size={48} />
+        <p className="ml-2">Redirecting to login...</p>
+      </div>
     );
   }
 
@@ -84,28 +74,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
       description: "You do not have permission to view this admin page.",
       variant: "destructive",
     });
-    // Redirect non-admins to their appropriate dashboard
-    router.push(user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
+    const userDashboard = user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
+    router.push(userDashboard);
     return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-            <LoadingSpinner size={48} />
-            <p className="ml-2">Redirecting...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <LoadingSpinner size={48} />
+        <p className="ml-2">Redirecting...</p>
+      </div>
     );
   }
 
-  // If user is logged in and trying to access their profile settings page, always allow.
-  // AuthContext will handle redirecting them TO this page if incomplete,
-  // or AWAY from it if they land here after completion.
+  // Allow access to profile settings page if user is authenticated, AuthContext will handle incomplete profile logic
   if (pathname === AUTHOR_PROFILE_SETTINGS_PATH || pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
     return <>{children}</>;
   }
-  
-  // NOTE: The logic for redirecting to profile completion if !isProfileComplete
-  // is now primarily handled by AuthContext.tsx. ProtectedRoute's main job
-  // is to ensure a user is logged in for protected routes, and check adminOnly.
 
   return <>{children}</>;
 };
 
 export default ProtectedRoute;
+
+    
