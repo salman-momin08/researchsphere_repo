@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // Keep for disabled email
 import { Label } from "@/components/ui/label";
 import { AnimatedInput } from "@/components/ui/AnimatedInput";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,6 +16,7 @@ import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import type { User } from "@/types"; // Import User type
 
 const profileUpdateSchema = z.object({
   displayName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -23,7 +24,7 @@ const profileUpdateSchema = z.object({
     .min(4, { message: "Username must be 4-20 characters." })
     .max(20, { message: "Username must be 4-20 characters." })
     .regex(/^[a-zA-Z0-9_]+$/, { message: "Username can only contain letters, numbers, and underscores." }),
-  role: z.enum(["Author", "Reviewer"], { required_error: "Please select a role." }),
+  role: z.enum(["Author", "Reviewer", "Admin"], { required_error: "Please select a role." }), // Added "Admin" here for form state, actual setting is controlled.
   phoneNumber: z.string().min(1, "Phone number is required.").regex(/^\+?\d[\d\s-]{7,14}$/, {
     message: "Invalid phone number format (e.g., +1-123-456-7890 or +91 9876543210).",
   }),
@@ -35,10 +36,12 @@ const profileUpdateSchema = z.object({
   }),
 });
 
-type ProfileUpdateFormValues = z.infer<typeof profileUpdateSchema>;
+// Use Omit to exclude 'email' as it's not part of the updatable form fields
+export type ProfileUpdateFormValues = Omit<z.infer<typeof profileUpdateSchema>, 'email'>;
+
 
 export default function ProfileUpdateForm() {
-  const { user, updateUserProfile, loading: authLoading } = useAuth();
+  const { user, updateUserProfile, loading: authLoading, isAdminUser } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,15 +52,26 @@ export default function ProfileUpdateForm() {
 
   const form = useForm<ProfileUpdateFormValues>({
     resolver: zodResolver(profileUpdateSchema),
-    // Default values will be set by useEffect based on user state
+    defaultValues: { // Will be overridden by useEffect
+      displayName: "",
+      username: "",
+      role: undefined,
+      phoneNumber: "",
+      institution: "",
+      researcherId: "",
+    },
   });
 
   useEffect(() => {
     if (user) {
+      // console.log("ProfileUpdateForm: User data from context:", user);
+      // console.log("ProfileUpdateForm: Setting form default values with role:", user.role);
       form.reset({
         displayName: user.displayName || "",
         username: user.username || "",
-        role: user.role === "Author" || user.role === "Reviewer" ? user.role : undefined,
+        // Ensure role is one of the enum values or undefined if not set.
+        // Handle potential null from Firestore by mapping to undefined for the Select.
+        role: user.role && ["Author", "Reviewer", "Admin"].includes(user.role) ? user.role as "Author" | "Reviewer" | "Admin" : undefined,
         phoneNumber: user.phoneNumber || "",
         institution: user.institution || "",
         researcherId: user.researcherId || "",
@@ -71,23 +85,19 @@ export default function ProfileUpdateForm() {
     setSuccessMessage(null);
 
     try {
-      await updateUserProfile(data); 
+      const profileDataToUpdate: Partial<User> = { ...data };
+      await updateUserProfile(profileDataToUpdate); 
+      // Redirection logic is now primarily handled by AuthContext after state update
       setSuccessMessage("Profile updated successfully!");
-      toast({ title: "Success", description: "Your profile has been updated." });
+      // toast({ title: "Success", description: "Your profile has been updated." }); // AuthContext handles toast for success
       
-      if (isCompletingProfile && data.username && data.role && data.phoneNumber) {
-        if (typeof window !== 'undefined') localStorage.removeItem('completingProfile');
-        // Redirection is handled by AuthContext's onAuthStateChanged listener
-      }
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage); 
-      // Specific errors like "Username already taken" will be shown in the Alert.
-      // Avoid generic toast for these specific, actionable errors.
       if (errorMessage !== "Username already taken. Please choose another one." &&
+          errorMessage !== "Phone number already in use by another account." &&
           errorMessage !== "Phone number already in use. Please use a different one.") {
-        // toast({ variant: "destructive", title: "Update Failed", description: errorMessage }); // Handled by form alert
+        // Generic toast is handled by AuthContext if specific validation errors aren't caught by its specific toasts
       }
     } finally {
       setIsSubmitting(false);
@@ -96,16 +106,27 @@ export default function ProfileUpdateForm() {
 
   const currentIsLoading = isSubmitting || authLoading;
 
-  if (authLoading && !user) {
-    return <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (authLoading && !user && !isMounted) { // Show spinner only if truly loading initial auth state
+    return <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2">Loading profile...</p></div>;
+  }
+  
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2">Loading profile form...</p></div>;
   }
 
-  if (!user) {
+
+  if (!user) { // Should be caught by ProtectedRoute, but as a fallback UI
      return (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>User not found. Please log in again.</AlertDescription>
+          <AlertTitle>Authentication Error</AlertTitle>
+          <AlertDescription>User not found or not authenticated. Please log in to view or update your profile.</AlertDescription>
+           <Button onClick={() => router.push('/login')} className="mt-2">Go to Login</Button>
         </Alert>
      );
   }
@@ -116,9 +137,9 @@ export default function ProfileUpdateForm() {
       {isCompletingProfile && (
         <Alert variant="default" className="bg-primary/10 border-primary/30 mb-4">
             <Info className="h-4 w-4 text-primary" />
-            <AlertTitle className="text-primary">Complete Your Profile</AlertTitle>
-            <AlertDescription>
-                Welcome! Please fill in the required details (Username, Role, and Phone Number) to complete your profile setup.
+            <AlertTitle className="text-primary font-semibold">Complete Your Profile</AlertTitle>
+            <AlertDescription className="text-primary/90">
+                Welcome! Please fill in/verify the required details (Username, Role, and Phone Number) to complete your profile setup.
             </AlertDescription>
         </Alert>
       )}
@@ -129,10 +150,10 @@ export default function ProfileUpdateForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {successMessage && !isCompletingProfile && (
+      {successMessage && !isCompletingProfile && ( // Only show success if not in "complete profile" flow which redirects
         <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 mb-4">
             <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
-            <AlertTitle>Success!</AlertTitle>
+            <AlertTitle className="font-semibold">Success!</AlertTitle>
             <AlertDescription className="!text-green-700 dark:!text-green-400">{successMessage}</AlertDescription>
         </Alert>
       )}
@@ -169,9 +190,9 @@ export default function ProfileUpdateForm() {
       <div className="pt-2">
         <Label htmlFor="role" className={cn(form.formState.errors.role ? "text-destructive" : "", "text-muted-foreground")}>Role *</Label>
         <Select 
-            onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer", { shouldValidate: true })} 
-            value={form.watch("role")} // Control the Select component
-            disabled={currentIsLoading}
+            onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer" | "Admin", { shouldValidate: true })} 
+            value={form.watch("role")}
+            disabled={currentIsLoading || (!isAdminUser && user.role === "Admin")} // Non-admin cannot change role if already admin
         >
           <SelectTrigger id="role" className="h-10 mt-1">
             <SelectValue placeholder="Select your role" />
@@ -179,6 +200,8 @@ export default function ProfileUpdateForm() {
           <SelectContent>
             <SelectItem value="Author">Author</SelectItem>
             <SelectItem value="Reviewer">Reviewer</SelectItem>
+            {/* Admin role is typically not self-selectable unless by another admin */}
+            {isAdminUser && <SelectItem value="Admin">Admin (System)</SelectItem>}
           </SelectContent>
         </Select>
         {form.formState.errors.role && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.role.message}</p>}
@@ -216,3 +239,5 @@ export default function ProfileUpdateForm() {
     </form>
   );
 }
+
+    
