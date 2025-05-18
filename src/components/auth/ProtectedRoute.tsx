@@ -2,15 +2,15 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter, usePathname, useSearchParams as useNextSearchParams } from "next/navigation";
-import React, { useEffect, useState, ReactNode } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 
 const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings';
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 const AUTHOR_DASHBOARD_PATH = '/author/dashboard';
-const REVIEWER_DASHBOARD_PATH = '/reviewer/dashboard';
+const REVIEWER_DASHBOARD_PATH = '/reviewer/dashboard'; // Ensure this is correct
 const HOME_PATH = '/';
 const LOGIN_PATH = '/login';
 const SIGNUP_PATH = '/signup';
@@ -28,56 +28,23 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading, isAdminUser, showLoginModal, setShowLoginModal } = useAuth();
+  const { user, loading, isAdminUser, showLoginModal, setShowLoginModal, isProfileComplete } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParamsFromHook = useNextSearchParams(); // For consistency
+  const pathname = usePathname(); // Current path
   const { toast } = useToast();
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
   useEffect(() => {
-    // console.log(`ProtectedRoute (${pathname}): Effect triggered. Loading: ${loading}, User: ${user ? user.id : 'null'}, IsAdmin: ${isAdminUser}`);
     if (!loading) {
-      setInitialCheckComplete(true); // Mark initial auth check as complete
-      const currentFullUrl = pathname + (searchParamsFromHook.toString() ? `?${searchParamsFromHook.toString()}` : "");
-
-      const isPublicPage = PUBLIC_PATHS_PATTERNS.some(pattern =>
-        typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
-      );
-
-      if (!user) { // User is not logged in
-        if (!isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?complete=true') ) {
-          // console.log(`ProtectedRoute (${pathname}): No user, not public, not profile settings. Storing redirect: ${currentFullUrl}`);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("redirectAfterLogin", currentFullUrl);
-          }
-          if (!showLoginModal) {
-            // console.log(`ProtectedRoute (${pathname}): Showing login modal.`);
-            setShowLoginModal(true);
-          }
-        }
-      } else { // User IS logged in
-        if (adminOnly && !isAdminUser) {
-          // console.warn(`ProtectedRoute (${pathname}): Admin access denied for non-admin user ${user.id}. Redirecting to their dashboard.`);
-          toast({
-            title: "Access Denied",
-            description: "You do not have permission to view this admin page.",
-            variant: "destructive",
-          });
-          router.push(user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
-        }
-        // Profile completion redirection is handled by AuthContext
-      }
+      setInitialCheckComplete(true);
     }
-  }, [user, loading, isAdminUser, adminOnly, pathname, router, showLoginModal, setShowLoginModal, toast, searchParamsFromHook]);
-
+  }, [loading]);
 
   if (loading || !initialCheckComplete) {
-    // console.log(`ProtectedRoute (${pathname}): Showing loading spinner (loading: ${loading}, initialCheckComplete: ${initialCheckComplete})`);
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
-        <p className="ml-2">Authenticating...</p>
+        <p className="ml-2">Verifying access...</p>
       </div>
     );
   }
@@ -86,11 +53,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
   );
 
-  // If still no user after loading, and it's a protected page not handled above (e.g., profile settings for a new user)
-  // AuthContext should manage the modal trigger. This component just ensures content isn't shown.
-  if (!user && !isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?complete=true')) {
-     // console.log(`ProtectedRoute (${pathname}): No user after load, rendering placeholder for modal.`);
-     return (
+  // Allow access to public pages, login, signup, forgot password regardless of auth state
+  if (isPublicPage) {
+    return <>{children}</>;
+  }
+
+  // If no user and not on a public page or auth utility page, prompt login
+  if (!user) {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("redirectAfterLogin", pathname + window.location.search);
+    }
+    if (!showLoginModal) {
+        // Defer showing modal to a microtask to avoid issues during render
+        setTimeout(() => setShowLoginModal(true), 0);
+    }
+    return (
         <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
             <LoadingSpinner size={48} />
             <p className="ml-2">Redirecting to login...</p>
@@ -98,17 +75,36 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     );
   }
 
-  if (adminOnly && user && !isAdminUser) {
-    // console.log(`ProtectedRoute (${pathname}): Admin access denied post-load. Rendering placeholder for redirect.`);
+  // User is logged in at this point
+
+  // If it's an admin-only route and user is not an admin
+  if (adminOnly && !isAdminUser) {
+    toast({
+      title: "Access Denied",
+      description: "You do not have permission to view this admin page.",
+      variant: "destructive",
+    });
+    // Redirect non-admins to their appropriate dashboard
+    router.push(user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH);
     return (
         <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
             <LoadingSpinner size={48} />
-            <p className="ml-2">Access Denied. Redirecting...</p>
+            <p className="ml-2">Redirecting...</p>
         </div>
     );
   }
 
-  // console.log(`ProtectedRoute (${pathname}): Rendering children.`);
+  // If user is logged in and trying to access their profile settings page, always allow.
+  // AuthContext will handle redirecting them TO this page if incomplete,
+  // or AWAY from it if they land here after completion.
+  if (pathname === AUTHOR_PROFILE_SETTINGS_PATH || pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
+    return <>{children}</>;
+  }
+  
+  // NOTE: The logic for redirecting to profile completion if !isProfileComplete
+  // is now primarily handled by AuthContext.tsx. ProtectedRoute's main job
+  // is to ensure a user is logged in for protected routes, and check adminOnly.
+
   return <>{children}</>;
 };
 

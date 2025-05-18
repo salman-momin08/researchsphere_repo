@@ -6,12 +6,12 @@ import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
 import { useSearchParams as useNextSearchParams } from "next/navigation"; // Renamed to avoid conflict
-import React, { Suspense } from 'react'; // Added React import
+import React, { Suspense } from 'react'; 
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 // This internal component uses the hook
 function ProfileSettingsPageContent() {
-  const searchParams = useNextSearchParams(); // Using the renamed hook
+  const searchParams = useNextSearchParams(); 
   const isCompletingProfile = searchParams.get('complete') === 'true';
 
   return (
@@ -25,7 +25,7 @@ function ProfileSettingsPageContent() {
           <CardDescription>
             {isCompletingProfile
               ? "Please provide the remaining details to finish setting up your account."
-              : "Update your personal information."}
+              : "Update your personal information and preferences."}
           </CardDescription>
         </CardHeader>
         <CardContent>

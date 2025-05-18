@@ -78,7 +78,7 @@ const NavLinkItem = ({ href, children, onClick, isActive, isAction, icon, isAdmi
 
 
 export default function Header() {
-  const { user, logout, isAdmin, setShowLoginModal } = useAuth();
+  const { user, logout, isAdminUser, setShowLoginModal } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -105,10 +105,10 @@ export default function Header() {
 
   const handleSubmitPaperClick = () => {
     setIsMobileMenuOpen(false);
-    if (user && !isAdmin) {
-      router.push('/user/submit');
-    } else if (!user) {
-      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/user/submit');
+    if (user) { // Admins should not submit papers
+      router.push('/author/submit');
+    } else {
+      if (typeof window !== 'undefined') localStorage.setItem('redirectAfterLogin', '/author/submit');
       setShowLoginModal(true);
     }
   };
@@ -124,11 +124,20 @@ export default function Header() {
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
 
-  const userNavLinks = [
+  const authorNavLinks = [
     { href: "/", label: "Home", icon: null },
-    { href: "/user/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/user/submit" },
-    { href: "/user/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles /> },
+    { href: "/author/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" },
+    { href: "/author/ai-pre-check", label: "AI Pre-Check", icon: <Sparkles /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone /> },
+  ];
+  
+  const reviewerNavLinks = [
+    { href: "/", label: "Home", icon: null },
+    { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
@@ -140,7 +149,7 @@ export default function Header() {
     { href: "/search-papers", label: "Search Papers", icon: <SearchIcon /> },
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
   ];
-
+  
   const adminSidebarLinks = [
       { href: "/admin/dashboard", label: "Dashboard Overview", icon: <LayoutDashboard /> },
       { href: "/admin/users", label: "User Management", icon: <UsersIconLucide /> },
@@ -151,11 +160,13 @@ export default function Header() {
 
   let currentNavLinks: Array<{ href?: string; label: string; icon: React.ReactNode | null; action?: () => void; }> = [];
   if (isClient) {
-    if (user && isAdmin) {
+    if (user && isAdminUser) {
       currentNavLinks = adminNavLinks;
-    } else if (user && !isAdmin) {
-      currentNavLinks = userNavLinks;
-    } else {
+    } else if (user && user.role === "Reviewer") {
+      currentNavLinks = reviewerNavLinks;
+    } else if (user && user.role === "Author") {
+      currentNavLinks = authorNavLinks;
+    } else { // Guest or user with no specific role yet (should be prompted to complete profile)
       currentNavLinks = baseNavLinks;
     }
   }
@@ -176,7 +187,7 @@ export default function Header() {
             const isActive = isActiveAdminPanelLink || isGeneralActiveLink || isHomeActiveLink;
             
             let buttonClasses = "";
-            if (user && isAdmin) {
+            if (user && isAdminUser) {
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
@@ -228,29 +239,34 @@ export default function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {isAdmin ? (
+                {isAdminUser ? (
                   <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
                     <Shield className="mr-2 h-4 w-4" />
                     <span>Admin Panel</span>
                   </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => router.push('/user/dashboard')}>
+                ) : user.role === "Reviewer" ? (
+                   <DropdownMenuItem onClick={() => router.push('/reviewer/dashboard')}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    <span>Reviewer Dashboard</span>
+                  </DropdownMenuItem>
+                ) : ( // Author or user completing profile
+                  <DropdownMenuItem onClick={() => router.push('/author/dashboard')}>
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     <span>Dashboard</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => router.push('/user/profile/settings')}>
+                <DropdownMenuItem onClick={() => router.push('/author/profile/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {!isAdmin && (
+                {!isAdminUser && user.role !== "Reviewer" && ( // Show submit for authors
                   <DropdownMenuItem onClick={handleSubmitPaperClick}>
                     <UploadCloud className="mr-2 h-4 w-4" />
                     <span>Submit Paper</span>
                   </DropdownMenuItem>
                 )}
-                {!isAdmin && (
-                  <DropdownMenuItem onClick={() => router.push('/user/ai-pre-check')}>
+                {!isAdminUser && ( // Show AI pre-check for authors and reviewers
+                  <DropdownMenuItem onClick={() => router.push('/author/ai-pre-check')}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     <span>AI Pre-Check</span>
                   </DropdownMenuItem>
@@ -307,14 +323,14 @@ export default function Header() {
                       isActive={isActive}
                       isAction={!!link.action}
                       icon={link.icon}
-                      isAdminContext={!!(user && isAdmin)}
+                      isAdminContext={!!(user && isAdminUser)}
                     >
                       {link.label}
                     </NavLinkItem>
                   );
                 })}
 
-                {isClient && user && isAdmin && (
+                {isClient && user && isAdminUser && (
                   <>
                      <DropdownMenuSeparator className="my-2" />
                      {adminSidebarLinks.map(link => {
@@ -342,16 +358,16 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                    <NavLinkItem href="/user/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/user/profile/settings"} icon={<Settings />} isAdminContext={!!(user && isAdmin)}>
+                    <NavLinkItem href="/author/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/author/profile/settings"} icon={<Settings />} isAdminContext={!!(user && isAdminUser)}>
                       Profile Settings
                     </NavLinkItem>
-                    {!isAdmin && (
-                      <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname === "/user/submit"} isAction={true} icon={<UploadCloud />} >
+                    {!isAdminUser && user.role !== "Reviewer" && (
+                      <NavLinkItem onClick={() => { handleSubmitPaperClick(); setIsMobileMenuOpen(false); }} isActive={pathname === "/author/submit"} isAction={true} icon={<UploadCloud />} >
                         Submit Paper
                       </NavLinkItem>
                     )}
-                    {!isAdmin && (
-                      <NavLinkItem href="/user/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/user/ai-pre-check"} icon={<Sparkles />} >
+                     {!isAdminUser && (
+                      <NavLinkItem href="/author/ai-pre-check" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/author/ai-pre-check"} icon={<Sparkles />} >
                         AI Pre-Check
                       </NavLinkItem>
                     )}
