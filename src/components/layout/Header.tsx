@@ -44,7 +44,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
     activeStyleClasses = isActive ? "bg-primary text-primary-foreground" : "text-foreground";
     hoverStyleClasses = isActive ? "hover:bg-primary/90" : "hover:bg-accent hover:text-accent-foreground";
   } else {
-    activeStyleClasses = isActive ? "bg-secondary text-primary font-semibold" : "text-foreground"; // Emphasize active user links
+    activeStyleClasses = isActive ? "bg-secondary text-primary font-semibold" : "text-foreground";
     hoverStyleClasses = isActive ? "hover:bg-secondary/80" : (isAction ? "hover:bg-primary/10" : "hover:bg-secondary hover:text-primary");
   }
 
@@ -55,7 +55,7 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
       <Link href={href} passHref legacyBehavior>
         <Button
           variant="ghost"
-          onClick={onClick} // onClick for closing sheet
+          onClick={onClick}
           className={combinedClasses}
         >
           {icon}{children}
@@ -63,7 +63,6 @@ const NavLinkItem: React.FC<NavLinkItemProps> = ({ href, children, onClick, isAc
       </Link>
     );
   }
-  // For actions without a direct href, like submit paper via modal
   if (isAction && onClick) {
     return (
       <Button
@@ -135,13 +134,23 @@ export default function Header() {
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
     { href: "/contact-us", label: "Contact", icon: <Phone /> },
   ];
-
-  // Links for authenticated non-admin users (Authors/Reviewers)
-  const userNavLinks = [
+  
+  const authorNavLinks = [
     { href: "/", label: "Home", icon: null },
-    // Dashboard link will be determined by role
-    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" }, // href for active state check
-    { label: "AI Pre-Check", action: handleAiPreCheckClick, icon: <Sparkles />, href: "/author/ai-pre-check" }, // href for active state check
+    { href: "/author/dashboard", label: "Author Dashboard", icon: <LayoutDashboard /> },
+    { label: "Submit Paper", action: handleSubmitPaperClick, icon: <UploadCloud />, href: "/author/submit" },
+    { label: "AI Pre-Check", action: handleAiPreCheckClick, icon: <Sparkles />, href: "/author/ai-pre-check" },
+    { href: "/registration", label: "Registration", icon: <FileTextIconLucide /> },
+    { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
+    { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
+    { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
+    { href: "/contact-us", label: "Contact", icon: <Phone /> },
+  ];
+
+  const reviewerNavLinks = [
+    { href: "/", label: "Home", icon: null },
+    { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> },
+    // "Registration" is removed for reviewers as requested
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
     { href: "/sample-templates", label: "Templates", icon: <FileTextIconLucide /> },
     { href: "/search-papers", label: "Search", icon: <SearchIcon /> },
@@ -154,7 +163,7 @@ export default function Header() {
     { href: "/key-committee", label: "Committee", icon: <UsersIconLucide /> },
   ];
   
-  const adminSidebarLinks = [ // For mobile sheet when admin is logged in
+  const adminSidebarLinks = [ 
       { href: "/admin/dashboard", label: "Dashboard Overview", icon: <LayoutDashboard /> },
       { href: "/admin/users", label: "User Management", icon: <UsersIconLucide /> },
       { href: "/admin/registered-admins", label: "Registered Admins", icon: <UserCheck /> },
@@ -165,13 +174,10 @@ export default function Header() {
   if (isClient) {
     if (user && isAdminUser) {
       currentNavLinks = adminNavLinks;
-    } else if (user) { // Authenticated non-admin
-      currentNavLinks = [...userNavLinks];
-      // Add role-specific dashboard link
-      const dashboardLink = user.role === "Reviewer" 
-        ? { href: "/reviewer/dashboard", label: "Reviewer Dashboard", icon: <Eye /> }
-        : { href: "/author/dashboard", label: "Author Dashboard", icon: <LayoutDashboard /> };
-      currentNavLinks.splice(1, 0, dashboardLink); // Insert dashboard link after "Home"
+    } else if (user && user.role === "Reviewer") {
+      currentNavLinks = reviewerNavLinks;
+    } else if (user) { // Authenticated Author or user with no specific role yet (defaults to author view)
+      currentNavLinks = authorNavLinks;
     } else { // Guest
       currentNavLinks = baseNavLinks;
     }
@@ -181,11 +187,10 @@ export default function Header() {
   return (
     <header className={cn(
       "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-      isViewingAdminSection && "md:pl-64" // Adjust main header padding if admin sidebar is present
+      isViewingAdminSection && "md:pl-64" 
     )}>
       <div className={cn(
           "container px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between",
-          // isViewingAdminSection && "md:ml-64" // This was removed to allow full width header with offset content
           )}>
         <Link href="/" className="mr-auto md:mr-6 flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
           <BookOpenText className="h-6 w-6 text-primary" />
@@ -194,29 +199,27 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center justify-center flex-grow space-x-1 text-sm font-medium">
           {isClient && currentNavLinks.map(link => {
-            // Determine active state
             let isActive = false;
             if (link.href) {
                 if (link.href === "/" && pathname === "/") isActive = true;
                 else if (link.href !== "/" && pathname.startsWith(link.href)) isActive = true;
-                // Specific check for admin dashboard when in any admin/* route
                 if (link.href === "/admin/dashboard" && isViewingAdminSection) isActive = true;
             }
             
             let buttonClasses = "";
-            if (user && isAdminUser) { // Styling for admin users
+            if (user && isAdminUser) { 
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90" // Admin active style
-                  : "text-foreground hover:bg-accent hover:text-accent-foreground" // Admin inactive hover
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                  : "text-foreground hover:bg-accent hover:text-accent-foreground" 
               );
-            } else { // Styling for guest or regular users
+            } else { 
               buttonClasses = cn(
                 "px-3 py-2 text-sm font-medium flex items-center [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4",
                 isActive
-                  ? "text-primary font-semibold bg-secondary" // User active style
-                  : "text-foreground hover:text-primary hover:bg-secondary" // User inactive hover
+                  ? "text-primary font-semibold bg-secondary" 
+                  : "text-foreground hover:text-primary hover:bg-secondary" 
               );
             }
 
@@ -266,7 +269,7 @@ export default function Header() {
                     <Eye className="mr-2 h-4 w-4" />
                     <span>Reviewer Dashboard</span>
                   </DropdownMenuItem>
-                ) : ( // Author or user completing profile
+                ) : ( 
                   <DropdownMenuItem onClick={() => router.push('/author/dashboard')}>
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     <span>Author Dashboard</span>
@@ -276,17 +279,17 @@ export default function Header() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {!isAdminUser && user.role !== "Reviewer" && ( 
-                  <DropdownMenuItem onClick={handleSubmitPaperClick}>
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    <span>Submit Paper</span>
-                  </DropdownMenuItem>
-                )}
-                {!isAdminUser && ( 
-                  <DropdownMenuItem onClick={handleAiPreCheckClick}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    <span>AI Pre-Check</span>
-                  </DropdownMenuItem>
+                {user.role !== "Reviewer" && !isAdminUser && ( 
+                  <>
+                    <DropdownMenuItem onClick={handleSubmitPaperClick}>
+                      <UploadCloud className="mr-2 h-4 w-4" />
+                      <span>Submit Paper</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAiPreCheckClick}>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      <span>AI Pre-Check</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuItem onClick={() => router.push('/search-papers')}>
                   <SearchIcon className="mr-2 h-4 w-4" />
@@ -349,7 +352,6 @@ export default function Header() {
                   );
                 })}
 
-                {/* Admin Sidebar Links in Mobile Menu */}
                 {isClient && user && isAdminUser && (
                   <>
                      <DropdownMenuSeparator className="my-2" />
@@ -379,18 +381,18 @@ export default function Header() {
                       <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
-                    <NavLinkItem href="/author/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname === "/author/profile/settings"} icon={<Settings />} isAdminContext={!!(user && isAdminUser)}>
+                    <NavLinkItem href="/author/profile/settings" onClick={() => setIsMobileMenuOpen(false)} isActive={pathname.startsWith("/author/profile/settings")} icon={<Settings />} isAdminContext={!!(user && isAdminUser)}>
                       Profile Settings
                     </NavLinkItem>
-                    {!isAdminUser && user.role !== "Reviewer" && (
-                      <NavLinkItem onClick={handleSubmitPaperClick} isActive={pathname === "/author/submit"} isAction icon={<UploadCloud />} >
-                        Submit Paper
-                      </NavLinkItem>
-                    )}
-                     {!isAdminUser && (
-                      <NavLinkItem onClick={handleAiPreCheckClick} isActive={pathname === "/author/ai-pre-check"} isAction icon={<Sparkles />} >
-                        AI Pre-Check
-                      </NavLinkItem>
+                    {user.role !== "Reviewer" && !isAdminUser && (
+                      <>
+                        <NavLinkItem onClick={handleSubmitPaperClick} isActive={pathname === "/author/submit"} isAction icon={<UploadCloud />} >
+                          Submit Paper
+                        </NavLinkItem>
+                        <NavLinkItem onClick={handleAiPreCheckClick} isActive={pathname === "/author/ai-pre-check"} isAction icon={<Sparkles />} >
+                          AI Pre-Check
+                        </NavLinkItem>
+                      </>
                     )}
                     <Button variant="ghost" onClick={handleLogout} className="w-full justify-start text-destructive hover:text-destructive flex items-center px-3 py-2 text-base font-medium [&_svg]:mr-2 [&_svg]:h-4 [&_svg]:w-4">
                       <LogOut /> Log Out
