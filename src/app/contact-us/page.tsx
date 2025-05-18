@@ -140,17 +140,17 @@ export default function ContactUsPage() {
                   </Avatar>
                   <CardTitle className="text-lg sm:text-xl">{person.name}</CardTitle>
                   <p className="text-xs sm:text-sm text-primary font-medium flex items-center justify-center">
-                    <Briefcase size={14} sm:size={16} className="mr-2" /> {person.designation}
+                    <Briefcase className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {person.designation}
                   </p>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-2 text-xs sm:text-sm text-muted-foreground text-center">
                   <a href={`mailto:${person.email}`} className="flex items-center justify-center hover:text-primary transition-colors">
-                    <Mail size={14} sm:size={16} className="mr-2 text-primary/80" />
+                    <Mail className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary/80" />
                     <span>{person.email}</span>
                   </a>
                   {person.phone && (
                     <a href={`tel:${person.phone}`} className="flex items-center justify-center hover:text-primary transition-colors">
-                      <Phone size={14} sm:size={16} className="mr-2 text-primary/80" />
+                      <Phone className="mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary/80" />
                       <span>{person.phone}</span>
                     </a>
                   )}
