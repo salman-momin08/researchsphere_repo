@@ -31,15 +31,15 @@ export type PlagiarismCheckInput = z.infer<typeof PlagiarismCheckInputSchema>;
 const PlagiarismCheckOutputSchema = z.object({
   plagiarismScore: z
     .number()
-    .min(0)
+    .min(-1) // Allow -1 as a special value
     .max(1)
     .describe(
-      'A score between 0 and 1 indicating the likelihood of plagiarism, where 1 is definite plagiarism.'
+      'A score between 0 and 1 indicating the likelihood of plagiarism (1 is definite plagiarism), or -1 if analysis could not be performed.'
     ),
   highlightedSections: z
     .array(z.string())
     .describe(
-      'Sections of the document that may be plagiarized, highlighted for review.'
+      'Sections of the document that may be plagiarized, or an explanation if analysis failed.'
     ),
 });
 export type PlagiarismCheckOutput = z.infer<typeof PlagiarismCheckOutputSchema>;
@@ -58,7 +58,7 @@ const PromptInputSchema = PlagiarismCheckInputSchema.extend({
 
 const plagiarismCheckPrompt = ai.definePrompt({
   name: 'plagiarismCheckPrompt',
-  model: 'googleai/gemini-1.5-flash', // Added model specification
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: PromptInputSchema}, // Use the extended schema
   output: {schema: PlagiarismCheckOutputSchema},
   prompt: `You are an AI plagiarism checker.
