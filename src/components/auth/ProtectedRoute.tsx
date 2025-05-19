@@ -3,8 +3,9 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, usePathname } from "next/navigation";
-import React, { useEffect } from "react"; // Removed useState as initialCheckComplete is handled by AuthContext
+import React, { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { useToast } from "@/hooks/use-toast";
 
 const AUTHOR_PROFILE_SETTINGS_PATH = '/author/profile/settings';
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
@@ -27,12 +28,61 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading, isAdminUser, setShowLoginModal, initialAuthCheckComplete, isProfileComplete } = useAuth();
+  const { user, loading, isAdminUser, setShowLoginModal, initialAuthCheckComplete } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Use initialAuthCheckComplete from AuthContext to determine if initial auth processing is done
-  if (!initialAuthCheckComplete || loading) { // Also check general loading state
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted || !initialAuthCheckComplete || loading) {
+      return;
+    }
+
+    const isPublicPage = PUBLIC_PATHS_PATTERNS.some(pattern =>
+      typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
+    );
+
+    // Allow access to public pages unless it's an adminOnly public page (which shouldn't exist)
+    if (isPublicPage && !adminOnly) {
+      return;
+    }
+
+    if (!user) {
+      if (pathname !== AUTHOR_PROFILE_SETTINGS_PATH && // Allow unauthenticated users to *potentially* land here if redirected
+          !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?') &&
+          !isPublicPage) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("redirectAfterLogin", pathname + window.location.search);
+        }
+        setShowLoginModal(true);
+      }
+      return; // Early return for unauthenticated users on potentially public or login-redirecting paths
+    }
+
+    // User is authenticated at this point
+    if (adminOnly && !isAdminUser) {
+      toast({ title: "Access Denied", description: "You do not have permission to view this admin page.", variant: "destructive" });
+      const userDashboard = user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
+      router.push(userDashboard);
+      return;
+    }
+
+    // If an admin tries to access a non-admin profile settings page (authors')
+    if (isAdminUser && pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH)) {
+        router.push(ADMIN_DASHBOARD_PATH); // Or to admin profile settings if one exists
+        return;
+    }
+
+
+  }, [isMounted, initialAuthCheckComplete, loading, user, isAdminUser, adminOnly, pathname, router, setShowLoginModal, toast]);
+
+
+  if (!isMounted || !initialAuthCheckComplete || loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
@@ -45,17 +95,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     typeof pattern === 'string' ? pattern === pathname : pattern.test(pathname)
   );
 
-  // Allow access to public pages unless it's an adminOnly public page (which shouldn't exist)
-  if (isPublicPage && !adminOnly) {
-    return <>{children}</>;
-  }
-
-  // If no user, and it's not a public page
-  if (!user) {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("redirectAfterLogin", pathname + window.location.search);
-    }
-    setTimeout(() => setShowLoginModal(true), 0); // Defer to avoid issues during render
+  if (!user && !isPublicPage && pathname !== AUTHOR_PROFILE_SETTINGS_PATH && !pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
+     // This case should be handled by setShowLoginModal above and AuthContext will render its initial loading.
+     // Or, show a specific "Redirecting to login..." message if preferred.
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
@@ -63,43 +105,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
       </div>
     );
   }
-
-  // User is logged in at this point
-
-  // If it's an admin-only route and user is not an admin
-  if (adminOnly && !isAdminUser) {
-    const userDashboard = user.role === "Reviewer" ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH;
-    router.push(userDashboard);
+  
+  // If adminOnly is true, but user is not an admin (and user is loaded)
+  if (user && adminOnly && !isAdminUser) {
+    // This will be caught by the useEffect, but this return prevents rendering children prematurely
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <LoadingSpinner size={48} />
-        <p className="ml-2">Redirecting...</p>
+        <p className="ml-2">Access Denied. Redirecting...</p>
       </div>
     );
   }
 
-  // Allow access to profile settings page for any authenticated user.
-  // AuthContext will handle redirecting TO it if incomplete, or AWAY if completed.
-  if (pathname === AUTHOR_PROFILE_SETTINGS_PATH || pathname.startsWith(AUTHOR_PROFILE_SETTINGS_PATH + '?')) {
-    return <>{children}</>;
-  }
-  
-  // If profile is incomplete and user is trying to access a page other than profile settings or public pages
-  // AuthContext is responsible for redirecting them to AUTHOR_PROFILE_SETTINGS_PATH.
-  // ProtectedRoute shows a loading/checking state while AuthContext processes this.
-  if (!isProfileComplete && !isPublicPage) {
-    // AuthContext should have already initiated a redirect if needed.
-    // This state indicates we are waiting for that redirect or for profile to be completed.
-    // console.log(`ProtectedRoute: User ${user.email} profile incomplete on ${pathname}. AuthContext should handle redirect.`);
-    return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-            <LoadingSpinner size={48} />
-            <p className="ml-2">Checking profile status...</p>
-        </div>
-    );
-  }
-
-  // If all checks pass, render the children
   return <>{children}</>;
 };
 
