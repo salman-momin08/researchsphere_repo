@@ -83,11 +83,17 @@ export default function UserManagementPage() {
       toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot change their own role through this interface." });
       return;
     }
-    if (!confirm(`Are you sure you want to change this user's role to ${newRole}? If they are currently an Admin, their admin status will be revoked.`)) return;
+    const targetUser = users.find(u => u.id === targetUserId);
+    if (targetUser?.role === "Admin" && (newRole === "Author" || newRole === "Reviewer")) {
+      if (!confirm(`This user is currently an Admin. Changing their role to ${newRole} will also revoke their admin privileges. Are you sure?`)) return;
+    } else {
+      if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+    }
+    
     setProcessingUserId(targetUserId);
     try {
       await updateUserRole(targetUserId, newRole);
-      toast({ title: "Success", description: `User role updated to ${newRole}. Admin status may have been adjusted.` });
+      toast({ title: "Success", description: `User role updated to ${newRole}. Admin status may have been adjusted if applicable.` });
       fetchUsers();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Role Update Failed", description: err.message || "Could not update user role." });
@@ -138,7 +144,7 @@ export default function UserManagementPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,46 +177,48 @@ export default function UserManagementPage() {
                           <Badge variant="default" className="bg-green-500 hover:bg-green-600">Active</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right space-x-1 flex flex-col sm:flex-row justify-end items-center gap-1 py-2">
-                        <Select
-                          value={user.role || undefined}
-                          onValueChange={(newRole) => handleChangeRole(user.id, newRole as "Author" | "Reviewer")}
-                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id || user.role === "Admin"}
-                        >
-                          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs" aria-label={`Change role for ${user.displayName}`}>
-                             <SelectValue placeholder="Change Role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Author">Author</SelectItem>
-                            <SelectItem value="Reviewer">Reviewer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant={user.isAdmin ? "destructive" : "default"}
-                          size="sm"
-                          onClick={() => handleToggleAdmin(user)}
-                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
-                          className="w-full sm:w-32 text-xs"
-                        >
-                          {user.isAdmin ? (
-                            <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
-                          ) : (
-                            <><ShieldCheck className="mr-2 h-4 w-4" /> Make Admin</>
-                          )}
-                        </Button>
-                        <Button
-                          variant={user.isSuspended ? "secondary" : "destructive"}
-                          size="sm"
-                          onClick={() => handleToggleSuspension(user)}
-                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
-                          className="w-full sm:w-32 text-xs"
-                        >
-                          {user.isSuspended ? (
-                             <><Undo className="mr-2 h-4 w-4" /> Unsuspend</>
-                          ) : (
-                             <><Ban className="mr-2 h-4 w-4" /> Suspend</>
-                          )}
-                        </Button>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col sm:flex-row justify-center items-center gap-1 py-2">
+                            <Select
+                            value={user.role || undefined}
+                            onValueChange={(newRole) => handleChangeRole(user.id, newRole as "Author" | "Reviewer")}
+                            disabled={currentAdminUser?.id === user.id || processingUserId === user.id || user.role === "Admin"}
+                            >
+                            <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs" aria-label={`Change role for ${user.displayName}`}>
+                                <SelectValue placeholder="Change Role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Author">Author</SelectItem>
+                                <SelectItem value="Reviewer">Reviewer</SelectItem>
+                            </SelectContent>
+                            </Select>
+                            <Button
+                            variant={user.isAdmin ? "destructive" : "default"}
+                            size="sm"
+                            onClick={() => handleToggleAdmin(user)}
+                            disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
+                            className="w-full sm:w-32 text-xs"
+                            >
+                            {user.isAdmin ? (
+                                <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
+                            ) : (
+                                <><ShieldCheck className="mr-2 h-4 w-4" /> Make Admin</>
+                            )}
+                            </Button>
+                            <Button
+                            variant={user.isSuspended ? "secondary" : "destructive"}
+                            size="sm"
+                            onClick={() => handleToggleSuspension(user)}
+                            disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
+                            className="w-full sm:w-32 text-xs"
+                            >
+                            {user.isSuspended ? (
+                                <><Undo className="mr-2 h-4 w-4" /> Unsuspend</>
+                            ) : (
+                                <><Ban className="mr-2 h-4 w-4" /> Suspend</>
+                            )}
+                            </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
