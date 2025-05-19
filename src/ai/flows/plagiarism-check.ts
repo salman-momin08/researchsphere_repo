@@ -48,9 +48,17 @@ export async function plagiarismCheck(input: PlagiarismCheckInput): Promise<Plag
   return plagiarismCheckFlow(input);
 }
 
+// Define an extended schema for the prompt's input, including boolean flags for file types
+const PromptInputSchema = PlagiarismCheckInputSchema.extend({
+  isPdf: z.boolean().optional(),
+  isDocx: z.boolean().optional(),
+  isTxt: z.boolean().optional(),
+  isOtherFileType: z.boolean().optional(),
+});
+
 const plagiarismCheckPrompt = ai.definePrompt({
   name: 'plagiarismCheckPrompt',
-  input: {schema: PlagiarismCheckInputSchema},
+  input: {schema: PromptInputSchema}, // Use the extended schema
   output: {schema: PlagiarismCheckOutputSchema},
   prompt: `You are an AI plagiarism checker.
 {{#if documentUrl}}
@@ -65,15 +73,24 @@ No document content (URL or text) was provided. You cannot perform an accurate p
 {{#if fileName}}
 The document is referred to as "{{{fileName}}}".
 {{/if}}
+
 {{#if fileType}}
-  {{#if (eq fileType "application/pdf")}}
+  {{#if isPdf}}
   The document is a PDF. The provided text (if any) represents key excerpts like the title and abstract. Perform your analysis assuming these excerpts come from a full PDF document with this name.
-  {{else if (eq fileType "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}}
-  The document is a DOCX file. The provided text (if any) represents key excerpts like the title and abstract. Perform your analysis assuming these excerpts come from a full DOCX document with this name.
-  {{else if (eq fileType "text/plain")}}
-  The document is a plain text file, and the provided text should be considered its full content for analysis.
   {{else}}
+    {{#if isDocx}}
+  The document is a DOCX file. The provided text (if any) represents key excerpts like the title and abstract. Perform your analysis assuming these excerpts come from a full DOCX document with this name.
+    {{else}}
+      {{#if isTxt}}
+  The document is a plain text file, and the provided text should be considered its full content for analysis.
+      {{else}}
+        {{#if isOtherFileType}}
   The document type is "{{{fileType}}}". Consider this type when evaluating the provided text.
+        {{else}}
+  The document type is "{{{fileType}}}". Consider this type when evaluating the provided text.
+        {{/if}}
+      {{/if}}
+    {{/if}}
   {{/if}}
 {{else if fileName}}
 Consider the file name "{{{fileName}}}" and its likely type when evaluating the provided text (if any).
@@ -88,18 +105,29 @@ Output in JSON format.`,
 const plagiarismCheckFlow = ai.defineFlow(
   {
     name: 'plagiarismCheckFlow',
-    inputSchema: PlagiarismCheckInputSchema,
+    inputSchema: PlagiarismCheckInputSchema, // Flow input remains the original schema
     outputSchema: PlagiarismCheckOutputSchema,
   },
   async input => {
-    const {output} = await plagiarismCheckPrompt(input);
+    // Pre-process to create boolean flags for the prompt
+    const isPdf = input.fileType === "application/pdf";
+    const isDocx = input.fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const isTxt = input.fileType === "text/plain";
+    const isOtherFileType = !!(input.fileType && !isPdf && !isDocx && !isTxt);
+
+    const promptInputData = {
+      ...input,
+      isPdf,
+      isDocx,
+      isTxt,
+      isOtherFileType,
+    };
+
+    const {output} = await plagiarismCheckPrompt(promptInputData);
     // Handle the -1 score case if AI indicates insufficient data
     if (output && output.plagiarismScore === -1 && output.highlightedSections && output.highlightedSections.length > 0) {
         // You might want to throw an error here or return a specific error structure
         // For now, we'll pass it through, the UI can interpret -1.
-        // Alternatively, adjust the score to 0 or a low value if preferred when data is insufficient.
-        // For example:
-        // return { plagiarismScore: 0, highlightedSections: ["AI indicated insufficient data for a proper check: " + output.highlightedSections.join("; ")] };
     }
     return output!;
   }
