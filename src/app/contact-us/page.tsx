@@ -60,15 +60,15 @@ const contactPersons: ContactPerson[] = [
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "coordinator woman"
+    dataAiHint: "business woman"
   },
   {
     id: "4",
     name: "Dr. Evelyn Reed", // From Key Committee
-    designation: "Conference Chair (Key Committee Liaison)",
-    email: "evelyn.reed@researchsphere.com", // Using a similar domain for consistency
+    designation: "Conference Chair Liaison",
+    email: "evelyn.reed@researchsphere.com",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "scientist woman"
+    dataAiHint: "academic conference"
   }
 ];
 

@@ -197,14 +197,14 @@ export default function HomePage() {
       {/* Call to Action Section */}
       <section className="py-12 md:py-20 bg-secondary">
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full max-w-4xl aspect-[3/1] mx-auto mb-8 rounded-lg shadow-md overflow-hidden">
+          <div className="relative w-full max-w-4xl aspect-[16/6] sm:aspect-[16/5] md:aspect-[16/4] mx-auto mb-8 rounded-lg shadow-md overflow-hidden">
             <Image
-              src="https://placehold.co/1200x400.png"
-              alt="A diverse group of researchers collaborating in a modern laboratory setting, symbolizing academic paper publication and innovation."
+              src="https://placehold.co/1200x450.png"
+              alt="A diverse group of researchers collaborating in a modern laboratory or university setting, symbolizing academic paper publication, innovation, and scholarly community."
               fill
               className="object-cover"
               data-ai-hint="research collaboration"
-              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
+              sizes="(max-width: 640px) 90vw, (max-width: 768px) 80vw, (max-width: 1024px) 70vw, 1200px"
               priority
             />
           </div>
