@@ -58,6 +58,7 @@ const PromptInputSchema = PlagiarismCheckInputSchema.extend({
 
 const plagiarismCheckPrompt = ai.definePrompt({
   name: 'plagiarismCheckPrompt',
+  model: 'googleai/gemini-1.5-flash', // Added model specification
   input: {schema: PromptInputSchema}, // Use the extended schema
   output: {schema: PlagiarismCheckOutputSchema},
   prompt: `You are an AI plagiarism checker.

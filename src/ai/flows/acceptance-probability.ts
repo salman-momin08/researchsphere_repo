@@ -35,6 +35,7 @@ export async function acceptanceProbability(input: AcceptanceProbabilityInput): 
 
 const acceptanceProbabilityPrompt = ai.definePrompt({
   name: 'acceptanceProbabilityPrompt',
+  model: 'googleai/gemini-1.5-flash', // Added model specification
   input: {schema: AcceptanceProbabilityInputSchema},
   output: {schema: AcceptanceProbabilityOutputSchema},
   prompt: `You are an AI assistant that evaluates the acceptance probability of a research paper for publication in a conference or journal.
@@ -58,4 +59,3 @@ const acceptanceProbabilityFlow = ai.defineFlow(
     return output!;
   }
 );
-
