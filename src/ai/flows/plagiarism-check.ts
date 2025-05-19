@@ -16,7 +16,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const PlagiarismCheckInputSchema = z.object({
+const PlagiarismCheckInputSchema = z.object({
   documentUrl: z
     .string()
     .url()
