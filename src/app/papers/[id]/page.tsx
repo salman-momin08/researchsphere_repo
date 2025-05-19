@@ -31,7 +31,7 @@ function PaperDetailsContent() {
   const params = useParams();
   const searchParamsHook = useNextSearchParams();
   const router = useRouter();
-  const { user, isAdminUser } = useAuth(); // Use isAdminUser from context
+  const { user, isAdminUser } = useAuth(); 
 
   const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
   const [loadingPaper, setLoadingPaper] = useState(true);
@@ -70,7 +70,6 @@ function PaperDetailsContent() {
 
           if (!isOwner && !isAdminUser && !isAssigned && paper.status !== "Published") {
             setCurrentPaper(null);
-            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this paper." });
             router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
             return;
           }
@@ -107,12 +106,10 @@ function PaperDetailsContent() {
 
         } else {
           setCurrentPaper(null);
-          toast({ variant: "destructive", title: "Paper Not Found", description: "This paper may not exist or you may not have access." });
           router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
         }
       } catch (err: any) {
         setCurrentPaper(null);
-        toast({ variant: "destructive", title: "Error", description: err.message || "Could not load paper details." });
          router.push(isAdminUser ? '/admin/dashboard' : (user?.role === 'Reviewer' ? '/reviewer/dashboard' : '/author/dashboard'));
       } finally {
         setLoadingPaper(false);
@@ -124,7 +121,7 @@ function PaperDetailsContent() {
       setLoadingPaper(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, user, isAdminUser, router]); // isAdminUser is now from context
+  }, [params.id, user, isAdminUser, router]); 
 
   useEffect(() => {
     fetchPaperDetails();
@@ -204,9 +201,17 @@ function PaperDetailsContent() {
     }
     setIsCheckingPlagiarism(true);
     try {
+      let inferredFileType: string | undefined = undefined;
+      if (currentPaper.fileName) {
+        if (currentPaper.fileName.toLowerCase().endsWith('.pdf')) inferredFileType = 'application/pdf';
+        else if (currentPaper.fileName.toLowerCase().endsWith('.docx')) inferredFileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        else if (currentPaper.fileName.toLowerCase().endsWith('.txt')) inferredFileType = 'text/plain';
+      }
+
       const result = await plagiarismCheck({
         documentUrl: currentPaper.fileUrl,
-        fileName: currentPaper.fileName || undefined
+        fileName: currentPaper.fileName || undefined,
+        fileType: inferredFileType
       });
       await updatePaperData(currentPaper.id, {
         plagiarismScore: result.plagiarismScore,
@@ -272,7 +277,7 @@ function PaperDetailsContent() {
     content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
 
     if (isAdminUser) {
-      if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore * 100).toFixed(1)}%\n`;
+      if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore === -1 ? 'N/A (Analysis Inconclusive)' : (currentPaper.plagiarismScore * 100).toFixed(1) + '%')}\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
     }
 
@@ -647,10 +652,10 @@ function PaperDetailsContent() {
                 <h3 className="text-lg font-semibold mb-2 flex items-center"><Star className="h-5 w-5 mr-2 text-primary" />Reviews Received</h3>
                 <div className="space-y-4">
                   {allReviewData.map((review, index) => {
-                    let reviewerDisplayName = `Reviewer ${index + 1}`; // Default for author view
+                    let reviewerDisplayName = `Reviewer ${index + 1}`; 
                     if (isAdminUser) {
                         reviewerDisplayName = review.reviewerDisplayName || `Reviewer (ID: ${review.reviewerId.substring(0,6)})`;
-                    } else if (user?.id === review.reviewerId) { // If current user is the reviewer
+                    } else if (user?.id === review.reviewerId && user?.role === "Reviewer") { 
                         reviewerDisplayName = "Your Review";
                     }
 
@@ -740,3 +745,4 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
+

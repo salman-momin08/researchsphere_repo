@@ -66,9 +66,9 @@ function AiPreCheckContent() {
   const onSubmit = async (data: AiPreCheckFormValues) => {
     setIsLoading(true);
     setError(null);
-    setPlagiarismResult(null); // Clear previous results
-    setAcceptanceResult(null); // Clear previous results
-    setResultTitle(null); // Clear previous result title
+    setPlagiarismResult(null);
+    setAcceptanceResult(null);
+    setResultTitle(null);
 
     let documentTextForPlagiarism = `${data.title}\n\n${data.abstract}`;
     const file = data.file[0];
@@ -89,19 +89,19 @@ function AiPreCheckContent() {
     const plagiarismInput: PlagiarismCheckInput = {
       documentText: documentTextForPlagiarism,
       fileName: file.name,
-      fileType: fileTypeForAI
+      fileType: fileTypeForAI // Pass the actual MIME type
     };
 
+    const acceptanceInputText = `${data.title}\n\n${data.abstract}`;
+
     try {
-      const acceptanceInputText = `${data.title}\n\n${data.abstract}`;
-      
       const [plagiarism, acceptance] = await Promise.all([
         plagiarismCheck(plagiarismInput),
         acceptanceProbability({ paperText: acceptanceInputText })
       ]);
       setPlagiarismResult(plagiarism);
       setAcceptanceResult(acceptance);
-      setResultTitle(data.title); // Store the title for the current results
+      setResultTitle(data.title);
       toast({ title: "AI Pre-Check Complete", description: "Results are displayed below." });
     } catch (err: any) {
       const errorMessage = err.message || "An error occurred during AI analysis.";
@@ -110,10 +110,9 @@ function AiPreCheckContent() {
       toast({ variant: "destructive", title: "AI Analysis Failed", description: errorMessage });
     } finally {
       setIsLoading(false);
-      // Clear form fields after analysis is done (success or error)
-      reset(); // Resets form to defaultValues
-      setValue('file', undefined as any, { shouldValidate: false }); // Explicitly reset file field for react-hook-form
-      setSelectedFileName(null); // Clear the displayed file name
+      reset();
+      setValue('file', undefined as any, { shouldValidate: false });
+      setSelectedFileName(null);
     }
   };
 
@@ -144,7 +143,6 @@ function AiPreCheckContent() {
     } else {
       feedbackContent += `--- Plagiarism Report ---\nNot Available\n\n`;
     }
-
 
     const blob = new Blob([feedbackContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -226,7 +224,15 @@ function AiPreCheckContent() {
               </div>
               {errors.file && <p className="text-sm text-destructive mt-1">{errors.file.message as string}</p>}
             </div>
-            {/* Removed the Alert component for "Note on AI Analysis" */}
+            <Alert variant="default" className="mt-4 bg-secondary/50">
+                <Sparkles className="h-4 w-4" />
+                <AlertTitle className="font-semibold">Note on AI Analysis</AlertTitle>
+                <AlertDescription>
+                    For this pre-check, all fields including file upload are required. 
+                    The AI analyzes your title and abstract, using the uploaded file's name and type for contextual understanding. 
+                    Full file content analysis typically occurs after formal submission. For .txt files, the full text is included in this pre-check.
+                </AlertDescription>
+            </Alert>
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
             <Button type="submit" className="w-full sm:w-auto text-sm sm:text-base" disabled={isLoading || !isDirty || !isValid}>
@@ -259,3 +265,4 @@ export default function AiPreCheckPage() {
         </ProtectedRoute>
     )
 }
+
