@@ -1,6 +1,4 @@
 
-'use server';
-
 import { genkit, GenkitError, type ModelArgument } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
