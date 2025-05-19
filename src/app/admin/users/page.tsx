@@ -3,22 +3,25 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
-import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus } from '@/lib/user-service';
+import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus, updateUserRole } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff, Ban, Undo } from 'lucide-react';
+import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff, Ban, Undo, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function UserManagementPage() {
   const { user: currentAdminUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -32,45 +35,66 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Removed users from dependency array to prevent potential loops if fetchUsers itself modifies users indirectly
+  }, []);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleToggleAdmin = async (targetUserId: string, currentIsAdmin: boolean | undefined) => {
-    if (!currentAdminUser || currentAdminUser.id === targetUserId) {
+  const handleToggleAdmin = async (targetUser: User) => {
+    if (!currentAdminUser || currentAdminUser.id === targetUser.id) {
       toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot change their own admin status through this interface." });
       return;
     }
 
-    if (!confirm(`Are you sure you want to ${currentIsAdmin ? 'revoke' : 'grant'} admin privileges for this user?`)) return;
-
+    if (!confirm(`Are you sure you want to ${targetUser.isAdmin ? 'revoke' : 'grant'} admin privileges for this user? This will also change their role.`)) return;
+    setProcessingUserId(targetUser.id);
     try {
-      await toggleUserAdminStatus(targetUserId, !!currentIsAdmin);
-      toast({ title: "Success", description: `User admin status updated.` });
-      fetchUsers(); 
+      await toggleUserAdminStatus(targetUser.id, !!targetUser.isAdmin);
+      toast({ title: "Success", description: `User admin status and role updated.` });
+      fetchUsers();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update admin status." });
+    } finally {
+      setProcessingUserId(null);
     }
   };
 
-  const handleToggleSuspension = async (targetUserId: string, currentIsSuspended: boolean | undefined) => {
-     if (!currentAdminUser || currentAdminUser.id === targetUserId) {
+  const handleToggleSuspension = async (targetUser: User) => {
+     if (!currentAdminUser || currentAdminUser.id === targetUser.id) {
       toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot suspend their own account through this interface." });
       return;
     }
-    if (!confirm(`Are you sure you want to ${currentIsSuspended ? 'unsuspend' : 'suspend'} this user?`)) return;
-
+    if (!confirm(`Are you sure you want to ${targetUser.isSuspended ? 'unsuspend' : 'suspend'} this user?`)) return;
+    setProcessingUserId(targetUser.id);
     try {
-      await toggleUserSuspensionStatus(targetUserId, !!currentIsSuspended);
+      await toggleUserSuspensionStatus(targetUser.id, !!targetUser.isSuspended);
       toast({ title: "Success", description: `User suspension status updated.` });
-      fetchUsers(); 
-    } catch (err: any)
-     {
+      fetchUsers();
+    } catch (err: any) {
       toast({ variant: "destructive", title: "Update Failed", description: err.message || "Could not update user suspension status." });
+    } finally {
+      setProcessingUserId(null);
     }
-  }
+  };
+
+  const handleChangeRole = async (targetUserId: string, newRole: "Author" | "Reviewer") => {
+    if (!currentAdminUser || currentAdminUser.id === targetUserId) {
+      toast({ variant: "destructive", title: "Action Not Allowed", description: "Admins cannot change their own role through this interface." });
+      return;
+    }
+    if (!confirm(`Are you sure you want to change this user's role to ${newRole}? If they are currently an Admin, their admin status will be revoked.`)) return;
+    setProcessingUserId(targetUserId);
+    try {
+      await updateUserRole(targetUserId, newRole);
+      toast({ title: "Success", description: `User role updated to ${newRole}. Admin status may have been adjusted.` });
+      fetchUsers();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Role Update Failed", description: err.message || "Could not update user role." });
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
 
 
   if (isLoading) {
@@ -147,13 +171,26 @@ export default function UserManagementPage() {
                           <Badge variant="default" className="bg-green-500 hover:bg-green-600">Active</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right space-x-1 flex justify-end items-center">
+                      <TableCell className="text-right space-x-1 flex flex-col sm:flex-row justify-end items-center gap-1 py-2">
+                        <Select
+                          value={user.role || undefined}
+                          onValueChange={(newRole) => handleChangeRole(user.id, newRole as "Author" | "Reviewer")}
+                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id || user.role === "Admin"}
+                        >
+                          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs" aria-label={`Change role for ${user.displayName}`}>
+                             <SelectValue placeholder="Change Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Author">Author</SelectItem>
+                            <SelectItem value="Reviewer">Reviewer</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Button
                           variant={user.isAdmin ? "destructive" : "default"}
                           size="sm"
-                          onClick={() => handleToggleAdmin(user.id, user.isAdmin)}
-                          disabled={currentAdminUser?.id === user.id}
-                          className="w-32"
+                          onClick={() => handleToggleAdmin(user)}
+                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
+                          className="w-full sm:w-32 text-xs"
                         >
                           {user.isAdmin ? (
                             <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
@@ -164,9 +201,9 @@ export default function UserManagementPage() {
                         <Button
                           variant={user.isSuspended ? "secondary" : "destructive"}
                           size="sm"
-                          onClick={() => handleToggleSuspension(user.id, user.isSuspended)}
-                          disabled={currentAdminUser?.id === user.id}
-                          className="w-32"
+                          onClick={() => handleToggleSuspension(user)}
+                          disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
+                          className="w-full sm:w-32 text-xs"
                         >
                           {user.isSuspended ? (
                              <><Undo className="mr-2 h-4 w-4" /> Unsuspend</>

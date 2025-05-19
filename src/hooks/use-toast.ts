@@ -1,3 +1,4 @@
+
 "use client"
 
 // Inspired by react-hot-toast library
@@ -9,13 +10,15 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 1000000 // Keep this high, actual duration handled by Toast component
+const DEFAULT_TOAST_DURATION = 5000; // Default duration for auto-close
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  duration?: number; // Add duration here
 }
 
 const actionTypes = {
@@ -142,7 +145,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast({ duration = DEFAULT_TOAST_DURATION, ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -158,6 +161,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      duration, // Pass the duration to the toast object
       onOpenChange: (open) => {
         if (!open) dismiss()
       },

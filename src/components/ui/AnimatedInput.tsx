@@ -15,7 +15,9 @@ const AnimatedInput = React.memo(React.forwardRef<HTMLInputElement, AnimatedInpu
   ({ className, type, label, id, containerClassName, value: propValue, defaultValue, onChange, onFocus, onBlur, ...props }, ref) => {
     const internalId = id || React.useId();
     
-    const [hasValue, setHasValue] = React.useState(!!(propValue !== undefined ? propValue : defaultValue));
+    // Determine initial hasValue based on propValue or defaultValue
+    const initialHasValue = !!(propValue !== undefined ? propValue : defaultValue);
+    const [hasValue, setHasValue] = React.useState(initialHasValue);
     const [isFocused, setIsFocused] = React.useState(false);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,14 +36,16 @@ const AnimatedInput = React.memo(React.forwardRef<HTMLInputElement, AnimatedInpu
 
     const handleBlurEvent = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
+      // Update hasValue based on the current actual value in the input field
       setHasValue(!!e.target.value); 
       if (onBlur) {
         onBlur(e);
       }
     };
 
+    // Effect to sync `hasValue` if `propValue` changes from outside (e.g., form reset)
     React.useEffect(() => {
-      if (propValue !== undefined) { 
+      if (propValue !== undefined) {
         setHasValue(!!propValue);
       }
     }, [propValue]);
@@ -55,10 +59,10 @@ const AnimatedInput = React.memo(React.forwardRef<HTMLInputElement, AnimatedInpu
           htmlFor={internalId}
           className={cn(
             "absolute left-3 transition-all duration-200 ease-in-out pointer-events-none",
-            isFocused ? "text-primary" : "text-muted-foreground",
+            isFocused ? "text-primary" : "text-muted-foreground", // Label color based on focus
             isLabelFloating
-              ? "top-0 text-xs" 
-              : "top-1/2 -translate-y-1/2 text-base" 
+              ? "top-0 text-xs" // Floated state
+              : "top-1/2 -translate-y-1/2 text-base" // Resting state inside input
           )}
         >
           {label}
@@ -68,14 +72,14 @@ const AnimatedInput = React.memo(React.forwardRef<HTMLInputElement, AnimatedInpu
           ref={ref}
           type={type}
           className={cn(
-            "h-10 pt-3 text-base", 
-            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
+            "h-10 pt-3 text-base", // Increased padding-top to accommodate resting label
+            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1", // Thinner focus ring
             className
           )}
           onChange={handleInputChange}
           onFocus={handleFocusEvent}
           onBlur={handleBlurEvent}
-          placeholder={isLabelFloating ? "" : " "} 
+          placeholder={isLabelFloating ? "" : " "} // Show placeholder only when label is not floating (trick to make space)
           value={propValue} 
           defaultValue={defaultValue}
           {...props}
