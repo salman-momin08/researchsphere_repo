@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UploadCloud, Sparkles, Loader2, Download, AlertTriangle, Info } from 'lucide-react';
+import { UploadCloud, Sparkles, Loader2, Download, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
@@ -226,13 +226,7 @@ function AiPreCheckContent() {
               </div>
               {errors.file && <p className="text-sm text-destructive mt-1">{errors.file.message as string}</p>}
             </div>
-            <Alert variant="default">
-              <Info className="h-4 w-4" />
-              <AlertTitle className="font-semibold">Note on AI Analysis</AlertTitle>
-              <AlertDescription className="text-xs sm:text-sm">
-                For this pre-check, all fields including file upload are required. The AI analyzes your title and abstract. If a `.txt` file is uploaded, its content is also included in the analysis. For PDF/DOCX files, the AI considers the file's name and type for contextual understanding in its simulated plagiarism check; full content parsing of PDF/DOCX is not performed client-side in this pre-check. Acceptance probability is based on title and abstract.
-              </AlertDescription>
-            </Alert>
+            {/* Removed the Alert component for "Note on AI Analysis" */}
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
             <Button type="submit" className="w-full sm:w-auto text-sm sm:text-base" disabled={isLoading || !isDirty || !isValid}>
@@ -265,4 +259,3 @@ export default function AiPreCheckPage() {
         </ProtectedRoute>
     )
 }
-
