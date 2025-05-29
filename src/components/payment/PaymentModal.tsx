@@ -59,7 +59,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
         setUpiId("");
         setPaymentMethod("card");
     }
-  }, [isOpen]); // Removed paymentStep from deps to avoid re-triggering on its change if isOpen is true
+  }, [isOpen, paymentStep]);
 
   useEffect(() => {
     // Reset to form step if the paper changes while modal is open (should be rare)
@@ -204,7 +204,7 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                         width={120}
                         height={120}
                         className="rounded"
-                        data-ai-hint="qr payment"
+                        data-ai-hint="QR code payment"
                       />
                     </div>
                      <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>

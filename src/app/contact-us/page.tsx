@@ -43,7 +43,7 @@ const contactPersons: ContactPerson[] = [
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "support woman"
+    dataAiHint: "support professional"
   },
   {
     id: "2",
@@ -52,7 +52,7 @@ const contactPersons: ContactPerson[] = [
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "tech support"
+    dataAiHint: "tech expert"
   },
   {
     id: "3",
@@ -60,7 +60,7 @@ const contactPersons: ContactPerson[] = [
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "business woman"
+    dataAiHint: "business professional"
   },
   {
     id: "4",
@@ -68,7 +68,7 @@ const contactPersons: ContactPerson[] = [
     designation: "Conference Chair Liaison",
     email: "evelyn.reed@researchsphere.com",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "academic conference"
+    dataAiHint: "academic leader"
   }
 ];
 
