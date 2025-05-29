@@ -96,8 +96,8 @@ export default function SampleTemplatesPage() {
                 <div className="flex items-start gap-3 sm:gap-4">
                   {template.icon}
                   <div>
-                    <CardTitle className="text-lg sm:text-xl">{template.title}</CardTitle>
-                    <CardDescription className="mt-1 text-xs sm:text-sm">Type: {template.fileType} | File: {template.fileName}</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl md:text-2xl">{template.title}</CardTitle>
+                    <CardDescription className="mt-1 text-xs sm:text-sm md:text-base">Type: {template.fileType} | File: {template.fileName}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -135,3 +135,4 @@ export default function SampleTemplatesPage() {
     </div>
   );
 }
+
