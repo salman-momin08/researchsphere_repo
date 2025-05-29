@@ -95,9 +95,11 @@ export default function SampleTemplatesPage() {
               <CardHeader>
                 <div className="flex items-start gap-3 sm:gap-4">
                   {template.icon}
-                  <div>
+                  <div className="min-w-0"> {/* Added min-w-0 here */}
                     <CardTitle className="text-lg sm:text-xl md:text-2xl break-words">{template.title}</CardTitle>
-                    <CardDescription className="mt-1 text-xs sm:text-sm md:text-base break-words">Type: {template.fileType} | File: {template.fileName}</CardDescription>
+                    <CardDescription className="mt-1 text-xs sm:text-sm md:text-base break-words">
+                      Type: {template.fileType} | File: {template.fileName}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -135,4 +137,3 @@ export default function SampleTemplatesPage() {
     </div>
   );
 }
-
