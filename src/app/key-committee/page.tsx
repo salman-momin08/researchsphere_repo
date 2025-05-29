@@ -31,7 +31,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Conference Chair",
     affiliation: "Institute of Advanced Technology",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "scientist academic",
+    dataAiHint: "academic scientist", // Updated hint
     bio: "Dr. Reed is a leading expert in artificial intelligence and its applications in scientific research. She has published numerous papers and chaired several international conferences.",
     achievements: [
       "Pioneered novel deep learning architectures for scientific discovery.",
@@ -47,7 +47,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Program Chair",
     affiliation: "University of Global Studies",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "professor academic",
+    dataAiHint: "academic professor", // Updated hint
     bio: "Professor Green's research focuses on sustainable development and global collaboration in academia. He is passionate about fostering interdisciplinary research.",
     achievements: [
       "Developed key frameworks for international research collaboration.",
@@ -62,7 +62,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "researcher technology",
+    dataAiHint: "tech researcher", // Updated hint
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
       "Lead organizer for the TPC of three major AI conferences.",
@@ -77,7 +77,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Publications Chair",
     affiliation: "Veridian Dynamics Publishing",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "editor publisher",
+    dataAiHint: "publishing editor", // Updated hint
     bio: "Dr. Bellwether has overseen the publication process for numerous high-impact journals and conference proceedings.",
     achievements: [
       "Editor-in-Chief for the 'Journal of Applied Research'.",
@@ -92,7 +92,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "Workshop Coordinator",
     affiliation: "Center for Collaborative Research",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "academic coordinator",
+    dataAiHint: "workshop coordinator", // Updated hint
     bio: "Professor Sharma excels at organizing engaging and productive workshops that bridge the gap between theory and practice.",
     achievements: [
       "Organized 30+ successful international workshops.",
@@ -107,7 +107,7 @@ const committeeMembers: CommitteeMember[] = [
     title: "International Liaison",
     affiliation: "Global Research Network",
     imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "professional liaison",
+    dataAiHint: "global liaison", // Updated hint
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
       "Established partnerships with over 25 international institutions.",
