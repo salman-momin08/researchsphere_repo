@@ -96,13 +96,13 @@ export default function SampleTemplatesPage() {
                 <div className="flex items-start gap-3 sm:gap-4">
                   {template.icon}
                   <div>
-                    <CardTitle className="text-lg sm:text-xl md:text-2xl">{template.title}</CardTitle>
-                    <CardDescription className="mt-1 text-xs sm:text-sm md:text-base">Type: {template.fileType} | File: {template.fileName}</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl md:text-2xl break-words">{template.title}</CardTitle>
+                    <CardDescription className="mt-1 text-xs sm:text-sm md:text-base break-words">Type: {template.fileType} | File: {template.fileName}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-grow">
-                <p className="text-sm sm:text-base text-muted-foreground">
+                <p className="text-sm sm:text-base text-muted-foreground break-words">
                   {template.description}
                 </p>
               </CardContent>
