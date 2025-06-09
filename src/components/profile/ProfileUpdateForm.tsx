@@ -86,6 +86,12 @@ export default function ProfileUpdateForm() {
 
     try {
       const profileDataToUpdate: Partial<User> = { ...data };
+      // If the role field was disabled (e.g. for Admin or already set role),
+      // do not include it in the update payload to prevent accidental changes.
+      if (user?.role === "Admin" || (user?.role && (user.role === "Author" || user.role === "Reviewer"))) {
+        delete profileDataToUpdate.role;
+      }
+
       await updateUserProfile(profileDataToUpdate); 
       // Redirection logic is now primarily handled by AuthContext after state update
       setSuccessMessage("Profile updated successfully!");
@@ -131,6 +137,9 @@ export default function ProfileUpdateForm() {
      );
   }
 
+  const isRoleSelectionDisabled = currentIsLoading || 
+                                  user.role === "Admin" || 
+                                  (user.role && (user.role === "Author" || user.role === "Reviewer"));
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
@@ -192,7 +201,7 @@ export default function ProfileUpdateForm() {
         <Select 
             onValueChange={(value) => form.setValue("role", value as "Author" | "Reviewer" | "Admin", { shouldValidate: true })} 
             value={form.watch("role")}
-            disabled={currentIsLoading || (!isAdminUser && user.role === "Admin")} // Non-admin cannot change role if already admin
+            disabled={isRoleSelectionDisabled}
         >
           <SelectTrigger id="role" className="h-10 mt-1">
             <SelectValue placeholder="Select your role" />
@@ -200,11 +209,17 @@ export default function ProfileUpdateForm() {
           <SelectContent>
             <SelectItem value="Author">Author</SelectItem>
             <SelectItem value="Reviewer">Reviewer</SelectItem>
-            {/* Admin role is typically not self-selectable unless by another admin */}
-            {isAdminUser && <SelectItem value="Admin">Admin (System)</SelectItem>}
+            {/* Admin role is typically not self-selectable unless by another admin, but shown if already admin */}
+            {user.role === "Admin" && <SelectItem value="Admin">Admin (System)</SelectItem>}
           </SelectContent>
         </Select>
         {form.formState.errors.role && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.role.message}</p>}
+         {isRoleSelectionDisabled && user.role !== "Admin" && user.role && (
+          <p className="text-xs text-muted-foreground mt-1 px-1">Your role as {user.role} cannot be changed after initial selection.</p>
+        )}
+         {user.role === "Admin" && (
+           <p className="text-xs text-muted-foreground mt-1 px-1">Admin role cannot be changed through this form.</p>
+        )}
       </div>
 
       <AnimatedInput
