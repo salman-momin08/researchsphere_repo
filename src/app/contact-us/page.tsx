@@ -15,6 +15,7 @@ import { Mail, Send, Loader2, CheckCircle, UserCircle, Phone, Briefcase } from "
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
+import { getInitials } from "@/lib/utils"; // Import the getInitials function
 
 const contactFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -124,19 +125,18 @@ export default function ContactUsPage() {
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary">
                     {person.imageUrl ? (
-                      <Image
+                      <AvatarImage
                         src={person.imageUrl}
                         alt={person.name}
-                        width={100}
-                        height={100}
+                        // width={100} // Not needed for AvatarImage
+                        // height={100} // Not needed for AvatarImage
                         className="aspect-square object-cover"
-                        data-ai-hint={person.dataAiHint || "professional portrait"}
+                        // data-ai-hint={person.dataAiHint || "professional portrait"} // Data AI hint is already part of picsum URL logic or for actual generation
                       />
-                    ) : (
-                      <AvatarFallback className="text-3xl bg-muted">
-                        <UserCircle size={48} />
-                      </AvatarFallback>
-                    )}
+                    ) : null }
+                    <AvatarFallback className="text-2xl sm:text-3xl bg-muted text-primary-foreground">
+                      {getInitials(person.name)}
+                    </AvatarFallback>
                   </Avatar>
                   <CardTitle className="text-lg sm:text-xl">{person.name}</CardTitle>
                   <p className="text-xs sm:text-sm text-primary font-medium flex items-center justify-center">

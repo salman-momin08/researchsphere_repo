@@ -8,6 +8,8 @@ import { Building, UserCircle, Mail, Star, Briefcase } from "lucide-react";
 import Image from "next/image";
 import dynamic from 'next/dynamic';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { getInitials } from "@/lib/utils"; // Import the getInitials function
+
 // Assuming CommitteeMember type will be defined or imported appropriately
 // For now, let's keep its definition here for clarity in this file if not moved to global types yet.
 // If CommitteeMember is in @/types, this local definition should be removed and imported.
@@ -157,19 +159,18 @@ export default function KeyCommitteePage() {
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary group-hover:border-primary/70 transition-colors">
                     {member.imageUrl ? (
-                    <Image
+                    <AvatarImage
                       src={member.imageUrl}
                       alt={member.name}
-                      width={100}
-                      height={100}
-                      className="aspect-square object-cover"
-                      data-ai-hint={member.dataAiHint || "professional portrait"}
+                      // width={100} // width & height are part of AvatarImage's props, not needed for next/image like usage here
+                      // height={100}
+                      className="aspect-square object-cover" // Keep this for proper image display
+                      // data-ai-hint={member.dataAiHint || "professional portrait"} // Already part of picsum URL or future direct AI image
                     />
-                    ) : (
-                    <AvatarFallback className="text-2xl sm:text-3xl bg-muted">
-                      <UserCircle size={48} />
+                    ) : null } 
+                    <AvatarFallback className="text-2xl sm:text-3xl bg-muted text-primary-foreground">
+                      {getInitials(member.name)}
                     </AvatarFallback>
-                    )}
                   </Avatar>
                   <CardTitle className="text-lg sm:text-xl group-hover:text-primary transition-colors">{member.name}</CardTitle>
                   <CardDescription className="text-xs sm:text-sm text-primary font-medium group-hover:text-primary/80 transition-colors">{member.title}</CardDescription>
@@ -190,7 +191,6 @@ export default function KeyCommitteePage() {
           </div>
         </div>
       </div>
-      {/* Ensure selectedMember is passed correctly to the dynamically imported modal */}
       {isModalOpen && selectedMember && <CommitteeMemberModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} member={selectedMember} />}
     </>
   );
