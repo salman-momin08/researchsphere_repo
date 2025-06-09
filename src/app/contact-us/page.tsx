@@ -42,8 +42,8 @@ const contactPersons: ContactPerson[] = [
     designation: "General Inquiries Lead",
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
-    imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "support professional" // Kept as is, good hint
+    imageUrl: "https://picsum.photos/seed/contact1/100/100.png",
+    dataAiHint: "support professional"
   },
   {
     id: "2",
@@ -51,24 +51,24 @@ const contactPersons: ContactPerson[] = [
     designation: "Technical Support Head",
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
-    imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "tech expert" // Kept as is, good hint
+    imageUrl: "https://picsum.photos/seed/contact2/100/100.png",
+    dataAiHint: "tech expert"
   },
   {
     id: "3",
     name: "Ms. Clara Dubois",
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
-    imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "business professional" // Kept as is, good hint
+    imageUrl: "https://picsum.photos/seed/contact3/100/100.png",
+    dataAiHint: "business professional"
   },
   {
     id: "4",
-    name: "Dr. Evelyn Reed", // From Key Committee
+    name: "Dr. Evelyn Reed", 
     designation: "Conference Chair Liaison",
     email: "evelyn.reed@researchsphere.com",
-    imageUrl: "https://placehold.co/128x128.png",
-    dataAiHint: "academic leader" // Kept as is, good hint
+    imageUrl: "https://picsum.photos/seed/contact4/100/100.png",
+    dataAiHint: "academic leader"
   }
 ];
 
@@ -240,3 +240,4 @@ export default function ContactUsPage() {
     </div>
   );
 }
+

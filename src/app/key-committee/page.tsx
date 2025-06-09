@@ -29,7 +29,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Evelyn Reed",
     title: "Conference Chair",
     affiliation: "Institute of Advanced Technology",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee1/100/100.png",
     dataAiHint: "academic scientist", 
     bio: "Dr. Reed is a leading expert in artificial intelligence and its applications in scientific research. She has published numerous papers and chaired several international conferences.",
     achievements: [
@@ -45,7 +45,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Samuel Green",
     title: "Program Chair",
     affiliation: "University of Global Studies",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee2/100/100.png",
     dataAiHint: "academic professor", 
     bio: "Professor Green's research focuses on sustainable development and global collaboration in academia. He is passionate about fostering interdisciplinary research.",
     achievements: [
@@ -60,7 +60,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Olivia Chen",
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee3/100/100.png",
     dataAiHint: "tech researcher", 
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
@@ -75,7 +75,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Marcus Bellwether",
     title: "Publications Chair",
     affiliation: "Veridian Dynamics Publishing",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee4/100/100.png",
     dataAiHint: "publishing editor", 
     bio: "Dr. Bellwether has overseen the publication process for numerous high-impact journals and conference proceedings.",
     achievements: [
@@ -90,7 +90,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Anya Sharma",
     title: "Workshop Coordinator",
     affiliation: "Center for Collaborative Research",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee5/100/100.png",
     dataAiHint: "workshop coordinator", 
     bio: "Professor Sharma excels at organizing engaging and productive workshops that bridge the gap between theory and practice.",
     achievements: [
@@ -105,7 +105,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Kenji Tanaka",
     title: "International Liaison",
     affiliation: "Global Research Network",
-    imageUrl: "https://placehold.co/128x128.png",
+    imageUrl: "https://picsum.photos/seed/committee6/100/100.png",
     dataAiHint: "global liaison", 
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
