@@ -199,7 +199,7 @@ export default function HomePage() {
         <div className="container mx-auto text-center px-4 sm:px-6 lg:px-8">
           <div className="relative w-full max-w-4xl aspect-[16/6] sm:aspect-[16/5] md:aspect-[16/4] mx-auto mb-8 rounded-lg shadow-md overflow-hidden">
             <Image
-              src="https://placehold.co/1200x450.png"
+              src="https://picsum.photos/seed/researchcollab01/1200/450"
               alt="A diverse group of researchers collaborating in a modern laboratory or university setting, symbolizing academic paper publication, innovation, and scholarly community."
               fill
               className="object-cover"
