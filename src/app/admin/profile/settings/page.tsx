@@ -6,8 +6,7 @@ import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
 import { useSearchParams as useNextSearchParams } from "next/navigation"; // Renamed to avoid conflict
-import React, { Suspense } from 'react';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import React from 'react'; // Removed Suspense and LoadingSpinner imports
 
 // This internal component uses the hook
 function AdminProfileSettingsPageContent() {
@@ -44,9 +43,7 @@ export default function AdminProfileSettingsPage() {
     // AdminLayout already has adminOnly={true}.
     // However, keeping it ensures the ProfileUpdateForm itself can also be protected if used elsewhere.
     <ProtectedRoute adminOnly={true}> {/* Ensures only admins can access this admin-specific settings page */}
-      <Suspense fallback={<div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>}>
-        <AdminProfileSettingsPageContent />
-      </Suspense>
+      <AdminProfileSettingsPageContent />
     </ProtectedRoute>
   );
 }

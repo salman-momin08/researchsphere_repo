@@ -6,8 +6,7 @@ import ProfileUpdateForm from '@/components/profile/ProfileUpdateForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCog } from "lucide-react";
 import { useSearchParams as useNextSearchParams } from "next/navigation";
-import React, { Suspense } from 'react';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import React from 'react'; // Removed Suspense and LoadingSpinner imports
 
 // This internal component uses the hook
 function AuthorProfileSettingsPageContent() {
@@ -42,9 +41,7 @@ export default function AuthorProfileSettingsPage() {
     // AuthContext will handle redirecting TO here if profile is incomplete.
     // AuthContext (via updateUserProfile) will handle redirecting AWAY if profile is completed.
     <ProtectedRoute> 
-      <Suspense fallback={<div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>}>
-        <AuthorProfileSettingsPageContent />
-      </Suspense>
+      <AuthorProfileSettingsPageContent />
     </ProtectedRoute>
   );
 }
