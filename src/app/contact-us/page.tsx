@@ -15,7 +15,7 @@ import { Mail, Send, Loader2, CheckCircle, UserCircle, Phone, Briefcase } from "
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
-import { getInitials } from "@/lib/utils"; // Import the getInitials function
+import { getInitials } from "@/lib/utils";
 
 const contactFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -32,8 +32,7 @@ interface ContactPerson {
   designation: string;
   email: string;
   phone?: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageFileName?: string; // Changed from imageUrl
 }
 
 const contactPersons: ContactPerson[] = [
@@ -43,8 +42,7 @@ const contactPersons: ContactPerson[] = [
     designation: "General Inquiries Lead",
     email: "support@researchsphere.com",
     phone: "+1-800-555-0100",
-    imageUrl: "https://picsum.photos/seed/contact1/100/100.png",
-    dataAiHint: "support professional"
+    imageFileName: "dr_eleanor_vance.png",
   },
   {
     id: "2",
@@ -52,24 +50,21 @@ const contactPersons: ContactPerson[] = [
     designation: "Technical Support Head",
     email: "tech@researchsphere.com",
     phone: "+1-800-555-0101",
-    imageUrl: "https://picsum.photos/seed/contact2/100/100.png",
-    dataAiHint: "tech expert"
+    imageFileName: "mr_samuel_finch.png",
   },
   {
     id: "3",
     name: "Ms. Clara Dubois",
     designation: "Partnership Coordinator",
     email: "partners@researchsphere.com",
-    imageUrl: "https://picsum.photos/seed/contact3/100/100.png",
-    dataAiHint: "business professional"
+    imageFileName: "ms_clara_dubois.png",
   },
   {
     id: "4",
-    name: "Dr. Evelyn Reed", 
+    name: "Dr. Evelyn Reed",
     designation: "Conference Chair Liaison",
     email: "evelyn.reed@researchsphere.com",
-    imageUrl: "https://picsum.photos/seed/contact4/100/100.png",
-    dataAiHint: "academic leader"
+    imageFileName: "dr_evelyn_reed_contact.png", // Potentially different image from committee page
   }
 ];
 
@@ -124,14 +119,11 @@ export default function ContactUsPage() {
               <Card key={person.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary">
-                    {person.imageUrl ? (
+                    {person.imageFileName ? (
                       <AvatarImage
-                        src={person.imageUrl}
+                        src={`/images/contact/${person.imageFileName}`}
                         alt={person.name}
-                        // width={100} // Not needed for AvatarImage
-                        // height={100} // Not needed for AvatarImage
                         className="aspect-square object-cover"
-                        // data-ai-hint={person.dataAiHint || "professional portrait"} // Data AI hint is already part of picsum URL logic or for actual generation
                       />
                     ) : null }
                     <AvatarFallback className="text-2xl sm:text-3xl bg-muted text-primary-foreground">

@@ -8,18 +8,14 @@ import { Building, UserCircle, Mail, Star, Briefcase } from "lucide-react";
 import Image from "next/image";
 import dynamic from 'next/dynamic';
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { getInitials } from "@/lib/utils"; // Import the getInitials function
+import { getInitials } from "@/lib/utils";
 
-// Assuming CommitteeMember type will be defined or imported appropriately
-// For now, let's keep its definition here for clarity in this file if not moved to global types yet.
-// If CommitteeMember is in @/types, this local definition should be removed and imported.
 interface CommitteeMember {
   id: string;
   name: string;
   title: string;
   affiliation: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageFileName?: string; // Changed from imageUrl to imageFileName
   bio?: string;
   achievements?: string[];
   email?: string;
@@ -31,8 +27,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Evelyn Reed",
     title: "Conference Chair",
     affiliation: "Institute of Advanced Technology",
-    imageUrl: "https://picsum.photos/seed/committee1/100/100.png",
-    dataAiHint: "academic scientist", 
+    imageFileName: "dr_evelyn_reed.png",
     bio: "Dr. Reed is a leading expert in artificial intelligence and its applications in scientific research. She has published numerous papers and chaired several international conferences.",
     achievements: [
       "Pioneered novel deep learning architectures for scientific discovery.",
@@ -47,8 +42,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Samuel Green",
     title: "Program Chair",
     affiliation: "University of Global Studies",
-    imageUrl: "https://picsum.photos/seed/committee2/100/100.png",
-    dataAiHint: "academic professor", 
+    imageFileName: "prof_samuel_green.png",
     bio: "Professor Green's research focuses on sustainable development and global collaboration in academia. He is passionate about fostering interdisciplinary research.",
     achievements: [
       "Developed key frameworks for international research collaboration.",
@@ -62,8 +56,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Olivia Chen",
     title: "Technical Program Committee Lead",
     affiliation: "Innovatech Research Labs",
-    imageUrl: "https://picsum.photos/seed/committee3/100/100.png",
-    dataAiHint: "tech researcher", 
+    imageFileName: "dr_olivia_chen.png",
     bio: "Dr. Chen specializes in data science and machine learning. She has extensive experience in organizing technical programs for academic events.",
     achievements: [
       "Lead organizer for the TPC of three major AI conferences.",
@@ -77,8 +70,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Marcus Bellwether",
     title: "Publications Chair",
     affiliation: "Veridian Dynamics Publishing",
-    imageUrl: "https://picsum.photos/seed/committee4/100/100.png",
-    dataAiHint: "publishing editor", 
+    imageFileName: "dr_marcus_bellwether.png",
     bio: "Dr. Bellwether has overseen the publication process for numerous high-impact journals and conference proceedings.",
     achievements: [
       "Editor-in-Chief for the 'Journal of Applied Research'.",
@@ -92,8 +84,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Prof. Anya Sharma",
     title: "Workshop Coordinator",
     affiliation: "Center for Collaborative Research",
-    imageUrl: "https://picsum.photos/seed/committee5/100/100.png",
-    dataAiHint: "workshop coordinator", 
+    imageFileName: "prof_anya_sharma.png",
     bio: "Professor Sharma excels at organizing engaging and productive workshops that bridge the gap between theory and practice.",
     achievements: [
       "Organized 30+ successful international workshops.",
@@ -107,8 +98,7 @@ const committeeMembers: CommitteeMember[] = [
     name: "Dr. Kenji Tanaka",
     title: "International Liaison",
     affiliation: "Global Research Network",
-    imageUrl: "https://picsum.photos/seed/committee6/100/100.png",
-    dataAiHint: "global liaison", 
+    imageFileName: "dr_kenji_tanaka.png",
     bio: "Dr. Tanaka is instrumental in fostering international collaborations and ensuring diverse global participation in academic events.",
     achievements: [
       "Established partnerships with over 25 international institutions.",
@@ -119,7 +109,6 @@ const committeeMembers: CommitteeMember[] = [
   },
 ];
 
-// Standard dynamic import for a component in a separate file
 const CommitteeMemberModal = dynamic(() => import('@/components/key-committee/CommitteeMemberModal'), {
   ssr: false,
   loading: () => <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"><LoadingSpinner size={32} /></div>,
@@ -131,7 +120,12 @@ export default function KeyCommitteePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = (member: CommitteeMember) => {
-    setSelectedMember(member);
+    // Construct imageUrl for the modal
+    const memberForModal = {
+      ...member,
+      imageUrl: member.imageFileName ? `/images/committee/${member.imageFileName}` : undefined
+    };
+    setSelectedMember(memberForModal as any); // Cast needed because modal expects imageUrl
     setIsModalOpen(true);
   };
 
@@ -158,16 +152,13 @@ export default function KeyCommitteePage() {
               >
                 <CardHeader className="items-center text-center">
                   <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-primary group-hover:border-primary/70 transition-colors">
-                    {member.imageUrl ? (
+                    {member.imageFileName ? (
                     <AvatarImage
-                      src={member.imageUrl}
+                      src={`/images/committee/${member.imageFileName}`}
                       alt={member.name}
-                      // width={100} // width & height are part of AvatarImage's props, not needed for next/image like usage here
-                      // height={100}
-                      className="aspect-square object-cover" // Keep this for proper image display
-                      // data-ai-hint={member.dataAiHint || "professional portrait"} // Already part of picsum URL or future direct AI image
+                      className="aspect-square object-cover"
                     />
-                    ) : null } 
+                    ) : null }
                     <AvatarFallback className="text-2xl sm:text-3xl bg-muted text-primary-foreground">
                       {getInitials(member.name)}
                     </AvatarFallback>
@@ -191,7 +182,7 @@ export default function KeyCommitteePage() {
           </div>
         </div>
       </div>
-      {isModalOpen && selectedMember && <CommitteeMemberModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} member={selectedMember} />}
+      {isModalOpen && selectedMember && <CommitteeMemberModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} member={selectedMember as any} />}
     </>
   );
 }

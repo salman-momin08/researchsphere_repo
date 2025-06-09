@@ -2,22 +2,20 @@
 "use client";
 
 import React from 'react';
-import Image from "next/image";
+import Image from "next/image"; // Keep this for internal use by AvatarImage with local paths
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building, Mail, Star, UserCircle } from "lucide-react";
+import { getInitials } from '@/lib/utils';
 
-// Define CommitteeMember interface here or import from a central types file if available
-// For this change, defining it locally to keep it self-contained.
-interface CommitteeMember {
+interface CommitteeMemberForModal {
   id: string;
   name: string;
   title: string;
   affiliation: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageUrl?: string; // This will be the constructed path like /images/committee/file.png
   bio?: string;
   achievements?: string[];
   email?: string;
@@ -26,7 +24,7 @@ interface CommitteeMember {
 export interface CommitteeMemberModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  member: CommitteeMember | null;
+  member: CommitteeMemberForModal | null;
 }
 
 const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: CommitteeMemberModalProps) => {
@@ -39,19 +37,15 @@ const CommitteeMemberModalComponent = ({ isOpen, onOpenChange, member }: Committ
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
             <Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-2 border-primary">
               {member.imageUrl ? (
-                <Image
-                  src={member.imageUrl}
+                <AvatarImage
+                  src={member.imageUrl} // Use the passed imageUrl
                   alt={member.name}
-                  width={112}
-                  height={112}
                   className="aspect-square object-cover"
-                  data-ai-hint={member.dataAiHint || "professional portrait"}
                 />
-              ) : (
-                <AvatarFallback className="text-3xl sm:text-4xl bg-muted">
-                  <UserCircle size={60} />
-                </AvatarFallback>
-              )}
+              ) : null }
+              <AvatarFallback className="text-3xl sm:text-4xl bg-muted">
+                {getInitials(member.name) || <UserCircle size={60} />}
+              </AvatarFallback>
             </Avatar>
             <div className="text-center sm:text-left">
               <DialogTitle className="text-xl sm:text-2xl font-bold">{member.name}</DialogTitle>
