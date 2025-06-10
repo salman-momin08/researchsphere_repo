@@ -301,28 +301,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setLoading(true);
     let emailToLogin = identifier.trim();
+
     try {
       if (!identifier.includes('@')) {
+        // Attempt to find user by username
         const usersRef = collection(firestoreDb, "users");
         const q = query(usersRef, where("username", "==", identifier.trim()));
         const querySnapshot = await getDocs(q);
+
         if (!querySnapshot.empty) {
           const userData = querySnapshot.docs[0].data() as User;
-          if (userData.email) emailToLogin = userData.email;
-          else throw new Error(`User '${identifier}' record incomplete (missing email).`);
+          if (userData.email) {
+            emailToLogin = userData.email;
+          } else {
+            // This case should ideally not happen if profiles are complete
+            throw new Error(`User account for '${identifier}' is improperly configured (missing email).`);
+          }
+        } else {
+          // Username not found, proceed to try identifier as email (will likely fail if it's not an email)
+          // Or, more explicitly, throw an error here if we want to differentiate "username not found"
+          // For security, it's better to have a generic error later.
         }
       }
+      // Attempt to sign in with the determined email (or original identifier if it was an email)
       await signInWithEmailAndPassword(firebaseAuth, emailToLogin, pass);
       setShowLoginModal(false);
       setHasShownIncompleteProfileToast(false);
       if (typeof window !== 'undefined') sessionStorage.removeItem('incompleteProfileToastShownThisSession');
     } catch (error: any) {
       let errorMessage = "Invalid email/username or password.";
-      if (error.code !== 'auth/invalid-credential' && error.code !== 'auth/user-not-found' && error.code !== 'auth/wrong-password') {
+      // Firebase errors for invalid credentials, user not found, or wrong password
+      if (error.code === 'auth/invalid-credential' || 
+          error.code === 'auth/user-not-found' || 
+          error.code === 'auth/wrong-password' ||
+          error.code === 'auth/invalid-email') { // invalid-email might occur if username was used and not found
+        // Keep generic message for these specific auth errors
+      } else if (error.message.startsWith('User account for')) {
+        // Specific error from our username check
+        errorMessage = error.message;
+      }
+      else {
+        // For other types of errors, use Firebase's message or a fallback
         errorMessage = error.message || errorMessage;
       }
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
-      throw new Error(errorMessage);
+      throw new Error(errorMessage); // Re-throw to be caught by the form if needed
     } finally {
       setLoading(false);
     }
