@@ -227,7 +227,7 @@ export default function Header() {
                 isActive
                   ? "text-primary font-semibold bg-secondary" 
                   : "text-foreground hover:text-primary hover:bg-secondary" 
-              );
+ );
             }
 
             return (

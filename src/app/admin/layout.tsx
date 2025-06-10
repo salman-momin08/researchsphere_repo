@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { Shield, Users, LayoutDashboard, FileText as FileTextIcon, UserCheck, Eye, Settings } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, FileText as FileTextIcon, UserCheck, Eye, Settings, MailQuestion } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -18,6 +18,7 @@ const adminNavLinks = [
   { href: '/admin/users', label: 'User Management', icon: <Users /> },
   { href: '/admin/registered-admins', label: 'Registered Admins', icon: <UserCheck /> },
   { href: '/admin/reviewers', label: 'Reviewer Management', icon: <Eye /> },
+  { href: '/admin/contact-submissions', label: 'Contact Messages', icon: <MailQuestion /> },
   { href: '/admin/profile/settings', label: 'Profile Settings', icon: <Settings /> },
 ];
 

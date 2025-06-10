@@ -11,11 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mail, Send, Loader2, CheckCircle, UserCircle, Phone, Briefcase } from "lucide-react";
+import { Mail, Send, Loader2, CheckCircle, UserCircle, Phone, Briefcase, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
 import { getInitials } from "@/lib/utils";
+import { addContactSubmission } from "@/lib/contact-service"; // Import the service
 
 const contactFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -32,7 +33,7 @@ interface ContactPerson {
   designation: string;
   email: string;
   phone?: string;
-  imageFileName?: string; // Changed from imageUrl
+  imageFileName?: string;
 }
 
 const contactPersons: ContactPerson[] = [
@@ -64,7 +65,7 @@ const contactPersons: ContactPerson[] = [
     name: "Dr. Evelyn Reed",
     designation: "Conference Chair Liaison",
     email: "evelyn.reed@researchsphere.com",
-    imageFileName: "dr_evelyn_reed_contact.png", // Potentially different image from committee page
+    imageFileName: "dr_evelyn_reed_contact.png",
   }
 ];
 
@@ -72,6 +73,7 @@ const contactPersons: ContactPerson[] = [
 export default function ContactUsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -86,17 +88,27 @@ export default function ContactUsPage() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsLoading(true);
     setIsSuccess(false);
+    setFormError(null);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setIsLoading(false);
-    setIsSuccess(true);
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for contacting us. We'll get back to you soon.",
-    });
-    form.reset();
+    try {
+      await addContactSubmission(data);
+      setIsSuccess(true);
+      toast({
+        title: "Message Sent!",
+        description: "Thank you for contacting us. We'll get back to you soon.",
+      });
+      form.reset();
+    } catch (error: any) {
+      const errorMessage = error.message || "An unexpected error occurred. Please try again.";
+      setFormError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Message Not Sent",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -160,12 +172,19 @@ export default function ContactUsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 sm:space-y-6">
+            {formError && !isSuccess && (
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Submission Error</AlertTitle>
+                    <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+            )}
             {isSuccess ? (
               <Alert variant="default" className="border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
                 <CheckCircle className="h-4 w-4 !text-green-700 dark:!text-green-400" />
                 <AlertTitle>Message Sent Successfully!</AlertTitle>
                 <AlertDescription className="!text-green-700 dark:!text-green-400">
-                  Thank you for reaching out. We will get back to you as soon as possible.
+                  Thank you for reaching out. Your message has been recorded.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -232,4 +251,3 @@ export default function ContactUsPage() {
     </div>
   );
 }
-

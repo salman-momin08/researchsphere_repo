@@ -95,12 +95,11 @@ service cloud.firestore {
       // e.g., query for own papers: where('userId', '==', auth.uid)
       // e.g., query for assigned papers: where('assignedReviewerIds', 'array-contains', auth.uid)
       // e.g., query for published: where('status', '==', 'Published')
-      allow list: if request.auth != null &&
+      allow list: if isAdmin() ||
                      (
-                       isAdmin() ||
-                       (resource.data.userId == request.auth.uid) ||
-                       (resource.data.status == 'Published') ||
-                       (request.auth.uid in resource.data.assignedReviewerIds)
+                       request.auth != null && (resource.data.userId == request.auth.uid || request.auth.uid in resource.data.assignedReviewerIds)
+                     ) ||
+                     (resource.data.status == 'Published' && request.auth == null) // Allow listing published papers for unauthenticated users
                      );
 
       // CREATE:

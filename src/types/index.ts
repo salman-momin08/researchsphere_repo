@@ -14,8 +14,8 @@ export interface User {
   researcherId?: string | null;
   isAdmin?: boolean; // Primary flag for admin status
   isSuspended?: boolean;
-  createdAt?: string | null; // Changed from string | Timestamp | null
-  updatedAt?: string | null; // Changed from string | Timestamp | null
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export type PaperStatus =
@@ -40,7 +40,7 @@ export interface Review {
     relevance?: number;
     quality?: number;
   };
-  submittedAt: string; // Changed from string | Timestamp
+  submittedAt: string;
 }
 
 export interface Paper {
@@ -52,7 +52,7 @@ export interface Paper {
   keywords: string[];
   fileName: string | null;
   fileUrl: string | null; // Will be Cloudinary URL
-  uploadDate: string; // Changed from string | Timestamp
+  uploadDate: string;
   status: PaperStatus;
   plagiarismScore?: number | null;
   plagiarismReport?: {
@@ -63,13 +63,21 @@ export interface Paper {
     reasoning: string;
   } | null;
   adminFeedback?: string | null;
-  submissionDate?: string | null; // Changed from string | Timestamp | null
-  paymentDueDate?: string | null; // Changed from string | Timestamp | null
+  submissionDate?: string | null;
+  paymentDueDate?: string | null;
   paymentOption?: "payNow" | "payLater" | null;
-  paidAt?: string | null; // Changed from string | Timestamp | null
-  lastUpdatedAt?: string | null; // Changed from string | Timestamp | null
+  paidAt?: string | null;
+  lastUpdatedAt?: string | null;
   assignedReviewerIds?: string[];
   reviews?: Review[];
 }
 
-    
+export interface ContactSubmission {
+  id: string;
+  fullName: string;
+  email: string;
+  subject: string;
+  message: string;
+  sentAt: string; // ISO date string
+  isRead?: boolean; // Optional: for admins to mark as read
+}

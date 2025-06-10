@@ -17,7 +17,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'ResearchSphere - Academic Paper Publishing',
+  title: 'ResearchSphere - Research Paper Publishing',
   description: 'Upload, manage, and evaluate research papers with AI-powered tools.',
 };
 
