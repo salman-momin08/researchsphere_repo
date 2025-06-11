@@ -11,13 +11,16 @@ const LoginModal = dynamic(() => import('@/components/auth/LoginModal'), {
   loading: () => <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"><LoadingSpinner size={32} /></div>,
 });
 
-// You can add other client-side only dynamic imports here if needed
+const Chatbot = dynamic(() => import('@/components/chatbot/Chatbot'), {
+  ssr: false,
+  // No specific loading for chatbot FAB itself, it's small. Dialog will handle its own.
+});
 
 export default function ClientSideComponents() {
   return (
     <>
       <LoginModal />
-      {/* Render other dynamically imported client-side components here */}
+      <Chatbot />
     </>
   );
 }
