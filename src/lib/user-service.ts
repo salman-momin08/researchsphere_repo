@@ -13,6 +13,7 @@ import {
   Timestamp,
   serverTimestamp,
   orderBy,
+  deleteDoc, // Added deleteDoc
 } from "firebase/firestore";
 import { db as firestoreDb } from "@/lib/firebase";
 import type { User } from '@/types';
@@ -158,5 +159,18 @@ export const updateUserRole = async (targetUserId: string, newRole: "Author" | "
   } catch (error: any) {
     console.error(`UserService (updateUserRole): Error updating role for user ${targetUserId}:`, error.message);
     throw new Error("Failed to update user role.");
+  }
+};
+
+export const deleteUserFromFirestore = async (userId: string): Promise<void> => {
+  if (!firestoreDb) {
+    throw new Error("UserService (deleteUserFromFirestore): Database service unavailable.");
+  }
+  const userDocRef = doc(firestoreDb, "users", userId);
+  try {
+    await deleteDoc(userDocRef);
+  } catch (error: any) {
+    console.error(`UserService (deleteUserFromFirestore): Error deleting user ${userId} from Firestore:`, error.message);
+    throw new Error(`Failed to delete user from platform: ${error.message}`);
   }
 };

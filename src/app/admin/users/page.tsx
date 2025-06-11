@@ -3,13 +3,23 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
-import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus, updateUserRole } from '@/lib/user-service';
+import { getAllUsers, toggleUserAdminStatus, toggleUserSuspensionStatus, updateUserRole, deleteUserFromFirestore } from '@/lib/user-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff, Ban, Undo, Edit3 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Users as UsersIcon, AlertTriangle, ShieldCheck, ShieldOff, Ban, Undo, Edit3, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,6 +31,7 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
 
   const fetchUsers = useCallback(async () => {
@@ -35,7 +46,7 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]); // Added toast as a dependency
+  }, []); 
 
   useEffect(() => {
     fetchUsers();
@@ -99,6 +110,25 @@ export default function UserManagementPage() {
       toast({ variant: "destructive", title: "Role Update Failed", description: err.message || "Could not update user role." });
     } finally {
       setProcessingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete || !currentAdminUser || currentAdminUser.id === userToDelete.id || userToDelete.role === "Admin") {
+      toast({ variant: "destructive", title: "Action Not Allowed", description: "Cannot delete this user account." });
+      setUserToDelete(null);
+      return;
+    }
+    setProcessingUserId(userToDelete.id);
+    try {
+      await deleteUserFromFirestore(userToDelete.id);
+      toast({ title: "User Deleted", description: `User "${userToDelete.displayName}" has been deleted from the platform.` });
+      fetchUsers();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Deletion Failed", description: err.message || "Could not delete user." });
+    } finally {
+      setProcessingUserId(null);
+      setUserToDelete(null);
     }
   };
 
@@ -178,13 +208,13 @@ export default function UserManagementPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex flex-col sm:flex-row justify-center items-center gap-1 py-2">
+                        <div className="flex flex-col sm:flex-row justify-center items-center flex-wrap gap-1 py-2">
                             <Select
                             value={user.role || undefined}
                             onValueChange={(newRole) => handleChangeRole(user.id, newRole as "Author" | "Reviewer")}
                             disabled={currentAdminUser?.id === user.id || processingUserId === user.id || user.role === "Admin"}
                             >
-                            <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs" aria-label={`Change role for ${user.displayName}`}>
+                            <SelectTrigger className="h-9 w-full sm:w-auto sm:min-w-[130px] text-xs flex-shrink-0" aria-label={`Change role for ${user.displayName}`}>
                                 <SelectValue placeholder="Change Role" />
                             </SelectTrigger>
                             <SelectContent>
@@ -197,7 +227,7 @@ export default function UserManagementPage() {
                             size="sm"
                             onClick={() => handleToggleAdmin(user)}
                             disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
-                            className="w-full sm:w-32 text-xs"
+                            className="w-full sm:w-auto text-xs flex-shrink-0"
                             >
                             {user.isAdmin ? (
                                 <><ShieldOff className="mr-2 h-4 w-4" /> Revoke Admin</>
@@ -210,13 +240,22 @@ export default function UserManagementPage() {
                             size="sm"
                             onClick={() => handleToggleSuspension(user)}
                             disabled={currentAdminUser?.id === user.id || processingUserId === user.id}
-                            className="w-full sm:w-32 text-xs"
+                            className="w-full sm:w-auto text-xs flex-shrink-0"
                             >
                             {user.isSuspended ? (
                                 <><Undo className="mr-2 h-4 w-4" /> Unsuspend</>
                             ) : (
                                 <><Ban className="mr-2 h-4 w-4" /> Suspend</>
                             )}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setUserToDelete(user)}
+                              disabled={currentAdminUser?.id === user.id || processingUserId === user.id || user.role === "Admin"}
+                              className="w-full sm:w-auto text-xs flex-shrink-0"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete User
                             </Button>
                         </div>
                       </TableCell>
@@ -228,6 +267,26 @@ export default function UserManagementPage() {
           )}
         </CardContent>
       </Card>
+
+      {userToDelete && (
+        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the user &quot;{userToDelete.displayName || userToDelete.email}&quot;?
+                This will remove their profile from the platform. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">
+                Delete User
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
