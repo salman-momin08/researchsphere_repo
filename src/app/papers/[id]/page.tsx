@@ -10,7 +10,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Eye, UserCheck, UserPlus, Send, Star, MessageCircle, LayoutDashboard as AdminDashboardIcon } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Eye, UserCheck, UserPlus, Send, Star, MessageCircle, LayoutDashboard as AdminDashboardIcon, Trash2 } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import PlagiarismReport from '@/components/papers/PlagiarismReport';
 import AcceptanceProbabilityReport from '@/components/papers/AcceptanceProbabilityReport';
@@ -21,7 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { getPaper, updatePaperStatus, updatePaperData, addReviewToPaper } from '@/lib/paper-service';
+import { getPaper, updatePaperStatus, updatePaperData, addReviewToPaper, deletePaper } from '@/lib/paper-service';
 import CountdownTimer from '@/components/shared/CountdownTimer';
 import { getAllUsers, getUserProfile } from '@/lib/user-service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -58,6 +69,7 @@ function PaperDetailsContent() {
 
   const [isDownloadingFile, setIsDownloadingFile] = useState(false);
   const [fileDownloadProgress, setFileDownloadProgress] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 
   const isUserAssignedReviewer = user && currentPaper?.assignedReviewerIds?.includes(user.id);
@@ -425,6 +437,18 @@ function PaperDetailsContent() {
     }
   };
 
+  const handleDeletePaperConfirm = async () => {
+    if (!currentPaper || !isAdminUser) return;
+    setShowDeleteConfirm(false);
+    try {
+      await deletePaper(currentPaper.id);
+      toast({ title: "Paper Deleted", description: `Paper "${currentPaper.title}" has been successfully deleted.` });
+      router.push('/admin/dashboard'); // Navigate admin to dashboard after deletion
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error Deleting Paper", description: error.message || "Could not delete the paper." });
+    }
+  };
+
 
   if (loadingPaper) {
     return <div className="flex justify-center items-center py-20"><LoadingSpinner size={48} /></div>;
@@ -605,32 +629,45 @@ function PaperDetailsContent() {
              {isAdminUser && (
                 <Card className="mt-6 p-4 border rounded-md bg-card">
                   <CardHeader className="p-2">
-                    <CardTitle className="text-lg">Change Paper Status</CardTitle>
+                    <CardTitle className="text-lg">Manage Paper</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-2">
-                    <div className="flex flex-wrap gap-2">
-                        {(["Submitted", "Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
-                        <Button
-                            key={statusOption}
-                            variant={currentPaper.status === statusOption ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleStatusChange(statusOption)}
-                            disabled={isSubmittingFeedback || currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
-                        >
-                            Mark as {statusOption}
-                        </Button>
-                        ))}
-                        {isPaperOverdue && currentPaper.status === "Payment Pending" && (
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleStatusChange("Rejected")}
-                                disabled={isSubmittingFeedback}
-                            >
-                                Confirm Rejection (Overdue)
-                            </Button>
-                        )}
+                  <CardContent className="p-2 space-y-3">
+                    <div>
+                      <h4 className="font-medium mb-1">Change Status:</h4>
+                      <div className="flex flex-wrap gap-2">
+                          {(["Submitted", "Under Review", "Accepted", "Rejected", "Action Required", "Published", "Payment Pending"] as Paper['status'][]).map(statusOption => (
+                          <Button
+                              key={statusOption}
+                              variant={currentPaper.status === statusOption ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleStatusChange(statusOption)}
+                              disabled={isSubmittingFeedback || currentPaper.status === statusOption || (isPaperOverdue && currentPaper.status === "Payment Pending" && statusOption !== "Rejected")}
+                          >
+                              Mark as {statusOption}
+                          </Button>
+                          ))}
+                          {isPaperOverdue && currentPaper.status === "Payment Pending" && (
+                              <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleStatusChange("Rejected")}
+                                  disabled={isSubmittingFeedback}
+                              >
+                                  Confirm Rejection (Overdue)
+                              </Button>
+                          )}
+                      </div>
                     </div>
+                    {currentPaper.status === 'Published' && (
+                      <div className="pt-3">
+                        <h4 className="font-medium mb-1">Delete Paper:</h4>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete This Published Paper
+                          </Button>
+                        </AlertDialogTrigger>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -819,6 +856,24 @@ function PaperDetailsContent() {
           onPaymentSuccess={handlePaymentSuccess}
         />
       )}
+      {currentPaper && isAdminUser && (
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete the published paper &quot;{currentPaper.title}&quot;? This action is permanent and cannot be undone.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeletePaperConfirm} className="bg-destructive hover:bg-destructive/90">
+                    Delete Paper
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
@@ -830,4 +885,3 @@ export default function PaperPage() {
     </ProtectedRoute>
   );
 }
-

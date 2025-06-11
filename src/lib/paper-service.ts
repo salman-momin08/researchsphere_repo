@@ -318,3 +318,17 @@ export const getPublishedPapers = async (): Promise<Paper[]> => {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => convertPaperTimestamps({ id: docSnap.id, ...docSnap.data() }));
 };
+
+export const deletePaper = async (paperId: string): Promise<void> => {
+  if (!firestoreDb) {
+    throw new Error("Database service unavailable.");
+  }
+  const paperDocRef = doc(firestoreDb, "papers", paperId);
+  try {
+    await deleteDoc(paperDocRef);
+  } catch (error: any) {
+    console.error(`PaperService (deletePaper): Error deleting paper ${paperId}:`, error.message);
+    throw new Error(`Failed to delete paper: ${error.message}`);
+  }
+};
+

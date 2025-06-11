@@ -3,7 +3,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import type { Paper, PaperStatus, User } from "@/types";
-import { Shield, BarChartHorizontalBig, AlertTriangle, Users as UsersIcon, FileText as FileTextIcon, Clock, Info, LayoutDashboard, UserCheck, Eye } from "lucide-react";
+import { Shield, BarChartHorizontalBig, AlertTriangle, Users as UsersIcon, FileText as FileTextIcon, Clock, Info, LayoutDashboard, UserCheck, Eye, Trash2 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getAllPapers, updatePaperStatus } from "@/lib/paper-service";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { getAllPapers, updatePaperStatus, deletePaper } from "@/lib/paper-service";
 import { getAllUsers } from "@/lib/user-service";
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +33,7 @@ function AdminDashboardContent() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
 
   const [stats, setStats] = useState({
     totalSubmissions: 0,
@@ -117,6 +129,19 @@ function AdminDashboardContent() {
       fetchAdminData(); 
     } catch (error: any) {
       toast({variant: "destructive", title: "Error Rejecting Paper", description: error.message || "Could not update paper status."});
+    }
+  };
+
+  const handleDeletePaperConfirm = async () => {
+    if (!paperToDelete) return;
+    try {
+      await deletePaper(paperToDelete.id);
+      toast({ title: "Paper Deleted", description: `Paper "${paperToDelete.title}" has been successfully deleted.` });
+      setPaperToDelete(null);
+      fetchAdminData(); // Refresh the list of papers
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error Deleting Paper", description: error.message || "Could not delete the paper." });
+      setPaperToDelete(null);
     }
   };
 
@@ -312,6 +337,13 @@ function AdminDashboardContent() {
                           {isPaymentOverdue && (
                              <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)} className="text-xs">Reject</Button>
                           )}
+                          {isAdminUser && paper.status === 'Published' && (
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="text-xs" onClick={() => setPaperToDelete(paper)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -322,6 +354,25 @@ function AdminDashboardContent() {
           )}
         </CardContent>
       </Card>
+
+      {paperToDelete && (
+        <AlertDialog open={!!paperToDelete} onOpenChange={(open) => !open && setPaperToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the published paper &quot;{paperToDelete.title}&quot;? This action is permanent and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPaperToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeletePaperConfirm} className="bg-destructive hover:bg-destructive/90">
+                Delete Paper
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
