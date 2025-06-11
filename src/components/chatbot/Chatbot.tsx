@@ -16,7 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
+  // DialogClose, // Removed DialogClose import
 } from "@/components/ui/dialog";
 
 export default function Chatbot() {
@@ -127,11 +127,8 @@ export default function Chatbot() {
               </Avatar>
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
+            {/* The explicit DialogClose button that was here has been removed. 
+                The DialogContent component itself provides the close button. */}
           </DialogHeader>
 
           <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
