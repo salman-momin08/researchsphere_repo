@@ -30,11 +30,11 @@ export default function Chatbot() {
   useEffect(() => {
     const greetingTimer = setTimeout(() => {
       setShowInitialGreeting(true);
-    }, 1500); // Show greeting after 1.5 seconds
+    }, 1500); 
 
     const hideGreetingTimer = setTimeout(() => {
       setShowInitialGreeting(false);
-    }, 7000); // Hide greeting after 7 seconds total (1.5s delay + 5.5s visible)
+    }, 7000); 
 
     return () => {
       clearTimeout(greetingTimer);
@@ -48,22 +48,21 @@ export default function Chatbot() {
         const rootElement = scrollAreaRef.current;
         if (!rootElement) return;
 
-        // The Viewport is typically the first child of the ScrollArea Root in Radix/ShadCN
-        const viewportElement = rootElement.firstChild;
+        const viewportElement = rootElement.firstChild as HTMLElement | null; 
 
-        if (viewportElement instanceof HTMLElement) {
+        if (viewportElement && typeof viewportElement.scrollTo === 'function') { 
           viewportElement.scrollTop = viewportElement.scrollHeight;
-        } else {
-          // Fallback if the firstChild is not what we expect, try scrolling the root.
+        } else if (typeof rootElement.scrollTo === 'function') {
+          console.warn("Chatbot: Could not find viewport, attempting to scroll root.");
           rootElement.scrollTop = rootElement.scrollHeight;
+        } else {
+          console.warn("Chatbot: Scrollable element not found or does not support scrollTo.");
         }
       };
-
-      // Defer to next tick to ensure DOM is ready for scroll calculations
       const timerId = setTimeout(attemptScroll, 0);
       return () => clearTimeout(timerId);
     }
-  }, [messages, isOpen]); // Rerun when messages change or dialog opens
+  }, [messages, isOpen]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -79,7 +78,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role, // Ensure 'bot' from UI maps to 'model' for AI
+      role: msg.role === 'bot' ? 'model' : msg.role,
       text: msg.text
     }));
 
@@ -144,8 +143,8 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-grow h-0" ref={scrollAreaRef}> {/* Removed p-4 from here */}
-            <div className="space-y-4 p-4"> {/* Added p-4 here */}
+          <ScrollArea className="flex-1 min-h-0" ref={scrollAreaRef}>
+            <div className="space-y-4 p-4">
               {messages.map((message) => (
                 <div
                   key={message.id}
