@@ -5,13 +5,14 @@ import type { Paper, PaperStatus } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock, Download } from 'lucide-react';
+import { FileText, Eye, DollarSign, CheckCircle, AlertCircle, Clock, Download, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import CountdownTimer from '../shared/CountdownTimer';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { Progress } from "@/components/ui/progress";
 
 interface PaperListItemProps {
   paper: Paper;
@@ -23,6 +24,8 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
   const { user } = useAuth();
   const [displayStatus, setDisplayStatus] = useState<PaperStatus>(paper.status);
   const [isOverdue, setIsOverdue] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     if (paper.status === "Payment Pending" && paper.paymentDueDate) {
@@ -77,19 +80,77 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     }
   }
 
-  const handleDownloadOriginalFile = () => {
-    if (paper.fileUrl) {
-        console.log("PaperListItem: Attempting to open original file URL:", paper.fileUrl);
-        window.open(paper.fileUrl, '_blank');
-        toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
-    } else {
-        toast({
-            variant: "destructive",
-            title: "File Not Available",
-            description: "File URL is missing for this paper.",
-        });
+  const handleDownloadOriginalFile = async () => {
+    if (!paper.fileUrl || isDownloading) return;
+
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    toast({ title: "Download Starting", description: `Preparing to download ${paper.fileName || 'the paper'}...` });
+
+    try {
+      const response = await fetch(paper.fileUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+      }
+      if (!response.body) {
+        throw new Error('Response body is null, cannot download.');
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+
+      const reader = response.body.getReader();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              loaded += value.length;
+              if (total > 0) {
+                setDownloadProgress(Math.round((loaded / total) * 100));
+              } else {
+                // Indeterminate progress if no total, update slowly
+                setDownloadProgress(prev => Math.min(prev + 5, 95));
+              }
+            }
+            controller.enqueue(value);
+          }
+          controller.close();
+          reader.releaseLock();
+        },
+        cancel() {
+          reader.cancel();
+        }
+      });
+
+      const blob = await new Response(stream).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = paper.fileName || 'downloaded_paper_file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Download Complete", description: `${paper.fileName || 'File'} downloaded.` });
+      setDownloadProgress(100);
+    } catch (error: any) {
+      console.error("Download error in PaperListItem:", error);
+      toast({ variant: "destructive", title: "Download Failed", description: error.message || "Could not download the file." });
+      setDownloadProgress(0); // Reset progress on error
+    } finally {
+      setIsDownloading(false);
+      // Optional: Reset progress after a short delay
+      setTimeout(() => {
+        if (!isDownloading) setDownloadProgress(0); // Check if another download hasn't started for this item
+      }, 2000);
     }
   };
+
 
   const handleDownloadMetadata = () => {
     const safeTitle = paper.title.replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
@@ -147,21 +208,28 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
             <CountdownTimer targetDateISO={paper.paymentDueDate} prefixText="" />
           </div>
         )}
+        {isDownloading && (
+          <div className="mt-2">
+            <Progress value={downloadProgress} className="w-full h-2" />
+            <p className="text-xs text-muted-foreground text-center mt-1">{downloadProgress}%</p>
+          </div>
+        )}
 
       </CardContent>
       <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-wrap sm:flex-row items-stretch md:items-center justify-end gap-2">
         {paper.status === 'Payment Pending' && displayStatus !== 'Payment Overdue' && user && user.id === paper.userId && (
-          <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto">
+          <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto" disabled={isDownloading}>
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto">
+        <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} className="w-full sm:w-auto" disabled={isDownloading}>
           <Eye className="mr-2 h-4 w-4" /> View Details
         </Button>
-        <Button variant="outline" size="sm" onClick={handleDownloadOriginalFile} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> Download Original File
+        <Button variant="outline" size="sm" onClick={handleDownloadOriginalFile} className="w-full sm:w-auto" disabled={isDownloading || !paper.fileUrl}>
+            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isDownloading ? 'Downloading...' : 'Download Original File'}
         </Button>
-         <Button variant="outline" size="sm" onClick={handleDownloadMetadata} className="w-full sm:w-auto text-xs">
+         <Button variant="outline" size="sm" onClick={handleDownloadMetadata} className="w-full sm:w-auto text-xs" disabled={isDownloading}>
             <FileText className="mr-1 h-3 w-3" /> Download Details
         </Button>
       </CardFooter>

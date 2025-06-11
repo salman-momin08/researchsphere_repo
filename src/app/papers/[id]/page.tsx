@@ -26,6 +26,7 @@ import CountdownTimer from '@/components/shared/CountdownTimer';
 import { getAllUsers, getUserProfile } from '@/lib/user-service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Timestamp } from 'firebase/firestore';
+import { Progress } from "@/components/ui/progress";
 
 function PaperDetailsContent() {
   const params = useParams();
@@ -54,6 +55,10 @@ function PaperDetailsContent() {
   const [reviewComments, setReviewComments] = useState("");
   const [reviewRecommendation, setReviewRecommendation] = useState<Review['recommendation'] | undefined>(undefined);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const [isDownloadingFile, setIsDownloadingFile] = useState(false);
+  const [fileDownloadProgress, setFileDownloadProgress] = useState(0);
+
 
   const isUserAssignedReviewer = user && currentPaper?.assignedReviewerIds?.includes(user.id);
   const hasUserAlreadyReviewed = user && currentPaper?.reviews?.some(r => r.reviewerId === user.id);
@@ -255,11 +260,72 @@ function PaperDetailsContent() {
     }
   };
 
-  const handleDownloadOriginalFile = () => {
-    if (currentPaper?.fileUrl) {
-        window.open(currentPaper.fileUrl, '_blank');
-    } else {
-        toast({ variant: "destructive", title: "File Not Available", description: "File URL is missing." });
+  const handleDownloadOriginalFile = async () => {
+    if (!currentPaper?.fileUrl || isDownloadingFile) return;
+
+    setIsDownloadingFile(true);
+    setFileDownloadProgress(0);
+    toast({ title: "Download Starting", description: `Preparing to download ${currentPaper.fileName || 'the paper'}...` });
+
+    try {
+      const response = await fetch(currentPaper.fileUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+      }
+      if (!response.body) {
+        throw new Error('Response body is null, cannot download.');
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+
+      const reader = response.body.getReader();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              loaded += value.length;
+              if (total > 0) {
+                setFileDownloadProgress(Math.round((loaded / total) * 100));
+              } else {
+                setFileDownloadProgress(prev => Math.min(prev + 5, 95));
+              }
+            }
+            controller.enqueue(value);
+          }
+          controller.close();
+          reader.releaseLock();
+        },
+        cancel() {
+          reader.cancel();
+        }
+      });
+
+      const blob = await new Response(stream).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = currentPaper.fileName || 'downloaded_paper_file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Download Complete", description: `${currentPaper.fileName || 'File'} downloaded.` });
+      setFileDownloadProgress(100);
+    } catch (error: any) {
+      console.error("Download error in PaperDetailsContent:", error);
+      toast({ variant: "destructive", title: "Download Failed", description: error.message || "Could not download the file." });
+      setFileDownloadProgress(0);
+    } finally {
+      setIsDownloadingFile(false);
+      setTimeout(() => {
+        if (!isDownloadingFile) setFileDownloadProgress(0);
+      }, 2000);
     }
   };
 
@@ -412,20 +478,35 @@ function PaperDetailsContent() {
             </div>
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto items-stretch md:items-center">
                 {currentPaper.fileUrl && (
-                  <Button onClick={handleDownloadOriginalFile} size="lg" variant="outline" className="w-full sm:w-auto">
-                      <Download className="mr-2 h-5 w-5" /> Download Original File
-                  </Button>
+                  <div className="flex flex-col w-full sm:w-auto">
+                    <Button 
+                      onClick={handleDownloadOriginalFile} 
+                      size="lg" 
+                      variant="outline" 
+                      className="w-full"
+                      disabled={isDownloadingFile || !currentPaper.fileUrl}
+                    >
+                      {isDownloadingFile ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Download className="mr-2 h-5 w-5" />}
+                      {isDownloadingFile ? 'Downloading...' : 'Download Original File'}
+                    </Button>
+                    {isDownloadingFile && (
+                      <div className="mt-1 w-full">
+                        <Progress value={fileDownloadProgress} className="h-1.5" />
+                         <p className="text-xs text-muted-foreground text-center">{fileDownloadProgress}%</p>
+                      </div>
+                    )}
+                  </div>
                 )}
-                 <Button onClick={handleDownloadMetadata} variant="outline" size="lg" className="w-full sm:w-auto">
+                 <Button onClick={handleDownloadMetadata} variant="outline" size="lg" className="w-full sm:w-auto" disabled={isDownloadingFile}>
                     <FileTextIcon className="mr-2 h-4 w-4" /> Download Details
                 </Button>
                 {effectiveStatus === 'Payment Pending' && user && currentPaper.userId === user.id && !isAdminUser && !isPaperOverdue && (
-                <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full sm:w-auto">
+                <Button onClick={() => setIsPaymentModalOpen(true)} size="lg" className="w-full sm:w-auto" disabled={isDownloadingFile}>
                     <DollarSign className="mr-2 h-5 w-5" /> Proceed to Payment
                 </Button>
                 )}
                 {isAdminUser && (
-                    <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto">
+                    <Button onClick={() => router.push('/admin/dashboard')} variant="outline" className="w-full sm:w-auto" disabled={isDownloadingFile}>
                         <AdminDashboardIcon className="mr-2 h-4 w-4" /> Admin Dashboard
                     </Button>
                 )}

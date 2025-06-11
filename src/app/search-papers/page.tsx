@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Search as SearchIcon, FileText as FileTextIcon, Eye, AlertTriangle } from 'lucide-react';
+import { Download, Search as SearchIcon, FileText as FileTextIcon, Eye, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Paper, PaperStatus } from '@/types';
 import { getPublishedPapers } from '@/lib/paper-service'; 
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useRouter } from 'next/navigation';
+import { Progress } from "@/components/ui/progress";
 
 
 function SearchPapersContent() {
@@ -25,6 +26,10 @@ function SearchPapersContent() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  const [downloadingPaperId, setDownloadingPaperId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -66,17 +71,72 @@ function SearchPapersContent() {
     }
   };
 
-  const handleDownloadOriginalFile = (paper: Paper) => {
-    if (paper.fileUrl) {
-        console.log("File URL:", paper.fileUrl);
-        window.open(paper.fileUrl, '_blank');
-        toast({ title: "Opening Original File", description: `Attempting to open ${paper.fileName || 'the paper'}.` });
-    } else {
-        toast({
-            variant: "destructive",
-            title: "File Not Available",
-            description: "File URL is missing for this paper.",
-        });
+  const handleDownloadOriginalFile = async (paper: Paper) => {
+    if (!paper.fileUrl || downloadingPaperId === paper.id) return;
+
+    setDownloadingPaperId(paper.id);
+    setDownloadProgress(0);
+    toast({ title: "Download Starting", description: `Preparing to download ${paper.fileName || 'the paper'}...` });
+
+    try {
+      const response = await fetch(paper.fileUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+      }
+      if (!response.body) {
+        throw new Error('Response body is null, cannot download.');
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+
+      const reader = response.body.getReader();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              loaded += value.length;
+              if (total > 0) {
+                setDownloadProgress(Math.round((loaded / total) * 100));
+              } else {
+                 setDownloadProgress(prev => Math.min(prev + 5, 95));
+              }
+            }
+            controller.enqueue(value);
+          }
+          controller.close();
+          reader.releaseLock();
+        },
+        cancel() {
+          reader.cancel();
+        }
+      });
+
+      const blob = await new Response(stream).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = paper.fileName || 'downloaded_paper_file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Download Complete", description: `${paper.fileName || 'File'} downloaded.` });
+      setDownloadProgress(100);
+    } catch (error: any) {
+      console.error("Download error in SearchPapersContent:", error);
+      toast({ variant: "destructive", title: "Download Failed", description: error.message || "Could not download the file." });
+      setDownloadProgress(0);
+    } finally {
+      setDownloadingPaperId(null);
+      setTimeout(() => {
+         if (downloadingPaperId === paper.id && !downloadingPaperId) setDownloadProgress(0);
+      }, 2000);
     }
   };
 
@@ -134,7 +194,7 @@ function SearchPapersContent() {
               className="flex-grow"
               disabled={isLoading}
             />
-            <Button onClick={handleSearch} disabled={isLoading}>
+            <Button onClick={handleSearch} disabled={isLoading || !!downloadingPaperId}>
               {isLoading ? <LoadingSpinner size={16} /> : <SearchIcon className="mr-2 h-4 w-4" />}
               Search
             </Button>
@@ -189,15 +249,31 @@ function SearchPapersContent() {
                         <Badge variant={getStatusBadgeVariant(paper.status)}>{paper.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleDownloadOriginalFile(paper)} title="Download Original File">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details">
-                          <FileTextIcon className="h-3 w-3 mr-1" /> Details
-                        </Button>
+                        <div className="flex flex-col items-end space-y-1">
+                          <div className="flex space-x-1">
+                            <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${paper.id}`)} title="View Details" disabled={!!downloadingPaperId}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleDownloadOriginalFile(paper)} 
+                                title="Download Original File"
+                                disabled={downloadingPaperId === paper.id || !!downloadingPaperId && downloadingPaperId !== paper.id || !paper.fileUrl}
+                            >
+                              {downloadingPaperId === paper.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDownloadMetadata(paper)} title="Download Details" disabled={!!downloadingPaperId}>
+                              <FileTextIcon className="h-3 w-3 mr-1" /> Details
+                            </Button>
+                          </div>
+                          {downloadingPaperId === paper.id && (
+                            <div className="w-24 mt-0.5">
+                                <Progress value={downloadProgress} className="h-1.5" />
+                                <p className="text-xs text-muted-foreground text-center">{downloadProgress}%</p>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
