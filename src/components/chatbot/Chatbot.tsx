@@ -24,7 +24,7 @@ export default function Chatbot() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showInitialGreeting, setShowInitialGreeting] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for the ScrollArea's root
+  const scrollAreaRef = useRef<HTMLDivElement>(null); 
   const { toast } = useToast();
 
   useEffect(() => {
@@ -48,23 +48,23 @@ export default function Chatbot() {
         const rootElement = scrollAreaRef.current;
         if (!rootElement) return;
 
-        // Use querySelector for a more robust way to find the Radix Viewport
         const viewportElement = rootElement.querySelector<HTMLElement>('[data-radix-scroll-area-viewport]');
 
         if (viewportElement && typeof viewportElement.scrollTo === 'function') {
           viewportElement.scrollTop = viewportElement.scrollHeight;
-        } else if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') { 
-          console.warn("Chatbot: Could not find Radix viewport with querySelector, attempting to scroll first child of ScrollArea root (if possible). Viewport found:", viewportElement);
-          const scrollableChild = rootElement.firstElementChild as HTMLElement;
-          scrollableChild.scrollTop = scrollableChild.scrollHeight;
-        } else if (typeof rootElement.scrollTo === 'function') {
-          console.warn("Chatbot: Could not find Radix viewport or scrollable first child, attempting to scroll root element itself (if possible).");
-          rootElement.scrollTop = rootElement.scrollHeight;
         } else {
-          console.warn("Chatbot: Scrollable element (Radix viewport or root) not found or does not support scrollTo method.");
+          console.warn("Chatbot: Could not find Radix viewport with querySelector. Fallback scrolling attempts might be less reliable.");
+          // Fallback attempts if specific viewport isn't found
+          if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') { 
+            const scrollableChild = rootElement.firstElementChild as HTMLElement;
+            scrollableChild.scrollTop = scrollableChild.scrollHeight;
+          } else if (typeof rootElement.scrollTo === 'function') {
+            rootElement.scrollTop = rootElement.scrollHeight;
+          } else {
+            console.warn("Chatbot: Scrollable element (Radix viewport or root) not found or does not support scrollTo method.");
+          }
         }
       };
-      // Defer scroll to allow DOM updates
       const timerId = setTimeout(attemptScroll, 0);
       return () => clearTimeout(timerId);
     }
@@ -84,7 +84,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role,
+      role: msg.role === 'bot' ? 'model' : msg.role, // Map 'bot' to 'model' for AI flow
       text: msg.text
     }));
 
@@ -147,10 +147,11 @@ export default function Chatbot() {
               </Avatar>
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
+            {/* Removed explicit close button as DialogContent provides one by default */}
           </DialogHeader>
 
-          {/* Wrapper div for ScrollArea to manage flexible space */}
-          <div className="flex-1 min-h-0">
+          {/* Fixed height wrapper for ScrollArea */}
+          <div className="h-[24rem] overflow-hidden">
             <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
               <div className="space-y-4 p-4">
                 {messages.map((message) => (
