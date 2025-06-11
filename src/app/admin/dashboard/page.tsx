@@ -21,7 +21,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getAllPapers, updatePaperStatus, deletePaper } from "@/lib/paper-service";
 import { getAllUsers } from "@/lib/user-service";
@@ -159,7 +158,7 @@ function AdminDashboardContent() {
             You do not have permission to view this page.
           </AlertDescription>
         </Alert>
-        <Link href={user.role === 'Reviewer' ? REVIEWER_DASHBOARD_PATH : AUTHOR_DASHBOARD_PATH}>
+        <Link href={user.role === 'Reviewer' ? "/reviewer/dashboard" : "/author/dashboard"}>
           <Button className="mt-6 text-sm md:text-base">Go to Your Dashboard</Button>
         </Link>
       </div>
@@ -338,11 +337,9 @@ function AdminDashboardContent() {
                              <Button variant="destructive" size="sm" onClick={() => paper.id && handleManualRejectOverdue(paper.id)} className="text-xs">Reject</Button>
                           )}
                           {isAdminUser && paper.status === 'Published' && (
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="text-xs" onClick={() => setPaperToDelete(paper)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
+                            <Button variant="destructive" size="sm" className="text-xs" onClick={() => setPaperToDelete(paper)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
