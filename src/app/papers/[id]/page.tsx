@@ -19,7 +19,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FileText as FileTextIcon, User as UserIcon, Users, Tag, CalendarDays, MessageSquare, DollarSign, Loader2, AlertTriangle, Sparkles, Clock, Download, Eye, UserCheck, UserPlus, Send, Star, MessageCircle, LayoutDashboard as AdminDashboardIcon, Trash2 } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -664,11 +663,9 @@ function PaperDetailsContent() {
                     {currentPaper.status === 'Published' && (
                       <div className="pt-3">
                         <h4 className="font-medium mb-1">Delete Paper:</h4>
-                        <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Delete This Published Paper
                           </Button>
-                        </AlertDialogTrigger>
                       </div>
                     )}
                   </CardContent>
