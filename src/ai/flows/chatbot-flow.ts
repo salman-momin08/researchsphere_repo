@@ -11,23 +11,38 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+// Original schema for individual messages in the history (external contract)
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'model']),
   text: z.string(),
 });
 
-// Removed 'export' from the schema definition
+// Original input schema for the exported flow function
 const ChatbotInputSchema = z.object({
   query: z.string().describe('The current query from the user.'),
   history: z.array(ChatMessageSchema).optional().describe('The recent conversation history.'),
 });
 export type ChatbotInput = z.infer<typeof ChatbotInputSchema>;
 
-// Removed 'export' from the schema definition
+// Output schema for the exported flow function (remains unchanged)
 const ChatbotOutputSchema = z.object({
   response: z.string().describe('The chatbot\'s response to the user query.'),
 });
 export type ChatbotOutput = z.infer<typeof ChatbotOutputSchema>;
+
+// --- Internal Schemas for the Prompt ---
+// Augmented message schema for the prompt's template context
+const PromptChatMessageSchema = ChatMessageSchema.extend({
+  isUser: z.boolean().optional(),
+  isModel: z.boolean().optional(),
+});
+
+// Augmented input schema for the prompt itself (what the template engine sees)
+const PromptInputSchema = z.object({
+  query: z.string(),
+  history: z.array(PromptChatMessageSchema).optional(),
+});
+// --- End Internal Schemas ---
 
 export async function researchSphereChatbot(input: ChatbotInput): Promise<ChatbotOutput> {
   return researchSphereChatbotFlow(input);
@@ -36,7 +51,7 @@ export async function researchSphereChatbot(input: ChatbotInput): Promise<Chatbo
 const chatbotPrompt = ai.definePrompt({
   name: 'researchSphereChatbotPrompt',
   model: 'googleai/gemini-1.5-flash',
-  input: {schema: ChatbotInputSchema},
+  input: {schema: PromptInputSchema}, // Use the internal, augmented schema for the template
   output: {schema: ChatbotOutputSchema},
   prompt: `You are ResearchSphere Assistant, a friendly and helpful AI chatbot.
 Your primary goal is to assist users with queries related to the ResearchSphere platform.
@@ -59,8 +74,8 @@ Keep your answers concise, helpful, and easy to understand.
 {{#if history}}
 Conversation History (for context):
 {{#each history}}
-  {{#if (eq role "user")}}User: {{text}}{{/if}}
-  {{#if (eq role "model")}}Assistant: {{text}}{{/if}}
+  {{#if isUser}}User: {{text}}{{/if}}
+  {{#if isModel}}Assistant: {{text}}{{/if}}
 {{/each}}
 {{/if}}
 
@@ -72,11 +87,25 @@ Assistant response:
 const researchSphereChatbotFlow = ai.defineFlow(
   {
     name: 'researchSphereChatbotFlow',
-    inputSchema: ChatbotInputSchema,
+    inputSchema: ChatbotInputSchema,     // Flow's public API uses the original input schema
     outputSchema: ChatbotOutputSchema,
   },
-  async (input) => {
-    const {output} = await chatbotPrompt(input);
+  async (input: ChatbotInput) => { // input is of type ChatbotInput (original schema)
+    // Augment history for the prompt template
+    const augmentedHistory = input.history?.map(msg => ({
+      ...msg,
+      isUser: msg.role === 'user',
+      isModel: msg.role === 'model',
+    }));
+
+    // Create the input object that matches the PromptInputSchema for the internal prompt call
+    const promptInputForInternalCall = {
+      query: input.query,
+      history: augmentedHistory,
+    };
+
+    const {output} = await chatbotPrompt(promptInputForInternalCall); // Pass augmented data
     return output!;
   }
 );
+
