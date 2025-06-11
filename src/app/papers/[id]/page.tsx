@@ -282,7 +282,12 @@ function PaperDetailsContent() {
     try {
       const response = await fetch(currentPaper.fileUrl);
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+        // throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+        let userMessage = `Download failed: ${response.statusText} (${response.status})`;
+        if (response.status === 401) {
+            userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
+        }
+        throw new Error(userMessage);
       }
       if (!response.body) {
         throw new Error('Response body is null, cannot download.');
@@ -332,9 +337,7 @@ function PaperDetailsContent() {
     } catch (error: any) {
       console.error("Download error in PaperDetailsContent:", error);
       let userMessage = error.message || "Could not download the file.";
-      if (error.message && error.message.includes("(401)")) {
-        userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
-      }
+      // The specific 401 message is now set before throwing the error above.
       toast({ variant: "destructive", title: "Download Failed", description: userMessage });
       setFileDownloadProgress(0);
     } finally {
@@ -358,7 +361,7 @@ function PaperDetailsContent() {
     content += `Original File Name: ${currentPaper.fileName || 'Not available'}\n`;
     content += `File URL: ${currentPaper.fileUrl || 'Not available'}\n`;
 
-    if (isAdminUser) {
+    if (isAdminUser || (user && isUserAssignedReviewer)) {
       if (currentPaper.plagiarismScore !== null && currentPaper.plagiarismScore !== undefined) content += `Plagiarism Score: ${(currentPaper.plagiarismScore === -1 ? 'N/A (Analysis Inconclusive)' : (currentPaper.plagiarismScore * 100).toFixed(1) + '%')}\n`;
       if (currentPaper.acceptanceProbability !== null && currentPaper.acceptanceProbability !== undefined) content += `Acceptance Probability: ${(currentPaper.acceptanceProbability * 100).toFixed(1)}%\n`;
     }
@@ -550,11 +553,11 @@ function PaperDetailsContent() {
 
             <Separator />
 
-            {isAdminUser && (
+            {(isAdminUser || (user && isUserAssignedReviewer)) && (
               <>
                 <div>
                   <h3 className="text-lg font-semibold mb-4 flex items-center">
-                    <Sparkles className="h-5 w-5 mr-2 text-primary" /> Validation Tools
+                    <Sparkles className="h-5 w-5 mr-2 text-primary" /> AI Validation Tools
                   </h3>
                   <div className="grid sm:grid-cols-2 gap-4 mb-6">
                     <Button onClick={handleRunPlagiarismValidation} disabled={isCheckingPlagiarism || isCheckingAcceptance || !currentPaper.fileUrl} variant="outline">
@@ -662,7 +665,7 @@ function PaperDetailsContent() {
                       <div className="pt-3">
                         <h4 className="font-medium mb-1">Delete Paper:</h4>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
+                          <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Delete This Published Paper
                           </Button>
                         </AlertDialogTrigger>
