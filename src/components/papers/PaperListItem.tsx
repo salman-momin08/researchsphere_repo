@@ -182,9 +182,9 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     <Card className="overflow-hidden transition-shadow hover:shadow-lg flex flex-col h-full">
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-grow">
-            <CardTitle className="text-lg sm:text-xl hover:text-primary transition-colors">
-              <Link href={`/papers/${paper.id}`}>{paper.title}</Link>
+          <div className="flex-grow min-w-0"> {/* Added min-w-0 to allow title to truncate if very long */}
+            <CardTitle className="text-lg sm:text-xl hover:text-primary transition-colors truncate">
+              <Link href={`/papers/${paper.id}`} title={paper.title}>{paper.title}</Link>
             </CardTitle>
             <CardDescription className="mt-1 text-xs sm:text-sm">
               Uploaded: {paper.uploadDate ? new Date(paper.uploadDate).toLocaleDateString() : 'N/A'}
@@ -216,7 +216,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
         )}
 
       </CardContent>
-      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col sm:flex-row sm:justify-end sm:items-center gap-2">
+      <CardFooter className="bg-secondary/30 p-3 sm:p-4 flex flex-col items-stretch sm:flex-row sm:flex-wrap sm:justify-end sm:items-center gap-2">
         {paper.status === 'Payment Pending' && displayStatus !== 'Payment Overdue' && user && user.id === paper.userId && (
           <Button size="sm" onClick={() => router.push(`/papers/${paper.id}?action=pay`)} className="w-full sm:w-auto" disabled={isDownloading}>
             <DollarSign className="mr-2 h-4 w-4" /> Pay Now
