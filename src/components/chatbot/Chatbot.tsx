@@ -43,13 +43,27 @@ export default function Chatbot() {
   }, []);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+    if (isOpen && scrollAreaRef.current) {
+      const attemptScroll = () => {
+        const rootElement = scrollAreaRef.current;
+        if (!rootElement) return;
+
+        // The Viewport is typically the first child of the ScrollArea Root in Radix/ShadCN
+        const viewportElement = rootElement.firstChild;
+
+        if (viewportElement instanceof HTMLElement) {
+          viewportElement.scrollTop = viewportElement.scrollHeight;
+        } else {
+          // Fallback if the firstChild is not what we expect, try scrolling the root.
+          rootElement.scrollTop = rootElement.scrollHeight;
+        }
+      };
+
+      // Defer to next tick to ensure DOM is ready for scroll calculations
+      const timerId = setTimeout(attemptScroll, 0);
+      return () => clearTimeout(timerId);
     }
-  }, [messages]);
+  }, [messages, isOpen]); // Rerun when messages change or dialog opens
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -64,10 +78,8 @@ export default function Chatbot() {
     setInputValue('');
     setIsLoading(true);
 
-    // Prepare history for the AI - last few messages for context
-    // Map 'bot' role to 'model' for compatibility with the AI flow's schema
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role, // Correctly map 'bot' to 'model'
+      role: msg.role === 'bot' ? 'model' : msg.role,
       text: msg.text
     }));
 
@@ -76,7 +88,7 @@ export default function Chatbot() {
       const result = await researchSphereChatbot(inputForFlow);
       const botMessage: ChatMessage = {
         id: Date.now().toString() + '-bot',
-        role: 'bot', // Keep 'bot' for client-side display consistency
+        role: 'bot',
         text: result.response,
         timestamp: new Date().toISOString(),
       };
@@ -132,7 +144,7 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
+          <ScrollArea className="flex-grow h-0 p-4" ref={scrollAreaRef}> {/* Added h-0 here */}
             <div className="space-y-4">
               {messages.map((message) => (
                 <div
