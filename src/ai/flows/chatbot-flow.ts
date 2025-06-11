@@ -16,13 +16,15 @@ const ChatMessageSchema = z.object({
   text: z.string(),
 });
 
-export const ChatbotInputSchema = z.object({
+// Removed 'export' from the schema definition
+const ChatbotInputSchema = z.object({
   query: z.string().describe('The current query from the user.'),
   history: z.array(ChatMessageSchema).optional().describe('The recent conversation history.'),
 });
 export type ChatbotInput = z.infer<typeof ChatbotInputSchema>;
 
-export const ChatbotOutputSchema = z.object({
+// Removed 'export' from the schema definition
+const ChatbotOutputSchema = z.object({
   response: z.string().describe('The chatbot\'s response to the user query.'),
 });
 export type ChatbotOutput = z.infer<typeof ChatbotOutputSchema>;
