@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  // DialogClose, // Removed DialogClose import
 } from "@/components/ui/dialog";
 
 export default function Chatbot() {
@@ -66,14 +65,18 @@ export default function Chatbot() {
     setIsLoading(true);
 
     // Prepare history for the AI - last few messages for context
-    const historyForAI = messages.slice(-4).map(msg => ({ role: msg.role as 'user' | 'model', text: msg.text }));
+    // Map 'bot' role to 'model' for compatibility with the AI flow's schema
+    const historyForAI = messages.slice(-4).map(msg => ({
+      role: msg.role === 'bot' ? 'model' : msg.role, // Correctly map 'bot' to 'model'
+      text: msg.text
+    }));
 
     try {
       const inputForFlow: ChatbotInput = { query: userMessage.text, history: historyForAI };
       const result = await researchSphereChatbot(inputForFlow);
       const botMessage: ChatMessage = {
         id: Date.now().toString() + '-bot',
-        role: 'bot',
+        role: 'bot', // Keep 'bot' for client-side display consistency
         text: result.response,
         timestamp: new Date().toISOString(),
       };
@@ -127,8 +130,6 @@ export default function Chatbot() {
               </Avatar>
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
-            {/* The explicit DialogClose button that was here has been removed. 
-                The DialogContent component itself provides the close button. */}
           </DialogHeader>
 
           <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
