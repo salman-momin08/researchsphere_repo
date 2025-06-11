@@ -130,7 +130,11 @@ function SearchPapersContent() {
       setDownloadProgress(100);
     } catch (error: any) {
       console.error("Download error in SearchPapersContent:", error);
-      toast({ variant: "destructive", title: "Download Failed", description: error.message || "Could not download the file." });
+      let userMessage = error.message || "Could not download the file.";
+      if (error.message && error.message.includes("(401)")) {
+        userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
+      }
+      toast({ variant: "destructive", title: "Download Failed", description: userMessage });
       setDownloadProgress(0);
     } finally {
       setDownloadingPaperId(null);
