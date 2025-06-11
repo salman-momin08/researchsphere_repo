@@ -86,6 +86,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     setIsDownloading(true);
     setDownloadProgress(0);
     toast({ title: "Download Starting", description: `Preparing to download ${paper.fileName || 'the paper'}...` });
+    console.log("Attempting to download from URL (Paper List Item):", paper.fileUrl); // Diagnostic log
 
     try {
       const response = await fetch(paper.fileUrl);
@@ -145,7 +146,6 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     } catch (error: any) {
       console.error("Download error in PaperListItem:", error);
       let userMessage = error.message || "Could not download the file.";
-      // Specific message for 401 is now set before throwing the error above.
       toast({ variant: "destructive", title: "Download Failed", description: userMessage });
       setDownloadProgress(0);
     } finally {

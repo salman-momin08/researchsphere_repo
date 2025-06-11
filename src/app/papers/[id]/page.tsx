@@ -277,6 +277,7 @@ function PaperDetailsContent() {
     setIsDownloadingFile(true);
     setFileDownloadProgress(0);
     toast({ title: "Download Starting", description: `Preparing to download ${currentPaper.fileName || 'the paper'}...` });
+    console.log("Attempting to download from URL (Paper Details Page):", currentPaper.fileUrl); // Diagnostic log
 
     try {
       const response = await fetch(currentPaper.fileUrl);
@@ -335,7 +336,6 @@ function PaperDetailsContent() {
     } catch (error: any) {
       console.error("Download error in PaperDetailsContent:", error);
       let userMessage = error.message || "Could not download the file.";
-      // The specific 401 message is now set before throwing the error above.
       toast({ variant: "destructive", title: "Download Failed", description: userMessage });
       setFileDownloadProgress(0);
     } finally {
