@@ -90,7 +90,11 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     try {
       const response = await fetch(paper.fileUrl);
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.statusText} (${response.status})`);
+        let userMessage = `Download failed: ${response.statusText || 'Error'} (${response.status})`;
+        if (response.status === 401) {
+            userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
+        }
+        throw new Error(userMessage);
       }
       if (!response.body) {
         throw new Error('Response body is null, cannot download.');
@@ -141,9 +145,7 @@ const PaperListItem = React.memo(({ paper }: PaperListItemProps) => {
     } catch (error: any) {
       console.error("Download error in PaperListItem:", error);
       let userMessage = error.message || "Could not download the file.";
-      if (error.message && error.message.includes("(401)")) {
-        userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
-      }
+      // Specific message for 401 is now set before throwing the error above.
       toast({ variant: "destructive", title: "Download Failed", description: userMessage });
       setDownloadProgress(0);
     } finally {

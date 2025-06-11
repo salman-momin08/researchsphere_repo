@@ -281,8 +281,7 @@ function PaperDetailsContent() {
     try {
       const response = await fetch(currentPaper.fileUrl);
       if (!response.ok) {
-        // throw new Error(`Download failed: ${response.statusText} (${response.status})`);
-        let userMessage = `Download failed: ${response.statusText} (${response.status})`;
+        let userMessage = `Download failed: ${response.statusText || 'Error'} (${response.status})`;
         if (response.status === 401) {
             userMessage = "Download unauthorized (401). The file may be private or access is restricted on the server. Please check file permissions on Cloudinary.";
         }
