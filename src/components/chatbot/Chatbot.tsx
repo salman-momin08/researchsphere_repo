@@ -19,8 +19,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Image from 'next/image';
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
 export default function Chatbot() {
+  const { user } = useAuth(); // Get user from auth context
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -33,35 +35,43 @@ export default function Chatbot() {
   const [isLoadingIcon, setIsLoadingIcon] = useState<boolean>(true);
 
   useEffect(() => {
-    const greetingTimer = setTimeout(() => {
-      setShowInitialGreeting(true);
-    }, 1500);
+    if (user && user.role === 'Author') { // Only show greeting if chatbot is active for this user
+      const greetingTimer = setTimeout(() => {
+        setShowInitialGreeting(true);
+      }, 1500);
 
-    const hideGreetingTimer = setTimeout(() => {
-      setShowInitialGreeting(false);
-    }, 7000);
+      const hideGreetingTimer = setTimeout(() => {
+        setShowInitialGreeting(false);
+      }, 7000);
 
-    return () => {
-      clearTimeout(greetingTimer);
-      clearTimeout(hideGreetingTimer);
-    };
-  }, []);
+      return () => {
+        clearTimeout(greetingTimer);
+        clearTimeout(hideGreetingTimer);
+      };
+    } else {
+        setShowInitialGreeting(false); // Ensure greeting is not shown if user is not author
+    }
+  }, [user]); // Re-run if user changes
 
   useEffect(() => {
-    const fetchIcon = async () => {
-      setIsLoadingIcon(true);
-      try {
-        const result = await generateRobotIcon({ prompt: "a friendly, minimalist robot assistant icon for a chatbot button, circular, simple lines, teal and white colors, high contrast" });
-        setRobotIconUri(result.imageDataUri);
-      } catch (error) {
-        console.error("Failed to generate robot icon:", error);
-        // Fallback to default icon handled by rendering logic
-      } finally {
-        setIsLoadingIcon(false);
-      }
-    };
-    fetchIcon();
-  }, []);
+    if (user && user.role === 'Author') { // Only fetch icon if chatbot will be shown
+      const fetchIcon = async () => {
+        setIsLoadingIcon(true);
+        try {
+          const result = await generateRobotIcon({ prompt: "a friendly, minimalist robot assistant icon for a chatbot button, circular, simple lines, teal and white colors, high contrast" });
+          setRobotIconUri(result.imageDataUri);
+        } catch (error) {
+          console.error("Failed to generate robot icon:", error);
+          // Fallback to default icon handled by rendering logic
+        } finally {
+          setIsLoadingIcon(false);
+        }
+      };
+      fetchIcon();
+    } else {
+        setIsLoadingIcon(false); // No need to load icon if user is not author
+    }
+  }, [user]); // Re-run if user changes
 
   useEffect(() => {
     if (isOpen && scrollAreaRef.current) {
@@ -137,6 +147,11 @@ export default function Chatbot() {
       setIsLoading(false);
     }
   };
+
+  // Conditionally render the chatbot only for logged-in authors
+  if (!user || user.role !== 'Author') {
+    return null;
+  }
 
   return (
     <>
