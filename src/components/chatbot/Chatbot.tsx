@@ -168,14 +168,13 @@ export default function Chatbot() {
         <DialogContent className="sm:max-w-lg p-0 flex flex-col h-[70vh] overflow-hidden">
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image
-                src="https://placehold.co/32x32.png"
-                alt="Chatbot Icon"
-                width={32}
-                height={32}
-                className="rounded-sm"
-                data-ai-hint="robot mascot"
-              />
+              {isLoadingIcon ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : robotIconUri ? (
+                <img src={robotIconUri} alt="Chatbot Icon" className="h-8 w-8 rounded-sm object-cover" />
+              ) : (
+                <Bot className="h-8 w-8 text-primary" />
+              )}
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
           </DialogHeader>
