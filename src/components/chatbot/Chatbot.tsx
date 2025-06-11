@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // Removed AvatarImage as it's not used here anymore
 import { Bot, Send, MessageSquare, Loader2, X } from 'lucide-react';
 import { researchSphereChatbot, ChatbotInput } from '@/ai/flows/chatbot-flow';
 import type { ChatMessage } from '@/types';
@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Image from 'next/image'; // Added Image import
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -54,7 +55,6 @@ export default function Chatbot() {
           viewportElement.scrollTop = viewportElement.scrollHeight;
         } else {
           console.warn("Chatbot: Could not find Radix viewport with querySelector. Fallback scrolling attempts might be less reliable.");
-          // Fallback attempts if specific viewport isn't found
           if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') { 
             const scrollableChild = rootElement.firstElementChild as HTMLElement;
             scrollableChild.scrollTop = scrollableChild.scrollHeight;
@@ -84,7 +84,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role, // Map 'bot' to 'model' for AI flow
+      role: msg.role === 'bot' ? 'model' : msg.role, 
       text: msg.text
     }));
 
@@ -142,15 +142,20 @@ export default function Chatbot() {
         <DialogContent className="sm:max-w-lg p-0 flex flex-col max-h-[80vh] sm:max-h-[70vh]">
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-5 w-5"/></AvatarFallback>
-              </Avatar>
+              <Image
+                src="https://placehold.co/32x32.png" 
+                alt="Chatbot Icon"
+                width={32}
+                height={32}
+                className="rounded-sm"
+                data-ai-hint="robot mascot" 
+              />
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
           </DialogHeader>
 
-          <div className="h-[24rem] overflow-hidden">
-            <ScrollArea className="h-full w-full">
+          <div className="flex-1 min-h-0 h-[24rem] overflow-hidden">
+            <ScrollArea ref={scrollAreaRef} className="h-full w-full">
               <div className="space-y-4 p-4">
                 {messages.map((message) => (
                   <div
