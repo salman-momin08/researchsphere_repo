@@ -234,23 +234,35 @@ export default function PaperUploadForm() {
 
             <div>
               <AnimatedInput id="title" {...form.register("title")} disabled={isSubmitting} label="Paper Title *"/>
-              {form.formState.errors.title && <p className="text-sm text-destructive mt-1">{form.formState.errors.title.message}</p>}
+              {form.formState.errors.title && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.title.message}</p>}
             </div>
 
             <div>
               <Label htmlFor="abstract">Abstract *</Label>
               <Textarea id="abstract" placeholder="Enter abstract here..." {...form.register("abstract")} rows={6} disabled={isSubmitting} className="mt-1" />
-              {form.formState.errors.abstract && <p className="text-sm text-destructive mt-1">{form.formState.errors.abstract.message}</p>}
+              {form.formState.errors.abstract && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.abstract.message}</p>}
             </div>
 
             <div>
-              <AnimatedInput id="authors" placeholder="e.g., John Doe, Jane Smith" {...form.register("authors")} disabled={isSubmitting} label="Authors (comma-separated) *"/>
-              {form.formState.errors.authors && <p className="text-sm text-destructive mt-1">{form.formState.errors.authors.message as string}</p>}
+              <AnimatedInput 
+                id="authors" 
+                {...form.register("authors")} 
+                disabled={isSubmitting} 
+                label="Authors (comma-separated) *"
+              />
+              <p className="text-xs text-muted-foreground mt-1 px-1">e.g., John Doe, Jane Smith</p>
+              {form.formState.errors.authors && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.authors.message as string}</p>}
             </div>
 
             <div>
-              <AnimatedInput id="keywords" placeholder="e.g., AI, Machine Learning, Academia" {...form.register("keywords")} disabled={isSubmitting} label="Keywords (comma-separated) *"/>
-              {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message as string}</p>}
+              <AnimatedInput 
+                id="keywords" 
+                {...form.register("keywords")} 
+                disabled={isSubmitting} 
+                label="Keywords (comma-separated) *"
+              />
+              <p className="text-xs text-muted-foreground mt-1 px-1">e.g., AI, Machine Learning, Academia</p>
+              {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.keywords.message as string}</p>}
             </div>
 
             <div>
@@ -279,7 +291,7 @@ export default function PaperUploadForm() {
                   )}
                 </div>
               </div>
-              {form.formState.errors.file && <p className="text-sm text-destructive mt-1">{form.formState.errors.file.message as string}</p>}
+              {form.formState.errors.file && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.file.message as string}</p>}
             </div>
 
             <div>
@@ -303,7 +315,7 @@ export default function PaperUploadForm() {
                   </Label>
                 </div>
               </RadioGroup>
-              {form.formState.errors.paymentOption && <p className="text-sm text-destructive mt-1">{form.formState.errors.paymentOption.message}</p>}
+              {form.formState.errors.paymentOption && <p className="text-sm text-destructive mt-1 px-1">{form.formState.errors.paymentOption.message}</p>}
             </div>
 
           </CardContent>
