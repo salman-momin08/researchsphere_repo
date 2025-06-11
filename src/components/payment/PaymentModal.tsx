@@ -199,12 +199,11 @@ export default function PaymentModal({ isOpen, onOpenChange, paper, onPaymentSuc
                     <Label className="font-medium">Scan QR Code</Label>
                     <div className="p-2 border rounded-md bg-white inline-block">
                        <Image
-                        src="https://placehold.co/120x120.png" 
-                        alt="Scan QR Code for UPI Payment"
+                        src="/images/upi-qr-code.png" 
+                        alt="Scan UPI QR Code for Payment"
                         width={120}
                         height={120}
                         className="rounded"
-                        data-ai-hint="QR code payment"
                       />
                     </div>
                      <p className="text-xs text-muted-foreground">Scan using any UPI payment app.</p>
