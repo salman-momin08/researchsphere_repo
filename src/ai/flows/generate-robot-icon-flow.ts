@@ -32,7 +32,7 @@ const generateRobotIconFlow = ai.defineFlow(
     outputSchema: GenerateRobotIconOutputSchema,
   },
   async (input) => {
-    const {media} = await ai.generate({
+    const genkitResponse = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
       prompt: input.prompt,
       config: {
@@ -40,10 +40,25 @@ const generateRobotIconFlow = ai.defineFlow(
       },
     });
 
-    if (!media || !media.url) {
-      throw new Error('Image generation failed or returned no media URL.');
+    const mediaUrl = genkitResponse.media?.url;
+
+    if (!mediaUrl) {
+      let errorMessage = 'Image generation failed or returned no media URL.';
+      if (genkitResponse.finishReason) {
+        errorMessage += ` Finish Reason: ${genkitResponse.finishReason}.`;
+      }
+      if (genkitResponse.text) {
+        errorMessage += ` Text response: "${genkitResponse.text}".`;
+      }
+      
+      console.error(
+        'Image Generation Flow Error:', errorMessage, 
+        'Full Genkit Response:', JSON.stringify(genkitResponse, null, 2) // Log full response for server-side debugging
+      );
+      throw new Error(errorMessage);
     }
 
-    return {imageDataUri: media.url};
+    return {imageDataUri: mediaUrl};
   }
 );
+
