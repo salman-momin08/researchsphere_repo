@@ -165,7 +165,7 @@ export default function Chatbot() {
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-lg p-0 flex flex-col max-h-[80vh] sm:max-h-[70vh]">
+        <DialogContent className="sm:max-w-lg p-0 flex flex-col h-[70vh] overflow-hidden">
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <Image
@@ -180,7 +180,7 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 h-[24rem] overflow-hidden">
+          <div className="flex-1 min-h-0"> {/* Message Area Wrapper: Flexible height, min-h-0 for scroll */}
             <ScrollArea ref={scrollAreaRef} className="h-full w-full">
               <div className="space-y-4 p-4">
                 {messages.map((message) => (
