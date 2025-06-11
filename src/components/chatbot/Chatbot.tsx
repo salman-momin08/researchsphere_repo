@@ -24,7 +24,7 @@ export default function Chatbot() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showInitialGreeting, setShowInitialGreeting] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for the ScrollArea's root
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,8 +53,12 @@ export default function Chatbot() {
 
         if (viewportElement && typeof viewportElement.scrollTo === 'function') {
           viewportElement.scrollTop = viewportElement.scrollHeight;
+        } else if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') { 
+          console.warn("Chatbot: Could not find Radix viewport with querySelector, attempting to scroll first child of ScrollArea root (if possible). Viewport found:", viewportElement);
+          const scrollableChild = rootElement.firstElementChild as HTMLElement;
+          scrollableChild.scrollTop = scrollableChild.scrollHeight;
         } else if (typeof rootElement.scrollTo === 'function') {
-          console.warn("Chatbot: Could not find Radix viewport with querySelector, attempting to scroll root element (if possible). Viewport found:", viewportElement);
+          console.warn("Chatbot: Could not find Radix viewport or scrollable first child, attempting to scroll root element itself (if possible).");
           rootElement.scrollTop = rootElement.scrollHeight;
         } else {
           console.warn("Chatbot: Scrollable element (Radix viewport or root) not found or does not support scrollTo method.");
@@ -80,7 +84,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role, // Map 'bot' to 'model' for AI flow
+      role: msg.role === 'bot' ? 'model' : msg.role,
       text: msg.text
     }));
 
@@ -145,52 +149,55 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 min-h-0" ref={scrollAreaRef}>
-            <div className="space-y-4 p-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex items-end gap-2',
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  {message.role === 'bot' && (
-                    <Avatar className="h-7 w-7 self-start">
-                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs"><Bot className="h-4 w-4"/></AvatarFallback>
-                    </Avatar>
-                  )}
+          {/* Wrapper div for ScrollArea to manage flexible space */}
+          <div className="flex-1 min-h-0">
+            <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
+              <div className="space-y-4 p-4">
+                {messages.map((message) => (
                   <div
+                    key={message.id}
                     className={cn(
-                      'max-w-[75%] rounded-lg px-3 py-2 text-sm shadow',
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-br-none'
-                        : 'bg-muted text-muted-foreground rounded-bl-none'
+                      'flex items-end gap-2',
+                      message.role === 'user' ? 'justify-end' : 'justify-start'
                     )}
                   >
-                    {message.text.split('\\n').map((line, index) => (
-                        <span key={index}>{line}{index < message.text.split('\\n').length - 1 && <br/>}</span>
-                    ))}
+                    {message.role === 'bot' && (
+                      <Avatar className="h-7 w-7 self-start">
+                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs"><Bot className="h-4 w-4"/></AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div
+                      className={cn(
+                        'max-w-[75%] rounded-lg px-3 py-2 text-sm shadow',
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-br-none'
+                          : 'bg-muted text-muted-foreground rounded-bl-none'
+                      )}
+                    >
+                      {message.text.split('\\n').map((line, index) => (
+                          <span key={index}>{line}{index < message.text.split('\\n').length - 1 && <br/>}</span>
+                      ))}
+                    </div>
+                    {message.role === 'user' && (
+                      <Avatar className="h-7 w-7 self-start">
+                        <AvatarFallback className="bg-primary/80 text-primary-foreground text-xs">U</AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                   {message.role === 'user' && (
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start items-center gap-2">
                     <Avatar className="h-7 w-7 self-start">
-                      <AvatarFallback className="bg-primary/80 text-primary-foreground text-xs">U</AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start items-center gap-2">
-                   <Avatar className="h-7 w-7 self-start">
-                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs"><Bot className="h-4 w-4"/></AvatarFallback>
-                    </Avatar>
-                  <div className="bg-muted text-muted-foreground rounded-lg px-3 py-2 shadow rounded-bl-none">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs"><Bot className="h-4 w-4"/></AvatarFallback>
+                      </Avatar>
+                    <div className="bg-muted text-muted-foreground rounded-lg px-3 py-2 shadow rounded-bl-none">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
 
           <div className="border-t p-4">
             <div className="flex items-center gap-2">
