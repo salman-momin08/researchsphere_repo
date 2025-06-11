@@ -5,9 +5,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // Removed AvatarImage as it's not used here anymore
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, Send, MessageSquare, Loader2, X } from 'lucide-react';
 import { researchSphereChatbot, ChatbotInput } from '@/ai/flows/chatbot-flow';
+import { generateRobotIcon } from '@/ai/flows/generate-robot-icon-flow'; // Import the new flow
 import type { ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import Image from 'next/image'; // Added Image import
+import Image from 'next/image';
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,22 +26,41 @@ export default function Chatbot() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showInitialGreeting, setShowInitialGreeting] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null); 
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const [robotIconUri, setRobotIconUri] = useState<string | null>(null);
+  const [isLoadingIcon, setIsLoadingIcon] = useState<boolean>(true);
 
   useEffect(() => {
     const greetingTimer = setTimeout(() => {
       setShowInitialGreeting(true);
-    }, 1500); 
+    }, 1500);
 
     const hideGreetingTimer = setTimeout(() => {
       setShowInitialGreeting(false);
-    }, 7000); 
+    }, 7000);
 
     return () => {
       clearTimeout(greetingTimer);
       clearTimeout(hideGreetingTimer);
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchIcon = async () => {
+      setIsLoadingIcon(true);
+      try {
+        const result = await generateRobotIcon({ prompt: "a friendly, minimalist robot assistant icon for a chatbot button, circular, simple lines, teal and white colors, high contrast" });
+        setRobotIconUri(result.imageDataUri);
+      } catch (error) {
+        console.error("Failed to generate robot icon:", error);
+        // Fallback to default icon handled by rendering logic
+      } finally {
+        setIsLoadingIcon(false);
+      }
+    };
+    fetchIcon();
   }, []);
 
   useEffect(() => {
@@ -55,7 +75,7 @@ export default function Chatbot() {
           viewportElement.scrollTop = viewportElement.scrollHeight;
         } else {
           console.warn("Chatbot: Could not find Radix viewport with querySelector. Fallback scrolling attempts might be less reliable.");
-          if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') { 
+          if (rootElement.firstElementChild && typeof rootElement.firstElementChild.scrollTo === 'function') {
             const scrollableChild = rootElement.firstElementChild as HTMLElement;
             scrollableChild.scrollTop = scrollableChild.scrollHeight;
           } else if (typeof rootElement.scrollTo === 'function') {
@@ -84,7 +104,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role, 
+      role: msg.role === 'bot' ? 'model' : msg.role,
       text: msg.text
     }));
 
@@ -131,10 +151,16 @@ export default function Chatbot() {
           onClick={() => setIsOpen(true)}
           variant="default"
           size="icon"
-          className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform"
+          className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center" // Added flex for centering
           aria-label="Open Chatbot"
         >
-          <Bot className="h-7 w-7" />
+          {isLoadingIcon ? (
+            <Loader2 className="h-7 w-7 animate-spin" />
+          ) : robotIconUri ? (
+            <img src={robotIconUri} alt="Chatbot AI Icon" className="h-10 w-10 rounded-full object-cover" />
+          ) : (
+            <Bot className="h-7 w-7" />
+          )}
         </Button>
       </div>
 
@@ -143,12 +169,12 @@ export default function Chatbot() {
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <Image
-                src="https://placehold.co/32x32.png" 
+                src="https://placehold.co/32x32.png"
                 alt="Chatbot Icon"
                 width={32}
                 height={32}
                 className="rounded-sm"
-                data-ai-hint="robot mascot" 
+                data-ai-hint="robot mascot"
               />
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
