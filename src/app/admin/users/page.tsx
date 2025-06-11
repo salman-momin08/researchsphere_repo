@@ -35,7 +35,7 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]); // Added toast as a dependency
 
   useEffect(() => {
     fetchUsers();
