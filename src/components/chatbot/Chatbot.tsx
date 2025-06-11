@@ -48,17 +48,19 @@ export default function Chatbot() {
         const rootElement = scrollAreaRef.current;
         if (!rootElement) return;
 
-        const viewportElement = rootElement.firstChild as HTMLElement | null; 
+        // Use querySelector for a more robust way to find the Radix Viewport
+        const viewportElement = rootElement.querySelector<HTMLElement>('[data-radix-scroll-area-viewport]');
 
-        if (viewportElement && typeof viewportElement.scrollTo === 'function') { 
+        if (viewportElement && typeof viewportElement.scrollTo === 'function') {
           viewportElement.scrollTop = viewportElement.scrollHeight;
         } else if (typeof rootElement.scrollTo === 'function') {
-          console.warn("Chatbot: Could not find viewport, attempting to scroll root.");
+          console.warn("Chatbot: Could not find Radix viewport with querySelector, attempting to scroll root element (if possible). Viewport found:", viewportElement);
           rootElement.scrollTop = rootElement.scrollHeight;
         } else {
-          console.warn("Chatbot: Scrollable element not found or does not support scrollTo.");
+          console.warn("Chatbot: Scrollable element (Radix viewport or root) not found or does not support scrollTo method.");
         }
       };
+      // Defer scroll to allow DOM updates
       const timerId = setTimeout(attemptScroll, 0);
       return () => clearTimeout(timerId);
     }
@@ -78,7 +80,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role,
+      role: msg.role === 'bot' ? 'model' : msg.role, // Map 'bot' to 'model' for AI flow
       text: msg.text
     }));
 
