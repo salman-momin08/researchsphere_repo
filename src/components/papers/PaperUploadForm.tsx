@@ -233,8 +233,7 @@ export default function PaperUploadForm() {
             )}
 
             <div>
-              <Label htmlFor="title">Paper Title *</Label>
-              <AnimatedInput id="title" {...form.register("title")} disabled={isSubmitting} className="mt-1" label="Paper Title *"/>
+              <AnimatedInput id="title" {...form.register("title")} disabled={isSubmitting} label="Paper Title *"/>
               {form.formState.errors.title && <p className="text-sm text-destructive mt-1">{form.formState.errors.title.message}</p>}
             </div>
 
@@ -245,14 +244,12 @@ export default function PaperUploadForm() {
             </div>
 
             <div>
-              <Label htmlFor="authors">Authors (comma-separated) *</Label>
-              <AnimatedInput id="authors" placeholder="e.g., John Doe, Jane Smith" {...form.register("authors")} disabled={isSubmitting} className="mt-1" label="Authors (comma-separated) *"/>
+              <AnimatedInput id="authors" placeholder="e.g., John Doe, Jane Smith" {...form.register("authors")} disabled={isSubmitting} label="Authors (comma-separated) *"/>
               {form.formState.errors.authors && <p className="text-sm text-destructive mt-1">{form.formState.errors.authors.message as string}</p>}
             </div>
 
             <div>
-              <Label htmlFor="keywords">Keywords (comma-separated) *</Label>
-              <AnimatedInput id="keywords" placeholder="e.g., AI, Machine Learning, Academia" {...form.register("keywords")} disabled={isSubmitting} className="mt-1" label="Keywords (comma-separated) *"/>
+              <AnimatedInput id="keywords" placeholder="e.g., AI, Machine Learning, Academia" {...form.register("keywords")} disabled={isSubmitting} label="Keywords (comma-separated) *"/>
               {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message as string}</p>}
             </div>
 
