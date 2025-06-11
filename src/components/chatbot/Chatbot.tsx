@@ -120,7 +120,7 @@ export default function Chatbot() {
 
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-[90]">
+      <div className="fixed right-6 z-[90]" style={{ bottom: '20%' }}>
         {showInitialGreeting && !isOpen && (
           <div className="absolute bottom-full right-0 mb-2 mr-2 px-3 py-2 bg-primary text-primary-foreground text-sm rounded-lg shadow-lg animate-in fade-in-0 slide-in-from-bottom-2">
             Hello! I am ResearchSphere Assistant.
@@ -147,12 +147,10 @@ export default function Chatbot() {
               </Avatar>
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
-            {/* Removed explicit close button as DialogContent provides one by default */}
           </DialogHeader>
 
-          {/* Fixed height wrapper for ScrollArea */}
           <div className="h-[24rem] overflow-hidden">
-            <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
+            <ScrollArea className="h-full w-full">
               <div className="space-y-4 p-4">
                 {messages.map((message) => (
                   <div
