@@ -79,7 +79,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     const historyForAI = messages.slice(-4).map(msg => ({
-      role: msg.role === 'bot' ? 'model' : msg.role,
+      role: msg.role === 'bot' ? 'model' : msg.role, // Ensure 'bot' from UI maps to 'model' for AI
       text: msg.text
     }));
 
@@ -144,8 +144,8 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-grow h-0 p-4" ref={scrollAreaRef}> {/* Added h-0 here */}
-            <div className="space-y-4">
+          <ScrollArea className="flex-grow h-0" ref={scrollAreaRef}> {/* Removed p-4 from here */}
+            <div className="space-y-4 p-4"> {/* Added p-4 here */}
               {messages.map((message) => (
                 <div
                   key={message.id}
