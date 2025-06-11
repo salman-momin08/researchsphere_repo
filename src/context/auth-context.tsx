@@ -359,14 +359,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     try {
       const usersRef = collection(firestoreDb, "users");
+      // Check for username uniqueness
       const qUsername = query(usersRef, where("username", "==", data.username.trim()));
       const usernameSnap = await getDocs(qUsername);
-      if (!usernameSnap.empty) throw new Error("Username already taken. Please choose another one.");
+      if (!usernameSnap.empty) {
+        throw new Error("Username already taken. Please choose another one.");
+      }
 
+      // Check for phone number uniqueness
       if (data.phoneNumber && data.phoneNumber.trim()) {
         const qPhone = query(usersRef, where("phoneNumber", "==", data.phoneNumber.trim()));
         const phoneSnap = await getDocs(qPhone);
-        if (!phoneSnap.empty) throw new Error("Phone number already in use. Please use a different one.");
+        if (!phoneSnap.empty) {
+          throw new Error("Phone number already in use by another account.");
+        }
       }
 
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
@@ -386,9 +392,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     } catch (error: any) {
       let errorMessage = error.message || "Signup failed.";
-      if (error.code === 'auth/email-already-in-use') errorMessage = "Email already registered.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Email already registered.";
+      } else if (error.message === "Username already taken. Please choose another one.") {
+        errorMessage = error.message;
+      } else if (error.message === "Phone number already in use by another account.") {
+        errorMessage = error.message;
+      }
       toast({ variant: "destructive", title: "Signup Failed", description: errorMessage });
-      throw error;
+      throw error; // Re-throw to be caught by the form
     } finally {
       setLoading(false);
     }
@@ -446,20 +458,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     let success = false;
     try {
+      // Check for username uniqueness if username is being changed
       if (data.username && data.username.trim() && data.username !== user.username) {
         const usersRef = collection(firestoreDb, "users");
         const qUsername = query(usersRef, where("username", "==", data.username.trim()));
         const usernameSnap = await getDocs(qUsername);
+        // Ensure the username is not taken by *another* user
         if (!usernameSnap.empty && usernameSnap.docs.some(doc => doc.id !== user.id)) {
-          throw new Error("Username already taken.");
+          throw new Error("Username already taken. Please choose another one.");
         }
       }
+      // Check for phone number uniqueness if phone number is being changed
       if (data.phoneNumber && data.phoneNumber.trim() && data.phoneNumber !== user.phoneNumber) {
         const usersRef = collection(firestoreDb, "users");
         const qPhone = query(usersRef, where("phoneNumber", "==", data.phoneNumber.trim()));
         const phoneSnap = await getDocs(qPhone);
+        // Ensure the phone number is not taken by *another* user
         if (!phoneSnap.empty && phoneSnap.docs.some(doc => doc.id !== user.id)) {
-          throw new Error("Phone number already in use.");
+          throw new Error("Phone number already in use. Please use a different one.");
         }
       }
 
@@ -469,7 +485,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.phoneNumber !== undefined) updatePayloadFS.phoneNumber = data.phoneNumber?.trim() || null;
       if (data.institution !== undefined) updatePayloadFS.institution = data.institution?.trim() || null;
       if (data.researcherId !== undefined) updatePayloadFS.researcherId = data.researcherId?.trim() || null;
-      if (data.role !== undefined) updatePayloadFS.role = data.role || "Author";
+      if (data.role !== undefined && user.role !== "Admin") { // Prevent admins from changing their role here
+        updatePayloadFS.role = data.role || "Author";
+      }
+
 
       if (data.displayName && currentFirebaseUser.displayName !== data.displayName) {
         await firebaseUpdateProfileAuth(currentFirebaseUser, { displayName: data.displayName });
@@ -506,8 +525,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error("Failed to re-fetch profile after update.");
       }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Update Failed", description: error.message });
-      throw error;
+      let errorMessage = error.message || "Update failed.";
+      if (error.message === "Username already taken. Please choose another one.") {
+        errorMessage = error.message;
+      } else if (error.message === "Phone number already in use. Please use a different one.") {
+        errorMessage = error.message;
+      }
+      toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
+      throw error; // Re-throw to be caught by the form
     } finally {
       setLoading(false);
     }
@@ -559,3 +584,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     </AuthContext.Provider>
   );
 };
+
+
+    
