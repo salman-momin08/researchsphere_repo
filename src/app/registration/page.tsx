@@ -166,7 +166,7 @@ export default function RegistrationPricingPage() {
                     <span className="text-3xl sm:text-4xl font-extrabold tracking-tight">{option.price}</span>
                     {option.price !== "Contact Us" && <span className="ml-1 text-lg sm:text-xl font-semibold text-muted-foreground">{option.priceFrequency}</span>}
                   </div>
-                   <CardDescription className="pt-2 h-12 text-sm sm:text-base">{option.description}</CardDescription>
+                   <CardDescription className="pt-2 text-sm sm:text-base">{option.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <ul role="list" className="space-y-3 text-sm sm:text-base">
@@ -248,3 +248,4 @@ export default function RegistrationPricingPage() {
     </div>
   );
 }
+
