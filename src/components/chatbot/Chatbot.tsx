@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, Send, MessageSquare, Loader2, X } from 'lucide-react';
 import { researchSphereChatbot, ChatbotInput } from '@/ai/flows/chatbot-flow';
-import { generateRobotIcon } from '@/ai/flows/generate-robot-icon-flow'; // Import the new flow
+import { generateRobotIcon } from '@/ai/flows/generate-robot-icon-flow';
 import type { ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -19,10 +19,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Image from 'next/image';
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth';
 
 export default function Chatbot() {
-  const { user } = useAuth(); // Get user from auth context
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -34,8 +34,11 @@ export default function Chatbot() {
   const [robotIconUri, setRobotIconUri] = useState<string | null>(null);
   const [isLoadingIcon, setIsLoadingIcon] = useState<boolean>(true);
 
+  // Determine if chatbot should be active based on user state
+  const isChatbotActive = !user || (user && user.role === 'Author');
+
   useEffect(() => {
-    if (user && user.role === 'Author') { // Only show greeting if chatbot is active for this user
+    if (isChatbotActive) {
       const greetingTimer = setTimeout(() => {
         setShowInitialGreeting(true);
       }, 1500);
@@ -49,29 +52,31 @@ export default function Chatbot() {
         clearTimeout(hideGreetingTimer);
       };
     } else {
-        setShowInitialGreeting(false); // Ensure greeting is not shown if user is not author
+      setShowInitialGreeting(false);
     }
-  }, [user]); // Re-run if user changes
+  }, [user, isChatbotActive, isOpen]); // Added isOpen as a dependency for greeting, and isChatbotActive for clarity
 
   useEffect(() => {
-    if (user && user.role === 'Author') { // Only fetch icon if chatbot will be shown
+    if (isChatbotActive) {
+      setIsLoadingIcon(true); // Set loading true when we start fetching
       const fetchIcon = async () => {
-        setIsLoadingIcon(true);
         try {
           const result = await generateRobotIcon({ prompt: "a friendly, minimalist robot assistant icon for a chatbot button, circular, simple lines, teal and white colors, high contrast" });
           setRobotIconUri(result.imageDataUri);
         } catch (error) {
           console.error("Failed to generate robot icon:", error);
           // Fallback to default icon handled by rendering logic
+          setRobotIconUri(null); // Ensure fallback if error
         } finally {
           setIsLoadingIcon(false);
         }
       };
       fetchIcon();
     } else {
-        setIsLoadingIcon(false); // No need to load icon if user is not author
+      setIsLoadingIcon(false); // Don't load icon if chatbot is not active
+      setRobotIconUri(null); // Ensure no old icon URI persists
     }
-  }, [user]); // Re-run if user changes
+  }, [user, isChatbotActive]);
 
   useEffect(() => {
     if (isOpen && scrollAreaRef.current) {
@@ -148,8 +153,8 @@ export default function Chatbot() {
     }
   };
 
-  // Conditionally render the chatbot only for logged-in authors
-  if (!user || user.role !== 'Author') {
+  // Conditionally render the chatbot based on the new logic
+  if (!isChatbotActive) {
     return null;
   }
 
@@ -166,7 +171,7 @@ export default function Chatbot() {
           onClick={() => setIsOpen(true)}
           variant="default"
           size="icon"
-          className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center" // Added flex for centering
+          className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
           aria-label="Open Chatbot"
         >
           {isLoadingIcon ? (
@@ -194,7 +199,7 @@ export default function Chatbot() {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0"> {/* Message Area Wrapper: Flexible height, min-h-0 for scroll */}
+          <div className="flex-1 min-h-0">
             <ScrollArea ref={scrollAreaRef} className="h-full w-full">
               <div className="space-y-4 p-4">
                 {messages.map((message) => (
@@ -264,3 +269,4 @@ export default function Chatbot() {
     </>
   );
 }
+
