@@ -13,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AcceptanceProbabilityInputSchema = z.object({
-  paperText: z.string().describe('The text content of the research paper.'),
+  paperText: z.string().describe('The text content of the research paper (e.g., title and abstract for initial checks).'),
 });
 export type AcceptanceProbabilityInput = z.infer<typeof AcceptanceProbabilityInputSchema>;
 
@@ -35,16 +35,20 @@ export async function acceptanceProbability(input: AcceptanceProbabilityInput): 
 
 const acceptanceProbabilityPrompt = ai.definePrompt({
   name: 'acceptanceProbabilityPrompt',
-  model: 'googleai/gemini-1.5-flash', // Added model specification
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: AcceptanceProbabilityInputSchema},
   output: {schema: AcceptanceProbabilityOutputSchema},
   prompt: `You are an AI assistant that evaluates the acceptance probability of a research paper for publication in a conference or journal.
 
   Assess the paper based on content quality, originality, clarity, structure, and novelty.
-  Provide a probability score between 0 and 1, where 0 indicates a very low chance of acceptance and 1 indicates a very high chance.
-  Also, provide a reasoning for the assigned probability score.
+  A critical part of your assessment is to evaluate the originality and uniqueness of the content. Specifically, you should consider:
+  - **Non-AI Generated Content**: The paper should reflect human authorship. Penalize heavily or assign a very low score if content appears to be primarily AI-generated without significant original contribution or proper disclosure.
+  - **Authorial Uniqueness**: The ideas, data, and presentation should be unique to the submitting authors and not repurposed or copied from other authors' work without proper citation and attribution. This goes beyond simple keyword-based plagiarism checks and into the intellectual contribution.
 
-  Paper Text:
+  Provide a probability score between 0 and 1, where 0 indicates a very low chance of acceptance and 1 indicates a very high chance.
+  Also, provide a detailed reasoning for the assigned probability score, explicitly mentioning your findings on AI-generated content and authorial uniqueness.
+
+  Paper Text (e.g., Title and Abstract):
   {{paperText}}`,
 });
 
@@ -59,3 +63,4 @@ const acceptanceProbabilityFlow = ai.defineFlow(
     return output!;
   }
 );
+
