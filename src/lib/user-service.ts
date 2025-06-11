@@ -125,3 +125,38 @@ export const toggleUserSuspensionStatus = async (targetUserId: string, currentIs
     throw new Error("Failed to update user suspension status.");
   }
 };
+
+export const updateUserRole = async (targetUserId: string, newRole: "Author" | "Reviewer"): Promise<void> => {
+  if (!firestoreDb) {
+    throw new Error("UserService (updateUserRole): Database service unavailable.");
+  }
+  const userDocRef = doc(firestoreDb, "users", targetUserId);
+  
+  const updateData: { role: "Author" | "Reviewer"; isAdmin?: boolean; updatedAt: any } = {
+    role: newRole,
+    updatedAt: serverTimestamp(),
+  };
+
+  // If a user's role is being changed FROM Admin to Author or Reviewer,
+  // their admin status must be explicitly revoked.
+  // This is confirmed by the UI calling this function.
+  const userSnap = await getDoc(userDocRef);
+  if (userSnap.exists()) {
+    const userData = userSnap.data() as User;
+    // Check if the user *was* an Admin and is being changed to a non-Admin role by this action.
+    if (userData.isAdmin && (newRole === "Author" || newRole === "Reviewer")) {
+      updateData.isAdmin = false;
+    }
+  } else {
+    // This case should ideally not be reached if called from the admin page where user exists.
+    console.warn(`UserService (updateUserRole): User with ID ${targetUserId} not found during role update. This might indicate an issue if the user was expected to exist.`);
+    throw new Error("User not found for role update.");
+  }
+
+  try {
+    await updateDoc(userDocRef, updateData);
+  } catch (error: any) {
+    console.error(`UserService (updateUserRole): Error updating role for user ${targetUserId}:`, error.message);
+    throw new Error("Failed to update user role.");
+  }
+};
