@@ -63,7 +63,13 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", uploadPreset);
-  formData.append("resource_type", "auto"); // Explicitly tell Cloudinary to auto-detect resource type
+  
+  // Explicitly set resource_type to 'raw' for non-image/video files like PDF/DOCX
+  if (file.type === "application/pdf" || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    formData.append("resource_type", "raw");
+  } else {
+    formData.append("resource_type", "auto");
+  }
 
   try {
     const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
