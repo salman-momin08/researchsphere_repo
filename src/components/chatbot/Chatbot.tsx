@@ -8,7 +8,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, Send, MessageSquare, Loader2, X } from 'lucide-react';
 import { researchSphereChatbot, ChatbotInput } from '@/ai/flows/chatbot-flow';
-import { generateRobotIcon } from '@/ai/flows/generate-robot-icon-flow';
 import type { ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -31,10 +30,6 @@ export default function Chatbot() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const [robotIconUri, setRobotIconUri] = useState<string | null>(null);
-  const [isLoadingIcon, setIsLoadingIcon] = useState<boolean>(true);
-
-  // Determine if chatbot should be active based on user state
   const isChatbotActive = !user || (user && user.role === 'Author');
 
   useEffect(() => {
@@ -54,29 +49,7 @@ export default function Chatbot() {
     } else {
       setShowInitialGreeting(false);
     }
-  }, [user, isChatbotActive, isOpen]); // Added isOpen as a dependency for greeting, and isChatbotActive for clarity
-
-  useEffect(() => {
-    if (isChatbotActive) {
-      setIsLoadingIcon(true); // Set loading true when we start fetching
-      const fetchIcon = async () => {
-        try {
-          const result = await generateRobotIcon({ prompt: "a friendly, minimalist robot assistant icon for a chatbot button, circular, simple lines, teal and white colors, high contrast" });
-          setRobotIconUri(result.imageDataUri);
-        } catch (error) {
-          console.error("Failed to generate robot icon:", error);
-          // Fallback to default icon handled by rendering logic
-          setRobotIconUri(null); // Ensure fallback if error
-        } finally {
-          setIsLoadingIcon(false);
-        }
-      };
-      fetchIcon();
-    } else {
-      setIsLoadingIcon(false); // Don't load icon if chatbot is not active
-      setRobotIconUri(null); // Ensure no old icon URI persists
-    }
-  }, [user, isChatbotActive]);
+  }, [user, isChatbotActive, isOpen]);
 
   useEffect(() => {
     if (isOpen && scrollAreaRef.current) {
@@ -153,7 +126,6 @@ export default function Chatbot() {
     }
   };
 
-  // Conditionally render the chatbot based on the new logic
   if (!isChatbotActive) {
     return null;
   }
@@ -174,13 +146,7 @@ export default function Chatbot() {
           className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
           aria-label="Open Chatbot"
         >
-          {isLoadingIcon ? (
-            <Loader2 className="h-7 w-7 animate-spin" />
-          ) : robotIconUri ? (
-            <img src={robotIconUri} alt="Chatbot AI Icon" className="h-10 w-10 rounded-full object-cover" />
-          ) : (
-            <Bot className="h-7 w-7" />
-          )}
+          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-10 w-10 rounded-full object-cover" />
         </Button>
       </div>
 
@@ -188,13 +154,7 @@ export default function Chatbot() {
         <DialogContent className="sm:max-w-lg p-0 flex flex-col h-[70vh] overflow-hidden">
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
-              {isLoadingIcon ? (
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              ) : robotIconUri ? (
-                <img src={robotIconUri} alt="Chatbot Icon" className="h-8 w-8 rounded-sm object-cover" />
-              ) : (
-                <Bot className="h-8 w-8 text-primary" />
-              )}
+              <img src="/boticon.jpg" alt="Chatbot Icon" className="h-8 w-8 rounded-sm object-cover" />
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
           </DialogHeader>
@@ -269,4 +229,3 @@ export default function Chatbot() {
     </>
   );
 }
-
