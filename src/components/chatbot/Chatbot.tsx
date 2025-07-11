@@ -143,10 +143,10 @@ export default function Chatbot() {
           onClick={() => setIsOpen(true)}
           variant="default"
           size="icon"
-          className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
+          className="rounded-full w-14 h-14 p-0 shadow-lg hover:scale-110 transition-transform flex items-center justify-center overflow-hidden"
           aria-label="Open Chatbot"
         >
-          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-12 w-12 rounded-full object-cover" />
+          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-14 w-14 object-cover" />
         </Button>
       </div>
 
