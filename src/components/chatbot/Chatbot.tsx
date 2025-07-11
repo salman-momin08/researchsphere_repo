@@ -146,7 +146,7 @@ export default function Chatbot() {
           className="rounded-full w-14 h-14 p-0 shadow-lg hover:scale-110 transition-transform flex items-center justify-center overflow-hidden"
           aria-label="Open Chatbot"
         >
-          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-14 w-14 object-cover" />
+          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="w-12 h-12 rounded-full" />
         </Button>
       </div>
 
