@@ -146,7 +146,7 @@ export default function Chatbot() {
           className="rounded-full w-14 h-14 shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
           aria-label="Open Chatbot"
         >
-          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-10 w-10 rounded-full object-cover" />
+          <img src="/boticon.jpg" alt="Chatbot AI Icon" className="h-12 w-12 rounded-full object-cover" />
         </Button>
       </div>
 
@@ -154,7 +154,7 @@ export default function Chatbot() {
         <DialogContent className="sm:max-w-lg p-0 flex flex-col h-[70vh] overflow-hidden">
           <DialogHeader className="p-4 border-b flex-row items-center justify-between">
             <div className="flex items-center gap-2">
-              <img src="/boticon.jpg" alt="Chatbot Icon" className="h-8 w-8 rounded-sm object-cover" />
+              <img src="/boticon.jpg" alt="Chatbot Icon" className="h-10 w-10 rounded-sm object-cover" />
               <DialogTitle className="text-lg">ResearchSphere Assistant</DialogTitle>
             </div>
           </DialogHeader>

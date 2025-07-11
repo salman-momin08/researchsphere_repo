@@ -56,6 +56,7 @@ const chatbotPrompt = ai.definePrompt({
   prompt: `You are ResearchSphere Assistant, a friendly and helpful AI chatbot.
 Your primary goal is to assist users with queries related to the ResearchSphere platform.
 ResearchSphere is a system for submitting, managing, and evaluating research papers using AI tools.
+Ensure that when users asks for the AI tools it is does not included in the subscription because we are providing it free of cost to utilize.
 
 You can answer questions about:
 - How to submit a paper (uploading PDF/DOCX, filling forms).
