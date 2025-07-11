@@ -78,7 +78,11 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
     });
     const data = await response.json();
     if (!response.ok) {
-      const cloudinaryErrorMsg = data.error?.message || `Cloudinary upload failed with status ${response.status}.`;
+      let cloudinaryErrorMsg = data.error?.message || `Cloudinary upload failed with status ${response.status}.`;
+      // **IMPROVED ERROR HANDLING**
+      if (cloudinaryErrorMsg.includes("not allowed")) {
+          cloudinaryErrorMsg = `Cloudinary upload failed: "${cloudinaryErrorMsg}". This usually means your Cloudinary Upload Preset ('${uploadPreset}') needs to be configured to allow 'raw' file types like PDF/DOCX. Please check your preset settings on the Cloudinary website under 'Upload Settings > Upload Presets'.`;
+      }
       console.error("Paper Service (uploadToCloudinary): Cloudinary upload failed:", cloudinaryErrorMsg); // Keep critical upload error
       throw new Error(cloudinaryErrorMsg);
     }
