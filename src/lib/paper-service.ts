@@ -63,6 +63,7 @@ const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; ori
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", uploadPreset);
+  formData.append("resource_type", "auto"); // Explicitly tell Cloudinary to auto-detect resource type
 
   try {
     const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
@@ -331,4 +332,3 @@ export const deletePaper = async (paperId: string): Promise<void> => {
     throw new Error(`Failed to delete paper: ${error.message}`);
   }
 };
-
